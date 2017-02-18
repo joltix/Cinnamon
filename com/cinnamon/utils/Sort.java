@@ -65,7 +65,7 @@ public abstract class Sort<E>
      *
      * @return Comparison.
      */
-    protected final Comparison<E> getComparison()
+    public final Comparison<E> getComparison()
     {
         return mCmp;
     }
