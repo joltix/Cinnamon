@@ -1,9 +1,15 @@
 package com.cinnamon.demo;
 
-import com.cinnamon.gfx.*;
+import com.cinnamon.gfx.Canvas;
+import com.cinnamon.gfx.ConcurrentSceneBuffer;
+import com.cinnamon.gfx.ImageFactory;
+import com.cinnamon.gfx.ShaderFactory;
 import com.cinnamon.object.BodyFactory;
 import com.cinnamon.object.GObjectFactory;
+import com.cinnamon.system.ControlMap;
+import com.cinnamon.system.EventHub;
 import com.cinnamon.system.Game;
+import com.cinnamon.system.Window;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -63,9 +69,6 @@ public class DemoDriver
 
     public static void main(String[] args)
     {
-        System.setProperty("org.lwjgl.librarypath", "");
-
-
         // Setup game info
         final Map<String, String> props = new HashMap<String, String>();
         props.put(Game.TITLE, TITLE);
@@ -74,18 +77,17 @@ public class DemoDriver
         props.put(Game.VSYNC, VSYNC);
 
         // Setup Window for Canvas drawing
-        final Window window = new Window(WIDTH, HEIGHT, props.get(Game.TITLE));
+        final Window window = new Window(WIDTH, HEIGHT, props.get(Game.TITLE), null);
 
         // Prepare game resource such as factories
         final Game.Resources res = new CustomResources();
 
         // Prepare Canvas for drawing
         final ConcurrentSceneBuffer sceneBuffer = new ConcurrentSceneBuffer();
-        final Canvas canvas;
-        canvas = new DemoCanvas(window, sceneBuffer, res.getShaderFactory());
+        final Canvas canvas = new DemoCanvas(window, sceneBuffer, res.getShaderFactory());
 
         // Begin game
-        new DemoGame(res, canvas, props).start();
+        new DemoGame(res, new CustomServices(), canvas, props).start();
     }
 
     private static class CustomResources extends Game.Resources
@@ -117,6 +119,21 @@ public class DemoDriver
         public BodyFactory getBodyFactory()
         {
             return mBodyFactory;
+        }
+    }
+
+    private static class CustomServices extends Game.Services
+    {
+        @Override
+        public EventHub getEventHub()
+        {
+            return null;
+        }
+
+        @Override
+        public ControlMap getControlMap()
+        {
+            return null;
         }
     }
 }
