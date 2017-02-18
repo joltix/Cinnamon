@@ -14,8 +14,6 @@ import com.cinnamon.utils.Point3F;
  *     ImageComponent that holds drawing information such as color tinting,
  *     transparency value, and {@link Texture} choice.
  * </p>
- *
- *
  */
 public abstract class ImageComponent extends ComponentFactory.Component
         implements Drawable, Positional, Dimensional
@@ -25,7 +23,7 @@ public abstract class ImageComponent extends ComponentFactory.Component
     private static final float COLOR_MAX = 1f;
 
     // Visibility change listener for notifying ImageFactory of draw refresh
-    private OnDrawVisibilityChangeListener mVisibilityListener;
+    private OnDrawVisibilityChangedListener mVisibilityListener;
 
     // Position padding
     private final Point3F mOffset = new Point3F(0, 0, 0);
@@ -101,12 +99,12 @@ public abstract class ImageComponent extends ComponentFactory.Component
     @Override
     public final void moveTo(float x, float y, float z)
     {
+        mPosition.set(x, y, z);
+
         // Notify ImageFactory drawing data may need resorting
         if (z != mPosition.getZ() && mVisibilityListener != null) {
-            mVisibilityListener.onChange();
+            mVisibilityListener.onChange(true);
         }
-
-        mPosition.set(x, y, z);
     }
 
     @Override
@@ -225,14 +223,20 @@ public abstract class ImageComponent extends ComponentFactory.Component
             alpha = COLOR_MIN;
         }
 
-        // Notify ImageFactory to refresh draw order if visibility changed
+        // Figure if crossed boundary from vis to invis or invis to vis
+        boolean visibilityChanged = false;
         if ((mAlpha <= 0 && alpha > 0)
-                || (mAlpha > 0 && alpha <= 0)
-                && mVisibilityListener != null) {
-            mVisibilityListener.onChange();
+                || (mAlpha > 0 && alpha <= 0)) {
+            visibilityChanged = true;
         }
 
+        // Update alpha
         mAlpha = alpha;
+
+        // Notify ImageFactory of visibility change
+        if (visibilityChanged && mVisibilityListener != null) {
+            mVisibilityListener.onChange(mAlpha >= 0);
+        }
     }
 
     /**
@@ -253,23 +257,23 @@ public abstract class ImageComponent extends ComponentFactory.Component
      */
     public final void setVisible(boolean enable)
     {
+        mVisible = enable;
+
         // Notify ImageFactory to update draw order
         if (enable != mVisible && mVisibilityListener != null) {
-            mVisibilityListener.onChange();
+            mVisibilityListener.onChange(false);
         }
-
-        mVisible = enable;
     }
 
     /**
-     * <p>Sets an {@link OnDrawVisibilityChangeListener} to be called whenever
+     * <p>Sets an {@link OnDrawVisibilityChangedListener} to be called whenever
      * either the ImageComponent's transparency reaches 0, visibility is
      * changed with {@link #setVisible(boolean)}, or the depth (z position) is
      * changed.</p>
      *
-     * @param listener OnDrawVisibilityChangeListener.
+     * @param listener OnDrawVisibilityChangedListener.
      */
-    void setOnVisibilityChangeListener(OnDrawVisibilityChangeListener
+    void setOnVisibilityChangeListener(OnDrawVisibilityChangedListener
                                                              listener)
     {
         mVisibilityListener = listener;
