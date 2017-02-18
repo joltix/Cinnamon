@@ -5,6 +5,8 @@ import com.cinnamon.object.Room;
 import com.cinnamon.system.ComponentFactory;
 import com.cinnamon.system.Config;
 import com.cinnamon.system.Game;
+import com.cinnamon.system.OnOrphanChangedListener;
+import com.cinnamon.utils.Comparison;
 import com.cinnamon.utils.Sort;
 
 /**
@@ -24,7 +26,10 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
     public static final String CONFIG_ROOM = "room";
 
     // Listener for ImageComponent visibility changes
-    private final OnDrawVisibilityChangeListener mVisibilityListener;
+    private final OnDrawVisibilityChangedListener mVisibilityListener = new VisibilitySentry();
+
+    // Listener for orphan status - implies visibility change
+    private final OnOrphanChangedListener mOrphanVisibilityListener = new OrphanChangedVisibilitySentry();
 
     // Listener for pending drawing
     private final OnFrameEndListener mFrameEndListener;
@@ -60,9 +65,11 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
         mDrawOrder = new ImageComponent[load];
         mDrawGrowth = growth;
 
-        // Instantiate listener for draw order changes
-        mVisibilityListener = new VisibilitySentry();
         mFrameEndListener = new OnFrameEndListener();
+
+        // Wrap user provided compare with outer layer pushing null and orphaned components to the arr's right
+        final Comparison<ImageComponent> cmp = new ValidityFilter(mDrawSorter.getComparison());
+        mDrawSorter.setComparison(cmp);
     }
 
     @Override
@@ -74,11 +81,13 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
             increaseDrawCapacity(newCap);
         }
 
+        component.setOnOrphanChangedListener(mOrphanVisibilityListener);
+
         // Attach listener for changes to drawing order
         component.setOnVisibilityChangeListener(mVisibilityListener);
 
         // Add new component to be sorted for drawing
-        mDrawOrder[mVisibleCount++] = component;
+        mDrawOrder[mVisibleCount] = component;
         notifyDrawOrderChanged();
     }
 
@@ -127,6 +136,22 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
         return mDrawChanged;
     }
 
+    @Override
+    protected void onRemove(ImageComponent component)
+    {
+        notifyDrawOrderChanged();
+    }
+
+    /**
+     * <p>Gets the number of visible {@link ImageComponent}s. This is the number of ImageComponents to be drawn.</p>
+     *
+     * @return number of visible ImageComponents.
+     */
+    public final int getVisibleCount()
+    {
+        return mVisibleCount;
+    }
+
     /**
      * <p>
      *     {@link Config} for assembling an {@link ImageComponent}.
@@ -134,7 +159,6 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
      */
     public interface ImageConfig extends Config<ImageComponent, ShaderFactory>
     {
-
     }
 
     /**
@@ -172,18 +196,79 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
     /**
      * <p>
      *     Private listener instance for
-     *     {@link OnDrawVisibilityChangeListener}. This class is to be set on
+     *     {@link OnDrawVisibilityChangedListener}. This class is to be set on
      *     each {@link ImageComponent} produced by the {@link ImageFactory} in
      *     order to notify the factory whenever the draw order needs sorting.
      * </p>
      */
-    private class VisibilitySentry implements OnDrawVisibilityChangeListener
+    private class VisibilitySentry implements OnDrawVisibilityChangedListener
     {
         @Override
-        public void onChange()
+        public void onChange(boolean visible)
         {
+            // Update visible count based off of current visibility
+            mVisibleCount = (visible) ? (mVisibleCount - 1) : (mVisibleCount + 1);
+
             // Notify ImageFactory drawing order needs resort
             ImageFactory.this.notifyDrawOrderChanged();
+        }
+    }
+
+    /**
+     * <p>
+     *     Orphan status listener for {@link ImageComponent}s. Disables ImageComponent's drawing and notifies the
+     *     factory of a change in drawing order.
+     * </p>
+     */
+    private class OrphanChangedVisibilitySentry implements OnOrphanChangedListener
+    {
+        @Override
+        public void onOrphanChanged(int id, boolean isOrphan)
+        {
+            // Update visible count based off of current visibility
+            mVisibleCount = (isOrphan) ? (mVisibleCount - 1) : (mVisibleCount + 1);
+
+            // Notify ImageFactory drawing order needs resort
+            notifyDrawOrderChanged();
+        }
+    }
+
+    private class ValidityFilter implements Comparison<ImageComponent>
+    {
+        private final Comparison<ImageComponent> mUserCmp;
+
+        public ValidityFilter(Comparison<ImageComponent> comparison)
+        {
+            mUserCmp = comparison;
+        }
+
+        @Override
+        public int compare(ImageComponent obj0, ImageComponent obj1)
+        {
+            // Null ImageComponents should be on the arr's right side
+            final boolean null0 = obj0 == null;
+            final boolean null1 = obj1 == null;
+            if (null0 && !null1) {
+                return 1;
+            } else if (!null0 && null1) {
+                return -1;
+            } else if (null0 && null1) {
+                return 0;
+            }
+
+            // Orphan ImageComponents should be on the arr's right side
+            final boolean orphan0 = obj0.getGObjectId() == Component.NULL;
+            final boolean orphan1 = obj1.getGObjectId() == Component.NULL;
+            if (orphan0 && !orphan1) {
+                return 1;
+            } else if (!orphan0 && orphan1) {
+                return -1;
+            } else if (orphan0 && orphan1) {
+                return 0;
+            }
+
+            // Defer compare to user's comparison when objs aren't null or orphans
+            return mUserCmp.compare(obj0, obj1);
         }
     }
 }
