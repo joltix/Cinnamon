@@ -1,6 +1,7 @@
 package com.cinnamon.gfx;
 
 import com.cinnamon.system.Game;
+import com.cinnamon.system.Window;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 
