@@ -6,8 +6,6 @@ import com.cinnamon.object.BodyComponent;
 import com.cinnamon.object.GObject;
 import com.cinnamon.object.Room;
 import com.cinnamon.utils.AxisAlignedRect;
-import com.cinnamon.utils.Event;
-import com.cinnamon.utils.MouseEvent;
 import com.cinnamon.utils.Rect2D;
 
 /**
@@ -230,8 +228,8 @@ public class View
         worldY += mBoundary.getY();
 
         // Update event with translated coords
-        final int button = event.getButton();
-        final Event.Action action = event.getAction();
+        final MouseEvent.Button button = event.getButton();
+        final InputEvent.Action action = event.getAction();
         event.update(button, action, worldX, worldY);
     }
 
