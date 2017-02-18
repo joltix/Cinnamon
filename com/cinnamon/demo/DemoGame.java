@@ -1,15 +1,13 @@
 package com.cinnamon.demo;
 
 import com.cinnamon.gfx.Canvas;
+import com.cinnamon.gfx.ImageComponent;
 import com.cinnamon.gfx.Texture;
 import com.cinnamon.object.GObject;
 import com.cinnamon.object.GObjectFactory;
 import com.cinnamon.object.Room;
 import com.cinnamon.object.Room2D;
-import com.cinnamon.system.ControlMap;
-import com.cinnamon.system.Game;
-import com.cinnamon.system.InputMap;
-import com.cinnamon.utils.KeyEvent;
+import com.cinnamon.system.*;
 
 import java.util.Map;
 
@@ -24,53 +22,86 @@ public class DemoGame extends Game
 {
     private GObject mPlayer;
 
-    private ControlMap.Action upAction = new ControlMap.Action<KeyEvent>()
+    private KeyEventHandler upAction = new KeyEventHandler()
     {
         @Override
-        public void execute(KeyEvent keyEvent)
+        public void handle(KeyEvent keyEvent)
         {
             mPlayer.moveTo(mPlayer.getX(), mPlayer.getY() + 10);
         }
     };
 
-    private ControlMap.Action rightAction = new ControlMap.Action<KeyEvent>()
+    private KeyEventHandler rightAction = new KeyEventHandler()
     {
         @Override
-        public void execute(KeyEvent keyEvent)
+        public void handle(KeyEvent keyEvent)
         {
             mPlayer.moveTo(mPlayer.getX() + 10, mPlayer.getY());
         }
     };
 
-    private ControlMap.Action downAction = new ControlMap.Action<KeyEvent>()
+    private KeyEventHandler downAction = new KeyEventHandler()
     {
         @Override
-        public void execute(KeyEvent keyEvent)
+        public void handle(KeyEvent keyEvent)
         {
             mPlayer.moveTo(mPlayer.getX(), mPlayer.getY() - 10);
         }
     };
 
-    private ControlMap.Action leftAction = new ControlMap.Action<KeyEvent>()
+    private KeyEventHandler leftAction = new KeyEventHandler()
     {
         @Override
-        public void execute(KeyEvent keyEvent)
+        public void handle(KeyEvent keyEvent)
         {
             mPlayer.moveTo(mPlayer.getX() - 10, mPlayer.getY());
         }
     };
 
-    public DemoGame(Resources services, Canvas canvas, Map<String,
-            String> properties)
+    /**
+     * <p>Show selected {@link GObject}.</p>
+     */
+    private MouseEventHandler showAction = new MouseEventHandler()
     {
-        super(services, canvas, properties);
-        setTickrate(60);
+        @Override
+        public void handle(MouseEvent event)
+        {
+            final GObject obj = getSelected();
+            if (obj == null) {
+                return;
+            }
 
+            final ImageComponent img = obj.getImageComponent();
+            img.setVisible(true);
+        }
+    };
+
+    /**
+     * <p>Hide selected {@link GObject}.</p>
+     */
+    private MouseEventHandler hideAction = new MouseEventHandler()
+    {
+        @Override
+        public void handle(MouseEvent event)
+        {
+            final GObject obj = getSelected();
+            if (obj == null) {
+                return;
+            }
+
+            final ImageComponent img = obj.getImageComponent();
+            img.setVisible(false);
+        }
+    };
+
+    public DemoGame(Resources resources, Services services, Canvas canvas, Map<String, String> properties)
+    {
+        super(resources, services, canvas, properties);
+        setTickrate(60);
     }
 
     @Override
     protected void onBegin() {
-        System.out.printf(DemoGame.class + "::onBegin()\n");
         final GObjectFactory goFactory = this.getGObjectFactory();
 
         // Create Room
@@ -94,18 +125,20 @@ public class DemoGame extends Game
         character.getImageComponent().setTint(0.1f, 0.8f, 0.1f);
 
         // Hook View position into arrow keys
-        final InputMap input = getInput();
-        input.attachKey(KeyEvent.KEY_UP, upAction);
-        input.attachKey(KeyEvent.KEY_RIGHT, rightAction);
-        input.attachKey(KeyEvent.KEY_DOWN, downAction);
-        input.attachKey(KeyEvent.KEY_LEFT, leftAction);
+        final ControlMap input = getControlMap();
+        input.attach(KeyEvent.Key.KEY_UP, upAction);
+        input.attach(KeyEvent.Key.KEY_RIGHT, rightAction);
+        input.attach(KeyEvent.Key.KEY_DOWN, downAction);
+        input.attach(KeyEvent.Key.KEY_LEFT, leftAction);
+        input.attach(MouseEvent.Button.RIGHT, hideAction);
+        input.attach(MouseEvent.Button.MIDDLE, showAction);
 
         // Keep View from leaving the Room
         getView().setRoomConstrained(true);
     }
 
     @Override
-    protected void update()
+    protected void onUpdate()
     {
         getView().moveToCenter(mPlayer);
     }
