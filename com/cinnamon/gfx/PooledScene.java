@@ -34,7 +34,7 @@ public class PooledScene implements Scene<Batch<Drawable>>
         mDrawableCount++;
 
         // Add the rest of the objects
-        for (int i = 1, sz = factory.size(); i < sz; i++) {
+        for (int i = 1, sz = factory.getVisibleCount(); i < sz; i++) {
 
             // Treat null entry as the arr's end
             final ImageComponent comp = factory.getAtDistance(i);

@@ -1,5 +1,7 @@
 package com.cinnamon.gfx;
 
+import com.cinnamon.system.Window;
+
 /**
  * <p>
  *     {@link Canvas} setup for 2D sprite drawing.

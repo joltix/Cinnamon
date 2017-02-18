@@ -3,8 +3,8 @@ package com.cinnamon.object;
 import com.cinnamon.gfx.ImageComponent;
 import com.cinnamon.gfx.Texture;
 import com.cinnamon.system.ComponentFactory;
+import com.cinnamon.system.MouseEvent;
 import com.cinnamon.utils.Identifiable;
-import com.cinnamon.utils.MouseEvent;
 import com.cinnamon.utils.OnClickListener;
 
 /**

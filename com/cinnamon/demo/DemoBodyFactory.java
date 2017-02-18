@@ -41,6 +41,12 @@ public class DemoBodyFactory extends BodyFactory
     }
 
     @Override
+    protected void onRemove(BodyComponent component)
+    {
+
+    }
+
+    @Override
     protected BodyComponent createComponent()
     {
         return new DemoBodyComponent();

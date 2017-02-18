@@ -203,7 +203,9 @@ public abstract class GObjectFactory
         final GObject obj = get(id, version);
         if (obj != null) {
 
-            // Defer cleanup ops to subclasses
+            obj.setImageComponent(null);
+
+            // Notify subclasses
             onRemove(obj);
 
             // Update GObject version # for next use
