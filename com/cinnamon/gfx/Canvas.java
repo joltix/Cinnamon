@@ -1,6 +1,7 @@
 package com.cinnamon.gfx;
 
 import com.cinnamon.system.Game;
+import com.cinnamon.system.RateLogger;
 import com.cinnamon.system.Window;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -40,11 +41,26 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
     private final Window mWindow;
     private final E mDrawInput;
 
+    // Separate thread for looping independent of main
+    private Thread mThread;
+
+    // Loop rate measurement
+    private RateLogger mRateLogger;
+
     // ShaderProgram storage
     private final T mShaderFactory;
 
     // Projection matrix
     private float[] mProjectionMat;
+
+    // OpenGL version
+    private String mGLVersion;
+
+    // GPU vendor
+    private String mGPUVendor;
+
+    // GPU model
+    private String mGPUModel;
 
     /**
      * <p>Constructor for a Canvas.</p>
@@ -60,7 +76,27 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
         mShaderFactory = shaders;
     }
 
-    public abstract void start();
+    /**
+     * <p>Initializes OpenGL, loads resources, and begins drawing on a separate thread.</p>
+     *
+     * @param rateSamples number of samples to measure before averaging framerate.
+     */
+    public final void start(int rateSamples)
+    {
+        mRateLogger = new RateLogger(rateSamples);
+
+        // Launch drawing on another Thread
+        mThread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                loop();
+            }
+        });
+
+        mThread.start();
+    }
 
     /**
      * <p>Begins the drawing loop. This method blocks.</p>
@@ -78,8 +114,14 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
         mWindow.setVsyncEnabled(mWindow.isVsyncEnabled());
         GL.createCapabilities();
 
+        mGLVersion = GL11.glGetString(GL11.GL_VERSION);
+        mGPUVendor = GL11.glGetString(GL11.GL_VENDOR);
+        mGPUModel = GL11.glGetString(GL11.GL_RENDERER);
+
         // Notify subclasses that GL resources can load
         onLoad();
+
+        mRateLogger.start();
 
         while (!mWindow.isClosing()) {
 
@@ -88,14 +130,14 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
 
             // Display frame
             mWindow.swapBuffers();
+            mRateLogger.log();
         }
     }
 
     /**
      * <p>Allows one-time rendering setup operations before drawing. This method
      * will be called after OpenGL has been initialized and related functions
-     * may be used. Subclasses must call this method before beginning the
-     * looping process.</p>
+     * may be used.</p>
      */
     protected abstract void onLoad();
 
@@ -283,6 +325,46 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
         if (err != GL11.GL_NO_ERROR) {
             throw new RuntimeException("OpenGL error code: " + err);
         }
+    }
+
+    /**
+     * <p>Gets a {@link String} describing the OpenGL version in use.</p>
+     *
+     * @return OpenGL version.
+     */
+    public final String getGLVersion()
+    {
+        return mGLVersion;
+    }
+
+    /**
+     * <p>Gets a {@link String} describing the vendor ofthe gpu used with OpenGL</p>
+     *
+     * @return gpu vendor.
+     */
+    public final String getGPUVendor()
+    {
+        return mGPUVendor;
+    }
+
+    /**
+     * <p>Gets a {@link String} describing the model of the gpu used with OpenGL.</p>
+     *
+     * @return gpu model.
+     */
+    public final String getGPUModel()
+    {
+        return mGPUModel;
+    }
+
+    /**
+     * <p>Gets the most recently measured framerate.</p>
+     *
+     * @return framerate.
+     */
+    public final int getCurrentFramerate()
+    {
+        return mRateLogger.getRate();
     }
 
     /**
