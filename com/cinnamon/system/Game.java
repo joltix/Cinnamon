@@ -49,15 +49,47 @@ public abstract class Game
      */
     public static final String VSYNC = "vsync";
 
+    /**
+     * <p>Target tickrate for updates per second.</p>
+     */
+    public static final String TICKRATE = "tickrate";
+
+    /**
+     * <p>Number of seconds before an average per second tickrate is measured.</p>
+     */
+    public static final String RATE_SAMPLES = "rate_samples";
+
+    /**
+     * <p>Toggle for enabling debug actions through console input.</p>
+     */
+    public static final String DEBUG_MODE = "debug_mode";
+
     // Conversion constant # of nanosec in 1 sec
     private static final long NS_PER_SEC = 1000000000L;
 
-    // Tick rate if not set
+    // Tickrate if not set
     private static final int DEFAULT_TICKRATE = 60;
 
+    // Tickrate sample size if not set (5 samples == 5 second measurement intervals)
+    private static final int DEFAULT_TICKRATE_SAMPLES = 5;
+
     // Frame rate and frame duration
-    private int mTickRate = DEFAULT_TICKRATE;
-    private long mTickSize = NS_PER_SEC / DEFAULT_TICKRATE;
+    private int mTickRate;
+    private long mTickSize;
+
+    /**
+     * Debug tools
+     */
+
+    // Measures game loop
+    private final RateLogger mRateLogger;
+
+    // Performs debug commands from console input
+    private DebugCtrl mDCtrl;
+
+    /**
+     * Current game area
+     */
 
     // Visible area on screen
     private final View mView;
@@ -65,7 +97,7 @@ public abstract class Game
     // Current game room
     private Room mRoom;
 
-    // Currently selected GObject (id/version)
+    // Currently selected GObject (id-version)
     private int mSelectedId = -1;
     private int mSelectedVersion = -1;
 
@@ -125,6 +157,19 @@ public abstract class Game
         // Defensive copy in case given Resources instantiates new Object with each method call
         mResDir = copy(resources);
 
+        // Compute tick details
+        mTickRate = getIntegerProperty(TICKRATE, DEFAULT_TICKRATE);
+        mTickSize = NS_PER_SEC / mTickRate;
+
+        // Create logger for measuring real tickrate
+        mRateLogger = new RateLogger(getIntegerProperty(RATE_SAMPLES, DEFAULT_TICKRATE_SAMPLES));
+
+        // Only instantiate debug if debug mode was requested
+        if (getBooleanProperty(DEBUG_MODE, false)) {
+            mDCtrl = new DebugCtrl(this);
+        }
+
+        // Pull user submitted Services
         final EventHub hub = services.getEventHub();
         final ControlMap ctrl = services.getControlMap();
 
@@ -256,10 +301,10 @@ public abstract class Game
     {
         // Set vsync from property
         final Window window = mCanvas.getWindow();
-        window.setVsyncEnabled(getVsyncProperty());
+        window.setVsyncEnabled(getBooleanProperty(VSYNC, true));
 
         // Launch rendering thread
-        mCanvas.start();
+        mCanvas.start(mRateLogger.getSampleSize());
 
         // Block till gfx resources are ready
         while (!getShaderFactory().isLoaded()) {
@@ -272,15 +317,48 @@ public abstract class Game
     }
 
     /**
-     * <p>Reads the set properties and returns true if a request for
-     * enabling vsync is found.</p>
+     * <p>Reads the set properties and returns a true or false if the given property name is associated with
+     * {@link #PROPERTY_ENABLE} or {@link #PROPERTY_DISABLE}, respectively. If the property is not found, this method
+     * returns the given default value.</p>
      *
-     * @return true if vsync was requested.
+     * @param name property name.
+     * @param defaultValue in case property was not found or was incorrectly formatted.
+     * @return value.
      */
-    private boolean getVsyncProperty()
+    private boolean getBooleanProperty(String name, boolean defaultValue)
     {
-        final String val = getProperty(VSYNC);
-        return (val != null && val.equals(PROPERTY_ENABLE));
+        final String val = mProperties.get(name);
+        if (val == null) {
+            return defaultValue;
+        }
+
+        return val.equals(PROPERTY_ENABLE) || !(val.equals(PROPERTY_DISABLE));
+    }
+
+    /**
+     * <p>Reads the set properties and returns an int associated with the given property name. If the property is
+     * not found, this method returns the given default value.</p>
+     *
+     * @param name property name.
+     * @param defaultValue in case property was not found or was incorrectly formatted.
+     * @return value.
+     */
+    private int getIntegerProperty(String name, int defaultValue)
+    {
+        final String val = mProperties.get(name);
+        if (val == null) {
+            return defaultValue;
+        }
+
+        // Try to convert value to int
+        int num = defaultValue;
+        try {
+            num = Integer.valueOf(val);
+        } catch (NumberFormatException e) {
+            e.printStackTrace();
+        }
+
+        return num;
     }
 
     /**
@@ -326,10 +404,17 @@ public abstract class Game
         // Notify game shutting down
         onEnd();
 
+        if (mDCtrl != null) {
+            mDCtrl.stop();
+        }
+
         // Close Window and release resources
         final Window window = getCanvas().getWindow();
         window.close();
         window.cleanup();
+
+        // Ensure any leftover blocking Threads are shutdown
+        System.exit(0);
     }
 
     /**
@@ -365,6 +450,8 @@ public abstract class Game
         long timeLastStart = System.nanoTime();
         long frameDuration = 0;
 
+        mRateLogger.start();
+
         // Begin game loop
         while (mContinue && !window.isClosing()) {
 
@@ -379,6 +466,11 @@ public abstract class Game
                 // Poll for GLFW events
                 window.pollEvents();
 
+                // Process debug mode actions if available
+                if (mDCtrl != null) {
+                    mDCtrl.debug();
+                }
+
                 // Process input
                 onUpdateBegin();
 
@@ -386,6 +478,7 @@ public abstract class Game
                 onUpdate();
 
                 frameDuration -= tickSize;
+                mRateLogger.log();
             }
 
             // Send drawing data
@@ -410,26 +503,26 @@ public abstract class Game
     }
 
     /**
-     * <p>Sets the number of ticks per second.</p>
-     *
-     * @param ticksPerSecond tick rate.
-     */
-    protected final void setTickrate(int ticksPerSecond)
-    {
-        mTickRate = ticksPerSecond;
-        mTickSize = NS_PER_SEC / ticksPerSecond;
-    }
-
-    /**
      * <p>Gets the desired duration of a game tick in nanoseconds.</p>
      *
-     * <p>This method is dependent on the rate given to {@link #setTickrate(int)}.</p>
+     * <p>This method is dependent on the tickrate submitted as a property in
+     * {@link #Game(Resources, Services, Canvas, Map)} using the name {@link #TICKRATE}.</p>
      *
      * @return desired nanosecond duration.
      */
     public final long getTickSize()
     {
         return mTickSize;
+    }
+
+    /**
+     * <p>Gets the most recently measured tickrate.</p>
+     *
+     * @return tickrate.
+     */
+    final int getCurrentTickrate()
+    {
+        return mRateLogger.getRate();
     }
 
     /**
@@ -490,6 +583,34 @@ public abstract class Game
         }
 
         return getGObjectFactory().get(mSelectedId, mSelectedVersion);
+    }
+
+    /**
+     * <p>Sets the selection to a specific {@link GObject} that matches a given id-version pair.</p>
+     *
+     * @param id id.
+     * @param version version.
+     */
+    protected final void setSelected(int id, int version)
+    {
+        mSelectedId = id;
+        mSelectedVersion = version;
+    }
+
+    /**
+     * <p>Sets the selection to a specific {@link GObject}.</p>
+     *
+     * @param object GObject to select, or null to reset selection.
+     */
+    protected final void setSelected(GObject object)
+    {
+        // Reset selection to invalid id-version if given null
+        if (object == null) {
+            setSelected(-1, -1);
+        } else {
+            // Assign GObject's id-version to selection
+            setSelected(object.getId(), object.getVersion());
+        }
     }
 
     /**
@@ -701,14 +822,14 @@ public abstract class Game
                 final ImageComponent rend = imgFactory.getAtDistance(i);
 
                 // Get BodyComponent for containment testing
-                final int id = rend.getGObjectId();
-                final int version = rend.getGObjectVersion();
-                final GObject obj = objFactory.get(id, version);
 
-                // Skip abandoned component (owning GObject is gone)
-                if (obj == null) {
+                // Skip orphaned Components
+                if (rend.isOrphan()) {
                     continue;
                 }
+
+                // Get owning GObject
+                final GObject obj = objFactory.get(rend.getGObjectId(), rend.getGObjectVersion());
 
                 // Can't test for containment without BodyComponent
                 final BodyComponent body = obj.getBodyComponent();
@@ -717,17 +838,20 @@ public abstract class Game
                 }
 
                 // Only select if mouse was in bounding box and body allows
-                if (body.contains(mouseEvent.getX(), mouseEvent.getY()) &&
-                        body.isSelectable()) {
+                if (body.contains(mouseEvent.getX(), mouseEvent.getY()) && body.isSelectable()) {
 
                     // Save new selected obj's id/version for reference
-                    mSelectedId = obj.getId();
-                    mSelectedVersion = obj.getVersion();
+                    Game.this.setSelected(obj.getId(), obj.getVersion());
 
-                    // Stop mouse event broadcast if consumed
-                    if (obj.click(mouseEvent)) {
-                        return;
-                    }
+                    // Allow GObject to handle click operations
+                    obj.click(mouseEvent);
+
+                    // First hit is implied user's desired target
+                    return;
+
+                } else {
+                    // No hit so set selection to nothing
+                    Game.this.setSelected(null);
                 }
             }
         }
