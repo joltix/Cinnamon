@@ -97,7 +97,6 @@ public class DemoGame extends Game
     public DemoGame(Resources resources, Services services, Canvas canvas, Map<String, String> properties)
     {
         super(resources, services, canvas, properties);
-        setTickrate(60);
     }
 
     @Override
