@@ -343,6 +343,16 @@ public abstract class ComponentFactory<E extends ComponentFactory.Component, U>
         }
 
         /**
+         * <p>Checks whether or not the Component has orphan status (i.e. has no owning {@link GObject}).</p>
+         *
+         * @return true if Component has been orphaned.
+         */
+        public final boolean isOrphan()
+        {
+            return mOwnerId == NULL && mOwnerVersion == NULL;
+        }
+
+        /**
          * <p>Sets an {@link OnOrphanChangedListener} to be notified of orphan status changes.</p>
          *
          * @param listener OnOrphanChangedListener.
