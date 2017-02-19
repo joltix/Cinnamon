@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * <p>
- *     Non-blocking access to console input.
+ *     Access to console input without blocking the main thread.
  * </p>
  *
  * <p>
