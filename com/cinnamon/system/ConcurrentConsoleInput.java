@@ -189,18 +189,17 @@ public abstract class ConcurrentConsoleInput<E>
             // Print if valid
             if (input != null) {
 
+                // Create appropriate msg based off input
+                final E msgOut = createMessage(input);
+
+                // Enqueue msg to expose to other Threads
+                if (msgOut != null) {
+                    mMessages.add(msgOut);
+                }
+
                 // Check if user requested Thread stop
                 if (isStopRequest(input)) {
                     stop();
-                } else {
-
-                    // Create appropriate msg based off input
-                    final E msgOut = createMessage(input);
-
-                    // Enqueue msg to expose to other Threads
-                    if (msgOut != null) {
-                        mMessages.add(msgOut);
-                    }
                 }
             }
         }
