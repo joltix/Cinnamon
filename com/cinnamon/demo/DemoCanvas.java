@@ -23,9 +23,6 @@ public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
     // Max number of instances in a Batch to allocate memory for
     private static final int INSTANCING_CAPACITY = 2000;
 
-    // Thread for running Canvas
-    private Thread mThread;
-
     // ShaderProgram for everything to draw
     private ShaderProgram mColorShader;
     private ShaderProgram mTextureShader;
@@ -40,22 +37,6 @@ public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
                       ShaderFactory shaders)
     {
         super(window, input, shaders);
-    }
-
-    @Override
-    public void start()
-    {
-        // Launch drawing on another Thread
-        mThread = new Thread(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                loop();
-            }
-        });
-
-        mThread.start();
     }
 
     @Override
