@@ -6,8 +6,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * <p>
- *     Thread-safe non-blocking access to console input. Subclasses should, at the very minimum, override
- *     {@link #createMessage(String)} to create messages based off of console input.
+ *     Non-blocking access to console input.
  * </p>
  *
  * <p>
