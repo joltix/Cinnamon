@@ -71,9 +71,9 @@ public class IndexList<E>
         final E obj = mObjs[index];
         mObjs[index] = null;
 
-        // Set index aside for reuse
+        // Set index aside for reuse and update size
         mIndexPool.add(index);
-
+        mSize--;
         return obj;
     }
 

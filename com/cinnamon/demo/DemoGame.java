@@ -97,7 +97,6 @@ public class DemoGame extends Game
     public DemoGame(Resources resources, Services services, Canvas canvas, Map<String, String> properties)
     {
         super(resources, services, canvas, properties);
-        setTickrate(60);
     }
 
     @Override
@@ -112,12 +111,12 @@ public class DemoGame extends Game
         this.setRoom(room);
 
         // Create player
-        mPlayer = goFactory.getGObject("character");
+        mPlayer = goFactory.getGObject("char");
         mPlayer.moveTo(300, 300);
         mPlayer.getImageComponent().setTint(0.8f, 1f, 1f);
 
         // Create untextured character
-        final GObject character = goFactory.getGObject("character");
+        final GObject character = goFactory.getGObject("char");
         character.moveTo(200, 200);
         character.getImageComponent().setTexture(Texture.NULL);
         character.getImageComponent().setHeight(100f);

@@ -7,6 +7,8 @@ import com.cinnamon.utils.IndexList;
 import com.cinnamon.utils.PooledQueue;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * <p>
@@ -280,6 +282,16 @@ public abstract class GObjectFactory
     public final void addConfiguration(String name, GObjectConfig config)
     {
         mConfigs.put(name, config);
+    }
+
+    /**
+     * <p>Gets a {@link Set} of all {@link GObjectConfig} names.</p>
+     *
+     * @return all GObjectConfig names.
+     */
+    public final Set<String> getConfigNames()
+    {
+        return mConfigs.keySet();
     }
 
     /**

@@ -162,7 +162,7 @@ public final class DefaultInput extends Window.Input
             final InputEvent.Action actionMapped = InputEvent.systemActionToAction(action);
 
             if (keyMapped == null) {
-                throw new IllegalStateException("Key couldn't be mapped: " + keyMapped);
+                throw new IllegalStateException("Unsupported keyboard key: " + key);
             }
 
             // Create KeyEvent and set aside for game thread polling

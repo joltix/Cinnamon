@@ -66,6 +66,9 @@ public class DemoDriver
     private static final String DEVELOPER = "Christian Ramos";
     private static final String VERSION = "0.01a";
     private static final String VSYNC = Game.PROPERTY_ENABLE;
+    private static final String TICKRATE = "60";
+    private static final String TICK_SAMPLES = "10";
+    private static final String DEBUG = Game.PROPERTY_ENABLE;
 
     public static void main(String[] args)
     {
@@ -75,6 +78,9 @@ public class DemoDriver
         props.put(Game.DEVELOPER, DEVELOPER);
         props.put(Game.VERSION, VERSION);
         props.put(Game.VSYNC, VSYNC);
+        props.put(Game.DEBUG_MODE, DEBUG);
+        props.put(Game.TICKRATE, TICKRATE);
+        props.put(Game.RATE_SAMPLES, TICK_SAMPLES);
 
         // Setup Window for Canvas drawing
         final Window window = new Window(WIDTH, HEIGHT, props.get(Game.TITLE), null);

@@ -25,7 +25,10 @@ public class DemoGObjectFactory extends GObjectFactory
     @Override
     protected void onLoad(Game.Resources directory)
     {
-        addConfiguration("character", new CharacterConfig());
+        addConfiguration("char", new CharacterConfig());
+        addConfiguration("red_char", new RedCharacterConfig());
+        addConfiguration("green_char", new GreenCharacterConfig());
+        addConfiguration("blue_char", new BlueCharacterConfig());
         addConfiguration(GObjectFactory.CONFIG_ROOM, new RoomConfig());
     }
 
@@ -54,6 +57,48 @@ public class DemoGObjectFactory extends GObjectFactory
         {
             final ImageFactory imgFact = resource.getImageFactory();
             final ImageComponent img = imgFact.getComponent("character");
+            object.setImageComponent(img);
+            object.setBodyComponent(new DemoBodyComponent(new Shape
+                    (Shape.Type.RECTANGLE, 100, 100)));
+        }
+    }
+
+    private class RedCharacterConfig implements GObjectConfig
+    {
+        @Override
+        public void configure(GObject object, Game.Resources resource)
+        {
+            final ImageFactory imgFact = resource.getImageFactory();
+            final ImageComponent img = imgFact.getComponent("character");
+            img.setTint(1f, 0f, 0f);
+            object.setImageComponent(img);
+            object.setBodyComponent(new DemoBodyComponent(new Shape
+                    (Shape.Type.RECTANGLE, 100, 100)));
+        }
+    }
+
+    private class GreenCharacterConfig implements GObjectConfig
+    {
+        @Override
+        public void configure(GObject object, Game.Resources resource)
+        {
+            final ImageFactory imgFact = resource.getImageFactory();
+            final ImageComponent img = imgFact.getComponent("character");
+            img.setTint(0f, 1f, 0f);
+            object.setImageComponent(img);
+            object.setBodyComponent(new DemoBodyComponent(new Shape
+                    (Shape.Type.RECTANGLE, 100, 100)));
+        }
+    }
+
+    private class BlueCharacterConfig implements GObjectConfig
+    {
+        @Override
+        public void configure(GObject object, Game.Resources resource)
+        {
+            final ImageFactory imgFact = resource.getImageFactory();
+            final ImageComponent img = imgFact.getComponent("character");
+            img.setTint(0f, 0f, 1f);
             object.setImageComponent(img);
             object.setBodyComponent(new DemoBodyComponent(new Shape
                     (Shape.Type.RECTANGLE, 100, 100)));
