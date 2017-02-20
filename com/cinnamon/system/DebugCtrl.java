@@ -37,8 +37,7 @@ public final class DebugCtrl
      * The following query commands retrieve and print information to the console.
      */
 
-    // Shuts down the game
-    private static final String SHUTDOWN = "shutdown";
+    private static final String HELP = "help";
 
     // Print the update per second (or tickrate)
     private static final String GET_TICKRATE = "get ups";
@@ -92,6 +91,9 @@ public final class DebugCtrl
     // Calls view.setRoomConstrained(boolean);
     private static final String SET_VIEW_CONSTRAINT = "constrain view";
 
+    // Shuts down the game
+    private static final String SHUTDOWN = "shutdown";
+
     // Threaded console input
     private final ConcurrentConsoleInput<String> mConsole = new DebugConsole();
 
@@ -124,13 +126,48 @@ public final class DebugCtrl
         }
 
         final String message = mConsole.poll();
-        if (isQuery(message)) {
+
+        if (message.equals(HELP)) {
+            // Print supported commands
+            printManual();
+        } else if (isQuery(message)) {
             // Fetch and print desired info if query
             printInfo(message);
         } else {
             // Execute operations if not query
             act(message);
         }
+    }
+
+    /**
+     * <p>Prints a list of supported commands.</p>
+     */
+    private void printManual()
+    {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<supported commands>\n");
+        builder.append(GET_TICKRATE).append(" - gets the tickrate\n");
+        builder.append(GET_FRAMERATE).append(" - gets the framerate\n");
+        builder.append(GET_META).append(" - gets the game title, developer, and build\n");
+        builder.append(GET_GL_VERSION).append(" - gets the OpenGL version\n");
+        builder.append(GET_GPU).append(" - gets the gpu's vendor and model\n");
+        builder.append(GET_PROCESSORS).append(" - gets the number of processors\n");
+        builder.append(GET_MEMORY).append(" - gets current memory stats\n");
+        builder.append(GET_RESOLUTION).append(" - gets drawing resolution\n");
+        builder.append(GET_GOBJECT_CONFIGS).append(" - lists available object configurations\n");
+        builder.append(GET_GOBJECT_COUNT).append(" - counts number of objects\n");
+        builder.append(GET_SELECTED).append(" - gets info on selected object\n");
+        builder.append(GET_ROOM).append(" - gets info on current Room\n");
+        builder.append(GET_VIEW).append(" - gets info on View\n");
+        builder.append(CREATE_GOBJ).append(" - creates an object and centers on View. Example: ").append(CREATE_GOBJ)
+                .append(" <configuration>\n");
+        builder.append(DESTROY_SELECTED).append(" - destroys selected object\n");
+        builder.append(SET_VIEW_CONSTRAINT).append(" - toggles locking View from leaving Room. Example: ").append
+                (SET_VIEW_CONSTRAINT).append(" <true|false>\n");
+        builder.append(SHUTDOWN).append(" - ends the game\n");
+        builder.append(DebugConsole.STOP_CMD).append(" - stops receiving console input");
+
+        System.out.printf("%s\n", format(builder.toString()));
     }
 
     /**
@@ -534,11 +571,12 @@ public final class DebugCtrl
     private class DebugConsole extends ConcurrentConsoleInput<String>
     {
         // Stop command shuts down console input when entered
-        private static final String STOP_CMD = "stop debug";
+        static final String STOP_CMD = "stop debug";
 
         // Intro text provides stop command and game shutdown reminder
         private static final String INTRO_MSG = "[Debug console enabled. To stop debug mode, enter \"" + STOP_CMD +
-                "\". To stop the game, enter \"" + SHUTDOWN + "\"]";
+                "\". To stop the game, enter \"" + SHUTDOWN + "\". For a list of supported commands, enter\"" + HELP +
+        "\"]";
 
         // Closing text to notify console will stop acting on input
         private static final String OUTRO_MSG = "[Debug console now disabled]";
