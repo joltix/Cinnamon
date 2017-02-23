@@ -60,6 +60,13 @@ public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
     }
 
     @Override
+    protected void onResize()
+    {
+        // Update GLBuffer's projection matrix since resolution changed
+        mBuffer.setProjection(getProjection());
+    }
+
+    @Override
     protected void draw(ConcurrentSceneBuffer input, ShaderFactory factory)
     {
         // Fill window background with color
