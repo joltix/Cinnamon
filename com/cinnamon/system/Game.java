@@ -18,14 +18,12 @@ import java.util.Map;
 public abstract class Game
 {
     /**
-     * <p>Constant value for enabling a property whose expected value is a
-     * toggle.</p>
+     * <p>Constant value for enabling a property whose expected value is a toggle.</p>
      */
     public static final String PROPERTY_ENABLE = "enable";
 
     /**
-     * <p>Constant value for disabling a property whose expected value is a
-     * toggle.</p>
+     * <p>Constant value for disabling a property whose expected value is a toggle.</p>
      */
     public static final String PROPERTY_DISABLE = "disable";
 
@@ -179,11 +177,13 @@ public abstract class Game
         // Use given ControlMap or use default if none provided
         mControlMap = (ctrl == null) ? new DefaultControlMap() : ctrl;
 
-        // Get Window.Input for generating InputEvents
-        mWinInput = mCanvas.getWindow().getInput();
+        // Create default Window.Input if none was set
+        final Window window = mCanvas.getWindow();
+        mWinInput = (window.getInput() == null) ? new DefaultInput(window) : window.getInput();
+        window.setInput(mWinInput);
 
         // Create fullscreen View
-        mView = new View(mCanvas);
+        mView = new View(window);
 
         mOnFrameEndListener = getImageFactory().newOnFrameEndListener();
     }
@@ -249,7 +249,9 @@ public abstract class Game
     }
 
     /**
-     * <p>Copies the Objects returned by the methods declared in {@link Resources} to a new instance of Resources.</p>
+     * <p>Copies the Objects returned by the methods declared in {@link Resources} to a new instance of Resources.
+     * This protects against cases where the given Resources does not instantiate a new resource with each call
+     * to its getter methods.</p>
      *
      * @param resources Resources.
      * @return new Resources.
@@ -258,7 +260,6 @@ public abstract class Game
     {
         return new Resources()
         {
-
             private final ShaderFactory mShaderFactory = resources.getShaderFactory();
             private final GObjectFactory mGObjectFactory = resources.getGObjectFactory();
             private final BodyFactory mBodyFactory = resources.getBodyFactory();
@@ -293,9 +294,8 @@ public abstract class Game
     /**
      * <p>Calls on the Game to begin.</p>
      *
-     * <p>This method blocks until {@link ShaderFactory} has finished
-     * loading its resources (e.g. textures and shaders) and
-     * {@link ShaderFactory#isLoaded()} returns true.</p>
+     * <p>This method blocks until {@link ShaderFactory} has finished loading its resources (e.g. textures and
+     * shaders) and {@link ShaderFactory#isLoaded()} returns true.</p>
      */
     public final void start()
     {
@@ -381,8 +381,7 @@ public abstract class Game
     }
 
     /**
-     * <p>Launches the game's window and signals the beginning of both
-     * drawing and game state operations./p>
+     * <p>Launches the game's window and signals the beginning of both drawing and game state operations./p>
      */
     protected final void run()
     {
@@ -392,8 +391,16 @@ public abstract class Game
         // Install GObject configs
         getGObjectFactory().load();
 
-        // Open the window
-        getCanvas().getWindow().show();
+        // Attach a listener for Window sizing changes then open
+        final Window window = mCanvas.getWindow();
+        window.setOnResizeListener(new OnResizeListener(){
+            @Override
+            public void onResize(float oldWidth, float oldHeight, float width, float height)
+            {
+                mView.setSize(width, height);
+            }
+        });
+        window.show();
 
         // Notify loop beginning
         onBegin();
@@ -404,16 +411,22 @@ public abstract class Game
         // Notify game shutting down
         onEnd();
 
+        // Request the debug thread stop if was created
         if (mDCtrl != null) {
             mDCtrl.stop();
         }
 
-        // Close Window and release resources
-        final Window window = getCanvas().getWindow();
+        // Request Window close and notify Canvas of closing
         window.close();
-        window.cleanup();
 
-        // Ensure any leftover blocking Threads are shutdown
+        // Wait for guarantee Canvas won't use GL ops anymore
+        while (!mCanvas.hasStopped()) {
+        }
+
+        // Release GLFW and GL resources
+        window.destroy();
+
+        // Ensure any leftover blocking Threads (like debug) won't keep program alive
         System.exit(0);
     }
 

@@ -16,7 +16,7 @@ public final class KeyEvent extends InputEvent
     /**
      * <p>Number of supported keyboard keys.</p>
      */
-    public static final int SUPPORTED_KEYS = 75;
+    public static final int SUPPORTED_KEYS = 79;
 
     /**
      * <p>
@@ -50,7 +50,7 @@ public final class KeyEvent extends InputEvent
         KEY_PERIOD,
         KEY_FORWARD_SLASH,
 
-        // Auxiliary constants (16)
+        // Auxiliary constants (20)
         KEY_ESCAPE,
         KEY_ENTER,
         KEY_SPACE,
@@ -67,6 +67,10 @@ public final class KeyEvent extends InputEvent
         KEY_DOWN,
         KEY_LEFT,
         KEY_UP,
+        KEY_LEFT_SUPER,
+        KEY_RIGHT_SUPER,
+        KEY_PAGE_UP,
+        KEY_PAGE_DOWN,
 
         // Function constants (12)
         KEY_F1,
@@ -294,6 +298,15 @@ public final class KeyEvent extends InputEvent
                 return KEY_LEFT;
             case GLFW.GLFW_KEY_UP:
                 return KEY_UP;
+
+            case GLFW.GLFW_KEY_LEFT_SUPER:
+                return KEY_LEFT_SUPER;
+            case GLFW.GLFW_KEY_RIGHT_SUPER:
+                return KEY_RIGHT_SUPER;
+            case GLFW.GLFW_KEY_PAGE_UP:
+                return KEY_PAGE_UP;
+            case GLFW.GLFW_KEY_PAGE_DOWN:
+                return KEY_PAGE_DOWN;
             default: return null;
         }
     }
@@ -484,7 +497,7 @@ public final class KeyEvent extends InputEvent
     {
         switch (key) {
             case KEY_ESCAPE:
-                return "esc";
+                return "escape";
             case KEY_ENTER:
                 return "enter";
             case KEY_SPACE:
@@ -494,7 +507,7 @@ public final class KeyEvent extends InputEvent
             case KEY_TAB:
                 return "tab";
             case KEY_CAPS_LOCK:
-                return "capslock";
+                return "caps_lock";
             case KEY_LEFT_CTRL:
                 return "left_ctrl";
             case KEY_LEFT_SHIFT:
@@ -515,6 +528,14 @@ public final class KeyEvent extends InputEvent
                 return "left";
             case KEY_UP:
                 return "up";
+            case KEY_LEFT_SUPER:
+                return "left_super";
+            case KEY_RIGHT_SUPER:
+                return "right_super";
+            case KEY_PAGE_UP:
+                return "page up";
+            case KEY_PAGE_DOWN:
+                return "page down";
             default: return null;
         }
     }

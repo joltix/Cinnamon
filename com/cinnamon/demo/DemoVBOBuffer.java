@@ -25,7 +25,7 @@ public final class DemoVBOBuffer extends GLBuffer
     private static final int SIZE_COLOR = 4;
     private static final int SIZE_MAT4 = 4 * 4;
 
-    private final float[] mProjection;
+    private float[] mProjection;
     private final int[] mConstantIndices;
 
     // Vertex array object
@@ -325,5 +325,11 @@ public final class DemoVBOBuffer extends GLBuffer
             mSelProjections = mProjections;
             mSelTranslations = mTranslations;
         }
+    }
+
+    @Override
+    public void setProjection(float[] matrix)
+    {
+        mProjection = matrix.clone();
     }
 }

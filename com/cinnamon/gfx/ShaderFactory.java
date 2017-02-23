@@ -271,7 +271,7 @@ public abstract class ShaderFactory
         {
             // Delete shader obj ids
             for (final ShaderObject shader : mNameMap.values()) {
-                mNameMap.get(shader.getName()).delete();
+                shader.delete();
             }
 
             // Clear lookup map

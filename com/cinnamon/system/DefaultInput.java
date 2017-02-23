@@ -1,7 +1,10 @@
 package com.cinnamon.system;
 
 import com.cinnamon.utils.PooledQueue;
-import org.lwjgl.glfw.*;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWKeyCallback;
+import org.lwjgl.glfw.GLFWMouseButtonCallback;
+import org.lwjgl.glfw.GLFWScrollCallback;
 
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -119,7 +122,7 @@ public final class DefaultInput extends Window.Input
     @Override
     void bind()
     {
-        final long windowId = this.getWindowId();
+        final long windowId = this.getId();
 
         // Attach input hooks to GLFW's window
         GLFW.glfwSetKeyCallback(windowId, new KeyboardHook());
@@ -130,7 +133,7 @@ public final class DefaultInput extends Window.Input
     @Override
     void unbind()
     {
-        final long windowId = this.getWindowId();
+        final long windowId = this.getId();
 
         // Detach input hooks
         GLFW.glfwSetKeyCallback(windowId, null);
@@ -186,7 +189,7 @@ public final class DefaultInput extends Window.Input
             }
 
             // Update mouse location
-            GLFW.glfwGetCursorPos(getWindowId(), mMouseX, mMouseY);
+            GLFW.glfwGetCursorPos(getId(), mMouseX, mMouseY);
             final float x = (float) mMouseX[0];
             final float y = (float) mMouseY[0];
 
@@ -214,7 +217,7 @@ public final class DefaultInput extends Window.Input
         @Override
         public void invoke(long window, double xoffset, double yoffset) {
             // Query mouse position on scroll
-            GLFW.glfwGetCursorPos(getWindowId(), mMouseX, mMouseY);
+            GLFW.glfwGetCursorPos(getId(), mMouseX, mMouseY);
             final float x = (float) mMouseX[0];
             final float y = (float) mMouseY[0];
 
