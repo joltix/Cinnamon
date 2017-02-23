@@ -1,6 +1,7 @@
 package com.cinnamon.gfx;
 
 import com.cinnamon.system.Game;
+import com.cinnamon.system.OnResizeListener;
 import com.cinnamon.system.RateLogger;
 import com.cinnamon.system.Window;
 import org.lwjgl.opengl.GL;
@@ -17,8 +18,7 @@ import org.lwjgl.opengl.GL11;
  *
  *
  */
-public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
-        ShaderFactory>
+public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFactory>
 {
     // Identity matrix
     private static final float[] IDENTITY = new float[] {1, 0, 0, 0,
@@ -27,10 +27,7 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
                                                          0, 0, 0, 1};
 
     // Translation matrix
-    private final float[] TRANSLATION = new float[]{1, 0, 0, 0,
-                                                    0, 1, 0, 0,
-                                                    0, 0, 1, 0,
-                                                    0, 0, 0, 1};
+    private final float[] TRANSLATION = IDENTITY.clone();
 
     // OpenGL uses column-major ordering so XYZ is at mat bottom
     private static final int TRANSLATION_X = 12;
@@ -62,6 +59,16 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
     // GPU model
     private String mGPUModel;
 
+    // Framebuffer size saved since last notified resize
+    private int mWidth;
+    private int mHeight;
+
+    // Whether or not the framebuffer has resized (changed the drawing area)
+    private volatile boolean mHasResized = false;
+
+    // Whether or not the Canvas has stopped drawing ops
+    private volatile boolean mStopped = false;
+
     /**
      * <p>Constructor for a Canvas.</p>
      *
@@ -72,7 +79,6 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
     {
         mWindow = window;
         mDrawInput = input;
-
         mShaderFactory = shaders;
     }
 
@@ -84,6 +90,17 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
     public final void start(int rateSamples)
     {
         mRateLogger = new RateLogger(rateSamples);
+
+        // Create a new projection matrix each time the Window size changes
+        mWindow.setOnFramebufferResizeListener(new OnResizeListener()
+        {
+            @Override
+            public void onResize(float oldWidth, float oldHeight, float width, float height)
+            {
+                // Defer viewport resize and related ops to Canvas' looping to allow GL access on other thread
+                mHasResized = true;
+            }
+        });
 
         // Launch drawing on another Thread
         mThread = new Thread(new Runnable()
@@ -109,9 +126,6 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
         // Enable OpenGL for current thread
         mWindow.selectThreadGL();
 
-        // Reapply vsync desire
-        // (must be called after selectThreadGL for effect)
-        mWindow.setVsyncEnabled(mWindow.isVsyncEnabled());
         GL.createCapabilities();
 
         mGLVersion = GL11.glGetString(GL11.GL_VERSION);
@@ -125,6 +139,20 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
 
         while (!mWindow.isClosing()) {
 
+            if (mHasResized) {
+                // Update framebuffer size
+                mWidth = mWindow.getFramebufferWidth();
+                mHeight = mWindow.getFramebufferHeight();
+
+                // Create new projection matrix from new size and match GL area
+                mProjectionMat = createProjectionMatrix();
+                GL11.glViewport(0, 0, getWidth(), getHeight());
+
+                // Notify subclasses
+                onResize();
+                mHasResized = false;
+            }
+
             // Defer drawing to subclasses
             draw(mDrawInput, mShaderFactory);
 
@@ -132,6 +160,11 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
             mWindow.swapBuffers();
             mRateLogger.log();
         }
+
+        // Cleanup shaders and textures
+        mShaderFactory.clear();
+
+        mStopped = true;
     }
 
     /**
@@ -243,7 +276,7 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
      */
     public final int getWidth()
     {
-        return mWindow.getWidth();
+        return mWidth;
     }
 
     /**
@@ -253,7 +286,7 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
      */
     public final int getHeight()
     {
-        return mWindow.getHeight();
+        return mHeight;
     }
 
     /**
@@ -275,16 +308,24 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
      */
     protected final float[] getProjection()
     {
+        // Create on first call and store
         if (mProjectionMat == null) {
             mProjectionMat = createProjectionMatrix();
         }
 
-        // In case implementor returns null
+        // In case subclass returns null from createProjectionMatrix()
         if (mProjectionMat == null) {
             return IDENTITY.clone();
         }
+
         return mProjectionMat.clone();
     }
+
+    /**
+     * <p>This method is called when the Canvas' drawing area has been resized. Calling {@link #getProjection()} wil
+     * return a new projection matrix updated for the new dimensions.</p>
+     */
+    protected abstract void onResize();
 
     /**
      * <p>Gets the {@link SceneBuffer} used to make drawing data available.</p>
@@ -365,6 +406,18 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends
     public final int getCurrentFramerate()
     {
         return mRateLogger.getRate();
+    }
+
+    /**
+     * <p>Checks whether or not the Canvas has stopped drawing operations.</p>
+     *
+     * <p>If this method returns true, no more GL operations will be performed from the Canvas' thread.</p>
+     *
+     * @return true if no more GL methods will be called.
+     */
+    public final boolean hasStopped()
+    {
+        return mStopped;
     }
 
     /**
