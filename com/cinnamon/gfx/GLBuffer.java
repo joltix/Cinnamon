@@ -42,6 +42,13 @@ public abstract class GLBuffer
     public abstract void setInstancing(boolean enable);
 
     /**
+     * <p>Sets the projection matrix to use when drawing.</p>
+     *
+     * @param matrix projection matrix.
+     */
+    public abstract void setProjection(float[] matrix);
+
+    /**
      * <p>Enables a vertex attribute array at the specified location index
      * set up for a 4x4 matrix.</p>
      *
