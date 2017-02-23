@@ -15,53 +15,70 @@ import java.util.Map;
  * <p>
  *     Demo {@link Game}.
  * </p>
- *
- *
  */
 public class DemoGame extends Game
 {
-    private GObject mPlayer;
-
-    private KeyEventHandler upAction = new KeyEventHandler()
+    private KeyEventHandler mCloseAction = new KeyEventHandler()
     {
         @Override
-        public void handle(KeyEvent keyEvent)
+        public void handle(KeyEvent event)
         {
-            mPlayer.moveTo(mPlayer.getX(), mPlayer.getY() + 10);
+            DemoGame.this.stop();
         }
     };
 
-    private KeyEventHandler rightAction = new KeyEventHandler()
+    private KeyEventHandler mUpAction = new KeyEventHandler()
     {
         @Override
         public void handle(KeyEvent keyEvent)
         {
-            mPlayer.moveTo(mPlayer.getX() + 10, mPlayer.getY());
+            final GObject obj = getSelected();
+            if (obj != null) {
+                obj.moveTo(obj.getX(), obj.getY() + 10);
+            }
         }
     };
 
-    private KeyEventHandler downAction = new KeyEventHandler()
+    private KeyEventHandler mRightAction = new KeyEventHandler()
     {
         @Override
         public void handle(KeyEvent keyEvent)
         {
-            mPlayer.moveTo(mPlayer.getX(), mPlayer.getY() - 10);
+            final GObject obj = getSelected();
+            if (obj != null) {
+                obj.moveTo(obj.getX() + 10, obj.getY());
+            }
         }
     };
 
-    private KeyEventHandler leftAction = new KeyEventHandler()
+    private KeyEventHandler mDownAction = new KeyEventHandler()
     {
         @Override
         public void handle(KeyEvent keyEvent)
         {
-            mPlayer.moveTo(mPlayer.getX() - 10, mPlayer.getY());
+            final GObject obj = getSelected();
+            if (obj != null) {
+                obj.moveTo(obj.getX(), obj.getY() - 10);
+            }
+        }
+    };
+
+    private KeyEventHandler mLeftAction = new KeyEventHandler()
+    {
+        @Override
+        public void handle(KeyEvent keyEvent)
+        {
+            final GObject obj = getSelected();
+            if (obj != null) {
+                obj.moveTo(obj.getX() - 10, obj.getY());
+            }
         }
     };
 
     /**
      * <p>Show selected {@link GObject}.</p>
      */
-    private MouseEventHandler showAction = new MouseEventHandler()
+    private MouseEventHandler mShowAction = new MouseEventHandler()
     {
         @Override
         public void handle(MouseEvent event)
@@ -79,7 +96,7 @@ public class DemoGame extends Game
     /**
      * <p>Hide selected {@link GObject}.</p>
      */
-    private MouseEventHandler hideAction = new MouseEventHandler()
+    private MouseEventHandler mHideAction = new MouseEventHandler()
     {
         @Override
         public void handle(MouseEvent event)
@@ -111,9 +128,10 @@ public class DemoGame extends Game
         this.setRoom(room);
 
         // Create player
-        mPlayer = goFactory.getGObject("char");
-        mPlayer.moveTo(300, 300);
-        mPlayer.getImageComponent().setTint(0.8f, 1f, 1f);
+        final GObject obj = goFactory.getGObject("char");
+        obj.moveTo(300, 300);
+        obj.getImageComponent().setTint(0.8f, 1f, 1f);
+        this.setSelected(obj);
 
         // Create untextured character
         final GObject character = goFactory.getGObject("char");
@@ -125,12 +143,17 @@ public class DemoGame extends Game
 
         // Hook View position into arrow keys
         final ControlMap input = getControlMap();
-        input.attach(KeyEvent.Key.KEY_UP, upAction);
-        input.attach(KeyEvent.Key.KEY_RIGHT, rightAction);
-        input.attach(KeyEvent.Key.KEY_DOWN, downAction);
-        input.attach(KeyEvent.Key.KEY_LEFT, leftAction);
-        input.attach(MouseEvent.Button.RIGHT, hideAction);
-        input.attach(MouseEvent.Button.MIDDLE, showAction);
+        input.attach(KeyEvent.Key.KEY_UP, mUpAction);
+        input.attach(KeyEvent.Key.KEY_RIGHT, mRightAction);
+        input.attach(KeyEvent.Key.KEY_DOWN, mDownAction);
+        input.attach(KeyEvent.Key.KEY_LEFT, mLeftAction);
+
+        // Allow game shutdown from ESC key
+        input.attach(KeyEvent.Key.KEY_ESCAPE, mCloseAction);
+
+        // Hide and show selected object
+        input.attach(MouseEvent.Button.RIGHT, mHideAction);
+        input.attach(MouseEvent.Button.MIDDLE, mShowAction);
 
         // Keep View from leaving the Room
         getView().setRoomConstrained(true);
@@ -139,12 +162,17 @@ public class DemoGame extends Game
     @Override
     protected void onUpdate()
     {
-        getView().moveToCenter(mPlayer);
+        final GObject obj = getSelected();
+        if (obj != null) {
+            getView().moveToCenter(obj);
+        }
     }
 
     @Override
     protected void onEnd()
     {
         getGObjectFactory().clear();
+        getBodyFactory().clear();
+        getImageFactory().clear();
     }
 }
