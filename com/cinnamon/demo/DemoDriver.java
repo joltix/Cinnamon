@@ -109,7 +109,7 @@ public class DemoDriver
         final boolean debugEnabled = props.get(Game.DEBUG_MODE).equals(Game.PROPERTY_ENABLE);
 
         // Setup Window for Canvas drawing
-        final Window window = new Window(resolution[0], resolution[1], props.get(Game.TITLE), null, debugEnabled);
+        final Window window = new Window(resolution[0], resolution[1], props.get(Game.TITLE), debugEnabled);
 
         // Prepare game resource such as factories
         final Game.Resources res = new CustomResources();
