@@ -1,26 +1,48 @@
 package com.cinnamon.system;
 
+import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.*;
 import org.lwjgl.system.MemoryUtil;
 
+import java.nio.IntBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * <p>
- *     Wrapper class for the GLFW windowing library.
+ *     Represents an application window wrapping the GLFW windowing library.
+ * </p>
+ *
+ * <p>
+ *     While a Window's maximum resolution is bounded by the primary display's maximum resolution, the Window's
+ *     minimum is set at {@link #MINIMUM_WIDTH} x {@link #MINIMUM_HEIGHT}. If the desired width or height is
+ *     smaller than either bounds, the Window will execute in fullscreen. There are no aspect ratio
+ *     controls and all width-height pairings in between the minimum and maximum dimensions are permitted.
  * </p>
  */
 public class Window
 {
-    // Callback for Window closing
-    private OnEndListener mOnEndListener;
+    /**
+     * <p>Minimum supported Window width.</p>
+     */
+    public static final int MINIMUM_WIDTH = 640;
+
+    /**
+     * <p>Minimum supported Window height.</p>
+     */
+    public static final int MINIMUM_HEIGHT = 480;
+
+    // Listener for Window size changes
+    private OnResizeListener mOnResizeListener;
 
     // Generates Events from user input
     private Input mInput;
 
     // Window handle
-    private long mWinId;
+    private final long mId;
 
     // Window title bar
-    private String mWinTitle;
+    private final String mWinTitle;
 
     // Whether or not the Window is open
     private boolean mOpen = false;
@@ -29,55 +51,79 @@ public class Window
     private int mWidth;
     private int mHeight;
 
+    // Framebuffer size in pixels
+    private final AtomicInteger mFBWidth = new AtomicInteger();
+    private final AtomicInteger mFBHeight = new AtomicInteger();
+
     // Primary monitor dimensions
     private int mPrimaryWidth;
     private int mPrimaryHeight;
 
     // Whether or not vsync is desired
-    private boolean mVsync = false;
+    private boolean mVsync = true;
 
     /**
      * <p>Constructor for a Window.</p>
      *
+     * <p>Although the Window can be set as resizable, this is only a request. In some cases, such as the requested
+     * resolution being higher than the display can support or lower than {@link #MINIMUM_WIDTH} x
+     * {@link #MINIMUM_HEIGHT}, the Window will not be resizable.</p>
+     *
+     * <p>This constructor should only be called on the main thread.</p>
+     *
      * @param width width.
      * @param height height.
      * @param title title bar text.
-     * @param input Input to generate {@link InputEvent}s.
+     * @param resizable whether or not to allow resizing.
      * @throws IllegalStateException if the windowing toolkit failed to
      * load.
      */
-    public Window(int width, int height, String title, Input input)
+    public Window(int width, int height, String title, boolean resizable)
     {
-        mWidth = width;
-        mHeight = height;
-        mWinTitle = title;
-
         // Prep windowing toolkit and OpenGL
         if (!GLFW.glfwInit()) {
             throw new IllegalStateException("GLFW initialization failed");
         }
 
-        // Fix dimensions and hide window
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_FALSE);
+        // Apply resizability and hide window
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, (resizable) ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
 
-        // Read primary monitor size and set title
+        // Read main display size
         getPrimaryResolution();
-        if (title != null) {
-            mWinTitle = title;
-        }
+
+        // Apply title
+        mWinTitle = (title == null) ? "" : title;
 
         // Build (hidden) window
         setResolution(width, height);
-        createWindow();
+        mId = createWindow();
 
-        // Instantiate default Input if none given
-        mInput = (input == null) ? mInput = new DefaultInput(this) : input;
-        mInput.bind();
+        // Center if windowed
+        attemptToCenter();
+
+        // Set callback to update stored size when resizing
+        GLFW.glfwSetWindowSizeCallback(mId, new SizeUpdateCallback());
+
+        // Read framebuffer size
+        final IntBuffer frameWidth = BufferUtils.createIntBuffer(1);
+        final IntBuffer frameHeight = BufferUtils.createIntBuffer(1);
+        GLFW.glfwGetFramebufferSize(mId, frameWidth, frameHeight);
+        frameWidth.clear();
+        frameHeight.clear();
+
+        // Store dimensions for later
+        mFBWidth.set(frameWidth.get(0));
+        mFBHeight.set(frameHeight.get(0));
+
+        // Set min-max supported sizes when resizing
+        GLFW.glfwSetWindowSizeLimits(mId, MINIMUM_WIDTH, MINIMUM_HEIGHT, mPrimaryWidth, mPrimaryHeight);
     }
 
     /**
      * <p>Queries GLFW for the user's primary monitor dimensions.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
      */
     private void getPrimaryResolution()
     {
@@ -87,22 +133,30 @@ public class Window
     }
 
     /**
-     * <p>Sets the Window's resolution. If either specified dimension is invalid (i.e. less than 1 or greater than
-     * the primary monitor's full resolution) then the Window's will go fullscreen.</p>
+     * <p>Sets the Window's resolution. If the desired resolution is more than the display is capable of or smaller
+     * than the minimum supported resolution, the Window will be set to fullscreen. If either of these cases occur,
+     * the Window's ability to resize will be disabled regardless of the argument passed in the constructor.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
      *
      * @param width width.
      * @param height height.
      */
     private void setResolution(int width, int height)
     {
-        // Default to fullscreen on invalid resolution
-        if (width < 1 || width > mPrimaryWidth
-        || height < 1 || height > mPrimaryHeight) {
+        // Check if desired dimensions are allowed
+        final boolean tooBig = width > mPrimaryWidth && height > mPrimaryHeight;
+        final boolean tooSmall = width < MINIMUM_WIDTH && height < MINIMUM_HEIGHT;
+
+        // Default to fullscreen if larger than monitor's capability or smaller than min support
+        if (tooBig || tooSmall) {
             mWidth = mPrimaryWidth;
             mHeight = mPrimaryHeight;
 
-        } else {
+            // Turn off resizable regardless of constructor's args since fullscreen
+            GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_FALSE);
 
+        } else {
             // Assign desired resolution
             mWidth = width;
             mHeight = height;
@@ -110,80 +164,105 @@ public class Window
     }
 
     /**
-     * <p>Generates GLFW's Window.</p>
+     * <p>Generates GLFW's window and assigns it an id.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @throws IllegalStateException if GLFW failed to create a window.
      */
-    private void createWindow()
+    private long createWindow()
     {
         // Set monitor to apply fullscreen too
-        long fillMonitorId = MemoryUtil.NULL;
-        if (isFullscreen()) fillMonitorId = GLFW.glfwGetPrimaryMonitor();
+        final long fillMonitorId = (isFullscreen()) ? GLFW.glfwGetPrimaryMonitor() : MemoryUtil.NULL;
 
         // Initialize window
-        mWinId = GLFW.glfwCreateWindow(mWidth, mHeight, mWinTitle, fillMonitorId,
-                MemoryUtil.NULL);
+        final long id = GLFW.glfwCreateWindow(mWidth, mHeight, mWinTitle, fillMonitorId, MemoryUtil.NULL);
 
-        if (mWinId == MemoryUtil.NULL) {
-            throw new IllegalStateException("GameWindow failed to load");
+        if (id == MemoryUtil.NULL) {
+            throw new IllegalStateException("Window failed to load");
         }
 
-        // Center if windowed
-        attemptToCenter();
+        return id;
     }
 
     /**
-     * <pTries to centers the Window onscreen if it's not fullscreen.</p>
+     * <p>Tries to centers the Window onscreen if it's not fullscreen.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
      */
     private void attemptToCenter()
     {
-        if (!isFullscreen()) {
-            int centerX = (mPrimaryWidth / 2) - (mWidth / 2);
-            int centerY = (mPrimaryHeight / 2) - (mHeight / 2);
-            GLFW.glfwSetWindowPos(mWinId, centerX, centerY);
+        // Nothing to center when fullscreen
+        if (isFullscreen()) {
+            return;
         }
+
+        // Compute main display's center and apply
+        int centerX = (mPrimaryWidth / 2) - (mWidth / 2);
+        int centerY = (mPrimaryHeight / 2) - (mHeight / 2);
+        GLFW.glfwSetWindowPos(mId, centerX, centerY);
     }
 
     /**
      * <p>Shows the Window and begins processing input {@link Event}s.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @throws IllegalStateException if no {@link Input} has yet been set.
      */
     public final void show()
     {
-        // Create default Input if none was set
         if (mInput == null) {
-            mInput = new DefaultInput(this);
+            throw new IllegalStateException("A Window.Input must be set before the Window is shown");
         }
 
-        GLFW.glfwShowWindow(mWinId);
+        GLFW.glfwShowWindow(mId);
         mOpen = true;
+
+        setVsyncEnabled(mVsync);
     }
 
     /**
      * <p>Attempts to close the Window.</p>
+     *
+     * <p>This method should be called before {@link #destroy()} and only from the main thread.</p>
      */
-    public void close()
+    public final void close()
     {
         mOpen = false;
-        GLFW.glfwSetWindowShouldClose(mWinId, true);
+        GLFW.glfwSetWindowShouldClose(mId, true);
+
+        // Remove GLFW callbacks
+        mInput.unbind();
     }
 
-    public void cleanup()
+    /**
+     * <p>Makes the calling thread's context current and releases the window's resources.</p>
+     *
+     * <p>This method should only be called after {@link #close()} and only from the main thread.</p>
+     */
+    public final void destroy()
     {
-        try {
-            // Remove GLFW callbacks
-            mInput.unbind();
-
-            GLFW.glfwDestroyWindow(mWinId);
-        } finally {
-            GLFW.glfwTerminate();
-        }
+        selectThreadGL();
+        GLFW.glfwDestroyWindow(mId);
+        GLFW.glfwTerminate();
     }
 
-    public void pollEvents()
+    /**
+     * <p>Processes windowing events and should be called continously to trigger the window's callbacks and update
+     * its state. This method wraps {@link GLFW#glfwPollEvents()}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     */
+    public final void pollEvents()
     {
         GLFW.glfwPollEvents();
     }
 
     /**
-     * <p>Gets the Window's width.</p>
+     * <p>Gets the Window's width in screen coordinates.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
      *
      * @return width.
      */
@@ -193,7 +272,9 @@ public class Window
     }
 
     /**
-     * <p>Gets the Window's height.</p>
+     * <p>Gets the Window's height in screen coordinates.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
      *
      * @return height.
      */
@@ -203,7 +284,39 @@ public class Window
     }
 
     /**
+     * <p>Gets the width of the Window's drawable area in pixels.</p>
+     *
+     * <p>On some systems, this method will return a value different than {@link #getWidth()}. This method should be
+     * used when dealing specifically with pixels. For screen coordinates, see getWidth().</p>
+     *
+     * <p>This method can safely be called from any thread.</p>
+     *
+     * @return width in pixels.
+     */
+    public final int getWidthInPixels()
+    {
+        return mFBWidth.get();
+    }
+
+    /**
+     * <p>Gets the height of the Window's drawable area in pixels.</p>
+     *
+     * <p>On some systems, this method will return a value different than {@link #getHeight()}. This method should
+     * be used when dealing specifically with pixels. For screen coordinates, see getHeight().</p>
+     *
+     * <p>This method can safely be called from any thread.</p>
+     *
+     * @return height in pixels.
+     */
+    public final int getHeightInPixels()
+    {
+        return mFBHeight.get();
+    }
+
+    /**
      * <p>Checks whether or not the Window is fullscreen.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
      *
      * @return true if the dimensions match the primary monitor's.
      */
@@ -213,31 +326,27 @@ public class Window
     }
 
     /**
-     * <p>Sets the calling thread to enable OpenGL operations.</p>
+     * <p>Sets the calling thread as responsible for GL operations for the Window and enables use of GL methods.</p>
      */
     public final void selectThreadGL()
     {
-        GLFW.glfwMakeContextCurrent(mWinId);
+        GLFW.glfwMakeContextCurrent(mId);
+
+        // Reapply vsync desire
+        // (must be called after selectThreadGL for effect)
+        setVsyncEnabled(mVsync);
     }
 
     /**
      * <p>Checks whether or not the Window is closing.</p>
      *
+     * <p>This method can safely be called from any thread.</p>
+     *
      * @return true if the Window is closing.
      */
     public final boolean isClosing()
     {
-        return GLFW.glfwWindowShouldClose(mWinId);
-    }
-
-    /**
-     * <p>Sets a listener to be called when the Window is closed.</p>
-     *
-     * @param listener callback.
-     */
-    public final void setOnEndListener(OnEndListener listener)
-    {
-        mOnEndListener = listener;
+        return GLFW.glfwWindowShouldClose(mId);
     }
 
     /**
@@ -260,27 +369,34 @@ public class Window
         mVsync = enable;
 
         // Apply vsync setting
-        GLFW.glfwSwapInterval((mVsync) ? 1 : 0);
+        GLFW.glfwSwapInterval((enable) ? 1 : 0);
     }
 
+    /**
+     * <p>Swaps the front and back frames to display the next image.</p>
+     *
+     * <p>This method should only be called from a thread who holds the Window's context through
+     * {@link #selectThreadGL()}.</p>
+     */
     public final void swapBuffers()
     {
-        GLFW.glfwSwapBuffers(mWinId);
+        GLFW.glfwSwapBuffers(mId);
     }
 
     /**
-     * <p>Gets the Window's handle.</p>
+     * <p>Gets the Window's id.</p>
      *
-     * @return Window handle.
+     * <p>This method can safely be called from any thread.</p>
+     *
+     * @return Window id.
      */
-    public final long getId()
+    private long getId()
     {
-        return mWinId;
+        return mId;
     }
 
     /**
-     * <p>Gets the {@link Input} associated with the Window for {@link Event}
-     * polling.</p>
+     * <p>Gets the {@link Input} associated with the Window for {@link Event} polling.</p>
      *
      * @return Input.
      */
@@ -292,18 +408,72 @@ public class Window
     /**
      * <p>Sets the {@link Input} to use for generating {@link InputEvent}s.</p>
      *
-     * @param input
+     * @param input Input.
      * @throws IllegalStateException if this method is called after {@link #show()}.
      */
     public final void setInput(Input input)
     {
         // Don't allow swapping Input
         if (mOpen) {
-            throw new IllegalStateException("Input may no longer be set after Window has been opened");
+            throw new IllegalStateException("Input may no longer be set after Window has been shown");
         }
 
         mInput = input;
+        mInput.bind();
     }
+
+    /**
+     * <p>Sets an {@link OnResizeListener} to be notified of changes to the {@link Window's framebuffer size. These
+     * dimensions typically change when the Window's dimensions are changed.</p>
+     *
+     * <p>This method should only be called on the main thread.
+     *
+     * @param listener OnResizeListener.
+     */
+    public void setOnFrameBufferResizeListener(OnResizeListener listener)
+    {
+        mOnResizeListener = listener;
+
+        // Notify listener of resize
+        if (mOnResizeListener == null) {
+            // Remove any previously set resize callback
+            GLFW.glfwSetWindowSizeCallback(mId, null);
+
+        } else {
+            GLFW.glfwSetFramebufferSizeCallback(mId, new GLFWFramebufferSizeCallbackI()
+            {
+                @Override
+                public void invoke(long window, int width, int height)
+                {
+                    final float oldW = mFBWidth.get();
+                    final float oldH = mFBHeight.get();
+
+                    // Update dimens in px
+                    mFBWidth.set(width);
+                    mFBHeight.set(height);
+
+                    // Notify listener of size change
+                    listener.onResize(oldW, oldH, width, height);
+                }
+            });
+        }
+    }
+
+    /**
+     * <p>
+     *     Callback for updating {@link Window}'s stored dimensions according to changes in GLFW's window size.
+     * </p>
+     */
+    private class SizeUpdateCallback implements GLFWWindowSizeCallbackI
+    {
+        @Override
+        public void invoke(long window, int width, int height)
+        {
+            Window.this.mWidth = width;
+            Window.this.mHeight = height;
+        }
+    }
+
 
     /**
      * <p>
@@ -320,7 +490,7 @@ public class Window
     public static abstract class Input
     {
         // Host Window's id
-        private long mWinId;
+        private long mId;
 
         /**
          * <p>Constructs an Input to gather input data from a given {@link Window}.</p>
@@ -329,12 +499,12 @@ public class Window
          */
         protected Input(Window window)
         {
-            mWinId = window.getId();
+            mId = window.getId();
         }
 
         /**
          * <p>Retrieves the oldest stored {@link InputEvent}s and places them in a {@link ControlMap} for user
-         * control bindings and an {@link DefaultEventHub} for propagation.</p>
+         * control bindings and an {@link EventHub} for propagation.</p>
          *
          * @param controls user control bindings.
          * @param hub {@link Event} propagator.
@@ -342,14 +512,16 @@ public class Window
         abstract void poll(ControlMap controls, EventHub hub);
 
         /**
-         * <p>Attaches all input handling to the Window and begins processing user input into {@link InputEvent}s.</p>
+         * <p>Attaches all input handling to the Window and begins translating user input into {@link InputEvent}s.</p>
          */
         abstract void bind();
 
         /**
-         * <p>Unbinds all input handling from the Window. After this method is called, Input will no longer
-         * receive user input to process and calling {@link #poll(ControlMap, EventHub)} will no longer produce
+         * <p>Unbinds all input handling from the Window. After this method is called, the set {@link Input} will no
+         * longer receive user input to process and calling {@link #poll(ControlMap, EventHub)} will no longer produce
          * {@link InputEvent}s.</p>
+         *
+         * <p>This method should be used when ending operations.</p>
          */
         abstract void unbind();
 
@@ -358,9 +530,9 @@ public class Window
          *
          * @return window id.
          */
-        protected final long getWindowId()
+        protected final long getId()
         {
-            return mWinId;
+            return mId;
         }
     }
 }
