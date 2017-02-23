@@ -1,11 +1,13 @@
 package com.cinnamon.system;
 
 import org.lwjgl.BufferUtils;
-import org.lwjgl.glfw.*;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWFramebufferSizeCallbackI;
+import org.lwjgl.glfw.GLFWVidMode;
+import org.lwjgl.glfw.GLFWWindowSizeCallbackI;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.IntBuffer;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -32,8 +34,11 @@ public class Window
      */
     public static final int MINIMUM_HEIGHT = 480;
 
-    // Listener for Window size changes
+    // Listener for screen coordinate-based size changes
     private OnResizeListener mOnResizeListener;
+
+    // Listener for framebuffer changes
+    private OnResizeListener mOnFramebufferResizeListener;
 
     // Generates Events from user input
     private Input mInput;
@@ -293,7 +298,7 @@ public class Window
      *
      * @return width in pixels.
      */
-    public final int getWidthInPixels()
+    public final int getFramebufferWidth()
     {
         return mFBWidth.get();
     }
@@ -308,7 +313,7 @@ public class Window
      *
      * @return height in pixels.
      */
-    public final int getHeightInPixels()
+    public final int getFramebufferHeight()
     {
         return mFBHeight.get();
     }
@@ -423,21 +428,38 @@ public class Window
     }
 
     /**
-     * <p>Sets an {@link OnResizeListener} to be notified of changes to the {@link Window's framebuffer size. These
-     * dimensions typically change when the Window's dimensions are changed.</p>
+     * <p>Sets an {@link OnResizeListener} to be notified of changes to the Window's screen size. These
+     * dimensions are measured in screen coordinates. For dealing with pixel-based methods such as GL, see {@link
+     * #setOnFramebufferResizeListener(OnResizeListener)}.</p>
      *
-     * <p>This method should only be called on the main thread.
+     * <p>This method should only be called on the main thread.</p>
      *
      * @param listener OnResizeListener.
      */
-    public void setOnFrameBufferResizeListener(OnResizeListener listener)
+    public void setOnResizeListener(OnResizeListener listener)
     {
         mOnResizeListener = listener;
+    }
+
+    /**
+     * <p>Sets an {@link OnResizeListener} to be notified of changes to the Window's framebuffer size. These
+     * dimensions typically change when the Window's dimensions are changed.</p>
+     *
+     * <p>For dealing in screen coordinates such as {@link MouseEvent}s, see
+     * {@link #setOnResizeListener(OnResizeListener)}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener OnResizeListener.
+     */
+    public void setOnFramebufferResizeListener(OnResizeListener listener)
+    {
+        mOnFramebufferResizeListener = listener;
 
         // Notify listener of resize
-        if (mOnResizeListener == null) {
+        if (mOnFramebufferResizeListener == null) {
             // Remove any previously set resize callback
-            GLFW.glfwSetWindowSizeCallback(mId, null);
+            GLFW.glfwSetFramebufferSizeCallback(mId, null);
 
         } else {
             GLFW.glfwSetFramebufferSizeCallback(mId, new GLFWFramebufferSizeCallbackI()
@@ -469,8 +491,17 @@ public class Window
         @Override
         public void invoke(long window, int width, int height)
         {
+            final float oldW = Window.this.mWidth;
+            final float oldH = Window.this.mHeight;
+
+            // Update size
             Window.this.mWidth = width;
             Window.this.mHeight = height;
+
+            // Notify any set listener
+            if (mOnResizeListener != null) {
+                mOnResizeListener.onResize(oldW, oldH, width, height);
+            }
         }
     }
 
