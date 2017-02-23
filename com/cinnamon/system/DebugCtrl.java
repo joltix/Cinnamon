@@ -575,7 +575,7 @@ public final class DebugCtrl
 
         // Intro text provides stop command and game shutdown reminder
         private static final String INTRO_MSG = "[Debug console enabled. To stop debug mode, enter \"" + STOP_CMD +
-                "\". To stop the game, enter \"" + SHUTDOWN + "\". For a list of supported commands, enter\"" + HELP +
+                "\". To stop the game, enter \"" + SHUTDOWN + "\". For a list of supported commands, enter \"" + HELP +
         "\"]";
 
         // Closing text to notify console will stop acting on input
