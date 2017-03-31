@@ -1,5 +1,6 @@
 package com.cinnamon.system;
 
+import com.cinnamon.utils.Point2F;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWFramebufferSizeCallbackI;
@@ -8,6 +9,8 @@ import org.lwjgl.glfw.GLFWWindowSizeCallbackI;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -38,7 +41,7 @@ public class Window
     private OnResizeListener mOnResizeListener;
 
     // Listener for framebuffer changes
-    private OnResizeListener mOnFramebufferResizeListener;
+    private final List<OnResizeListener> mOnFramebufferResizeListeners = new ArrayList<OnResizeListener>();
 
     // Generates Events from user input
     private Input mInput;
@@ -337,8 +340,7 @@ public class Window
     {
         GLFW.glfwMakeContextCurrent(mId);
 
-        // Reapply vsync desire
-        // (must be called after selectThreadGL for effect)
+        // Reapply vsync desire (must be set again here after effect to take hold)
         setVsyncEnabled(mVsync);
     }
 
@@ -430,7 +432,7 @@ public class Window
     /**
      * <p>Sets an {@link OnResizeListener} to be notified of changes to the Window's screen size. These
      * dimensions are measured in screen coordinates. For dealing with pixel-based methods such as GL, see {@link
-     * #setOnFramebufferResizeListener(OnResizeListener)}.</p>
+     * #addOnFramebufferResizeListener(OnResizeListener)}.</p>
      *
      * <p>This method should only be called on the main thread.</p>
      *
@@ -452,16 +454,15 @@ public class Window
      *
      * @param listener OnResizeListener.
      */
-    public void setOnFramebufferResizeListener(OnResizeListener listener)
+    public void addOnFramebufferResizeListener(OnResizeListener listener)
     {
-        mOnFramebufferResizeListener = listener;
+        // Nothing to add
+        if (listener == null) {
+            return;
+        }
 
-        // Notify listener of resize
-        if (mOnFramebufferResizeListener == null) {
-            // Remove any previously set resize callback
-            GLFW.glfwSetFramebufferSizeCallback(mId, null);
-
-        } else {
+        // Add framebuffer callback on first listener
+        if (mOnFramebufferResizeListeners.isEmpty()) {
             GLFW.glfwSetFramebufferSizeCallback(mId, new GLFWFramebufferSizeCallbackI()
             {
                 @Override
@@ -474,11 +475,16 @@ public class Window
                     mFBWidth.set(width);
                     mFBHeight.set(height);
 
-                    // Notify listener of size change
-                    listener.onResize(oldW, oldH, width, height);
+                    // Notify each listener of size change
+                    for (int i = 0, sz = mOnFramebufferResizeListeners.size(); i < sz; i++) {
+                        mOnFramebufferResizeListeners.get(i).onResize(oldW, oldH, width, height);
+                    }
                 }
             });
         }
+
+        // Add listener to list to be triggered with others
+        mOnFramebufferResizeListeners.add(listener);
     }
 
     /**
@@ -504,7 +510,6 @@ public class Window
             }
         }
     }
-
 
     /**
      * <p>
@@ -541,6 +546,11 @@ public class Window
          * @param hub {@link Event} propagator.
          */
         abstract void poll(ControlMap controls, EventHub hub);
+
+        /**
+         * <p>Sets the mouse's current screen coordinates in a {@link Point2F}.</p>
+         */
+        abstract void pollMouse(Point2F position);
 
         /**
          * <p>Attaches all input handling to the Window and begins translating user input into {@link InputEvent}s.</p>
