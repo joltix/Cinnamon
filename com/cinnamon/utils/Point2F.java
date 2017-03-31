@@ -2,14 +2,14 @@ package com.cinnamon.utils;
 
 /**
  * <p>
- *     Represents a point in space of two dimensions and facilitates passing
- *     around points from one object to another.
+ *     Represents a point in space of two dimensions and facilitates passing around coordinates.
  * </p>
- *
- *
  */
 public class Point2F
 {
+    // Precision to use for floating point equivalence comparison
+    public static final float PRECISION = 0.000001f;
+
     // Coords
     private float mX;
     private float mY;
@@ -77,6 +77,17 @@ public class Point2F
         mY = y;
     }
 
+    /**
+     * <p>Sets the x and y coordinates.</p>
+     *
+     * @param x x.
+     * @param y y.
+     */
+    public final void set(float x, float y)
+    {
+        mX = x;
+        mY = y;
+    }
 
     /**
      * <p>Translates the point by some x and y amount.</p>
@@ -91,35 +102,49 @@ public class Point2F
     }
 
     /**
-     * <p>Sets the x and y coordinates.</p>
-     *
-     * @param x x.
-     * @param y y.
-     */
-    public final void set(float x, float y)
-    {
-        mX = x;
-        mY = y;
-    }
-
-    /**
      * <p>Computes the distance to another Point2F.</p>
      *
      * @param point other Point2F.
      * @return distance.
      */
-    public final float distanceTo(Point2F point)
+    public final double distanceTo(Point2F point)
     {
-        float x = (float) Math.abs(Math.pow(mX - point.mX, 2));
-        float y = (float) Math.abs(Math.pow(mY - point.mY, 2));
-        return (float) Math.sqrt(x + y);
+        return Point2F.distanceBetween(mX, mY, point.mX, point.mY);
+    }
+
+    /**
+     * <p>Computes the distance between two (x,y) points.</p>
+     *
+     * @param x0 x.
+     * @param y0 y.
+     * @param x1 other x.
+     * @param y1 other y.
+     * @return distance between.
+     */
+    public static final double distanceBetween(double x0, double y0, double x1, double y1)
+    {
+        final double xDiff = Math.abs(x1 - x0);
+        final double yDiff = Math.abs(y1 - y0);
+
+        return Math.sqrt((xDiff * xDiff) + (yDiff * yDiff));
+    }
+
+    /**
+     * <p>Checks if two coordinates are roughly equivalent with a precision up to {@link #PRECISION}.</p>
+     *
+     * @param val0 one coordinate.
+     * @param val1 other coordinate.
+     * @return true if coordinates can be considered the same.
+     */
+    public static final boolean isEqual(float val0, float val1)
+    {
+        return Math.abs(val0 - val1) < Point2F.PRECISION;
     }
 
     @Override
     protected Object clone() throws CloneNotSupportedException
     {
-        throw new CloneNotSupportedException("Use the copy constructor " +
-                "instead");
+        throw new CloneNotSupportedException("Use the copy constructor instead");
     }
 
     @Override
