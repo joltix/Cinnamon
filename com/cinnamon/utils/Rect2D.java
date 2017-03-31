@@ -5,32 +5,22 @@ import com.cinnamon.object.Positional;
 
 /**
  * <p>
- *     Rect2D designates a 2D rectangle formed by two {@link Point2F}s
- *     defining opposite corners.
+ *     Rect2D describes a rectangular plane in 3D space. The rectangle is defined by two points forming the shape's
+ *     diagonal; both can be retrieved with {@link #getPosition()} and {@link #getCorner()}. Both corners will always
+ *     have the same z value.
  * </p>
- *
- *
  */
-public interface Rect2D extends Positional, Dimensional
+public interface Rect2D extends Positional
 {
     /**
-     * <p>Gets the {@link Point2F} representing the position.</p>
-     *
-     * @return position.
-     */
-    Point2F getOrigin();
-
-    /**
-     * <p>Gets the {@link Point2F} representing the corner opposite that of
-     * the origin position.</p>
+     * <p>Gets the corner as a {@link Point3F}. Changes to the Point3F do not affect the Rect2D's corner.</p>
      *
      * @return corner.
      */
-    Point2F getCorner();
+    Point3F getCorner();
 
     /**
-     * <p>Checks whether or not an (x,y) point is contained within the
-     * Rect2D.</p>
+     * <p>Checks whether or not an (x,y) point is contained within the Rect2D.</p>
      *
      * @param x x.
      * @param y y.
@@ -39,64 +29,72 @@ public interface Rect2D extends Positional, Dimensional
     boolean contains(float x, float y);
 
     /**
-     * <p>Checks whether or not another Rect2D contains.</p>
+     * <p>Checks whether or not an (x,y,z) point is contained within the Rect2D.</p>
+     *
+     * @param x x.
+     * @param y y.
+     * @return true if contained.
+     */
+    boolean contains(float x, float y, float z);
+
+    /**
+     * <p>Checks whether or not another Rect2D is fully contained within the Rect2D's boundaries.</p>
      *
      * @param rect other Rect2D.
-     * @return true if the Rect2D contains.
+     * @return true if Rect2D is fully contained.
+     */
+    boolean contains(Rect2D rect);
+
+    /**
+     * <p>Checks whether or not the rectangle formed by two (x,y) points is fully contained within the Rect2D's
+     * boundaries.</p>
+     *
+     * @param x x.
+     * @param y y.
+     * @param cornerX corner x.
+     * @param cornerY corner y.
+     * @return true if rectangle is fully contained.
+     */
+    boolean contains(float x, float y, float cornerX, float cornerY);
+
+    /**
+     * <p>Checks whether or not another Rect2D intersects the Rect2D.</p>
+     *
+     * @param rect other Rect2D.
+     * @return true if the two Rect2Ds intersect.
      */
     boolean intersects(Rect2D rect);
 
     /**
-     * <p>Checks whether or not an axis aligned rectangle formed by the
-     * origin point (originX,originY) and corner point (cornerX,cornerY)
-     * contains the calling Rect2D.</p>
+     * <p>Checks whether or not the rectangle formed by two (x,y) points is fully contained within the Rect2D's
+     * boundaries.</p>
      *
-     * @param originX origin x.
-     * @param originY origin y.
+     * @param x x.
+     * @param y y.
      * @param cornerX corner x.
      * @param cornerY corner y.
      * @return true if the two Rect2Ds intersect.
      */
-    boolean intersects(float originX, float originY, float cornerX,
-                       float cornerY);
+    boolean intersects(float x, float y, float cornerX, float cornerY);
 
     /**
-     * <p>This method will always return 0.</p>
+     * <p>Gets the corner x coordinate.</p>
      *
-     * @return 0.
+     * @return x.
      */
-    @Override
-    float getZ();
+    float getCornerX();
 
     /**
-     * <p>Moves the position to a specific (x,y) point. This method will
-     * always treat z as 0 and ignore any given z value.</p>
+     * <p>Gets the corner y coordinate.</p>
      *
-     * @param x x.
-     * @param y y.
-     * @param z z.
+     * @return y.
      */
-    @Override
-    void moveTo(float x, float y, float z);
+    float getCornerY();
 
     /**
-     * <p>Sets offset values for the x and y coordinates. This method will
-     * always set z to 0 and ignore any given z value.</p>
+     * <p>Gets the corner z coordinate.</p>
      *
-     * <p>These values are added to target destinations for methods such as
-     * {@link #moveTo(float, float, float)}.</p>
-     *
-     * @param x x offset.
-     * @param y y offset.
+     * @return z.
      */
-    @Override
-    void setOffset(float x, float y, float z);
-
-    /**
-     * <p>This method will always return 0.</p>
-     *
-     * @return 0.
-     */
-    @Override
-    float getOffsetZ();
+    float getCornerZ();
 }
