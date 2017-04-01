@@ -2,8 +2,9 @@ package com.cinnamon.utils;
 
 /**
  * <p>
- *     Array-backed structure that chooses an object's index when added and
- *     reuses indices as they become available (e.g. when objects are removed).
+ *     Array-backed list that chooses an object's index when added and reuses indices as they become available
+ *     (e.g. when objects are removed). Unlike the usual list, objects cannot be inserted to a specific index and no
+ *     particular order is guaranteed.
  * </p>
  *
  * @param <E> Objects to store.
@@ -21,8 +22,7 @@ public class IndexList<E>
     private int mSize;
 
     /**
-     * <p>Constructor for an IndexList with an initial capacity and a
-     * normalized growth factor (0.0 - 1.0).</p>
+     * <p>Constructor for an IndexList with an initial capacity and a normalized growth factor (0.0 - 1.0).</p>
      *
      * @param load initial capacity.
      * @param growth growth factor.
@@ -46,8 +46,7 @@ public class IndexList<E>
     }
 
     /**
-     * <p>Adds an object to the IndexList and returns the index for
-     * lookup.</p>
+     * <p>Adds an object to the IndexList and returns the index for lookup.</p>
      *
      * @param object object.
      * @return object index.
@@ -93,9 +92,8 @@ public class IndexList<E>
     /**
      * <p>Retrieves an index which corresponds to a null entry.</p>
      *
-     * <p>This method runs in amortized O(1)+ time. Dwindling array space may
-     * require allocating a larger array for O(n) where n is the number of
-     * stored objects (size).</p>
+     * <p>This method runs in amortized O(1)+ time. Dwindling array space may require allocating a larger array for O
+     * (n) where n is the number of stored objects (size).</p>
      *
      * @return index.
      */
@@ -111,8 +109,8 @@ public class IndexList<E>
     }
 
     /**
-     * <p>Creates a new E[] with a size (1 + growth) times the current E[]
-     * length and copies the old array's contents.</p>
+     * <p>Creates a new E[] with a size (1 + growth) times the current E[] length and copies the old array's contents
+     * .</p>
      */
     @SuppressWarnings("unchecked")
     private void increaseCapacity()
@@ -134,5 +132,15 @@ public class IndexList<E>
     public final int size()
     {
         return mSize;
+    }
+
+    /**
+     * <p>Checks if size is 0.</p>
+     *
+     * @return true if size == 0.
+     */
+    public final boolean isEmpty()
+    {
+        return mSize == 0;
     }
 }
