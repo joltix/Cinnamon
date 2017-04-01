@@ -1,5 +1,6 @@
 package com.cinnamon.system;
 
+import com.cinnamon.utils.Point2F;
 import com.cinnamon.utils.PooledQueue;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWKeyCallback;
@@ -117,6 +118,13 @@ public final class DefaultInput extends Window.Input
             controls.addEvent(mouseEvent);
             hub.add(mouseEvent);
         }
+    }
+
+    @Override
+    public void pollMouse(Point2F position)
+    {
+        GLFW.glfwGetCursorPos(getId(), mMouseX, mMouseY);
+        position.set((float) mMouseX[0], (float) mMouseY[0]);
     }
 
     @Override
