@@ -1,9 +1,7 @@
 package com.cinnamon.demo;
 
-import com.cinnamon.gfx.ImageComponent;
-import com.cinnamon.gfx.ImageFactory;
-import com.cinnamon.gfx.ShaderFactory;
-import com.cinnamon.gfx.Texture;
+import com.cinnamon.gfx.*;
+import com.cinnamon.system.Config;
 import com.cinnamon.utils.Comparison;
 import com.cinnamon.utils.Merge;
 
@@ -11,17 +9,15 @@ import com.cinnamon.utils.Merge;
  * <p>
  *     Demo {@link ImageFactory}.
  * </p>
- *
- *
  */
 public class DemoImageFactory extends ImageFactory
 {
     private static final int LOAD = 100;
     private static final float GROWTH = 0.15f;
 
-    private static final Float DEFAULT_WIDTH = 100f;
-    private static final Float DEFAULT_HEIGHT = 100f;
-    private static final int DEFAULT_TEXTURE = 0;
+    private static final Float DEFAULT_WIDTH = 5f;
+    private static final Float DEFAULT_HEIGHT = 5f;
+    private static final int DEFAULT_TEXTURE = Texture.NULL;
 
     public DemoImageFactory(ShaderFactory factory)
     {
@@ -30,51 +26,71 @@ public class DemoImageFactory extends ImageFactory
     }
 
     @Override
-    protected void onLoad(ShaderFactory factory)
+    protected Config<ImageComponent, ShaderFactory> createDefaultConfig()
     {
-        addConfig("character", new CharacterConfig());
-        addConfig(ImageFactory.CONFIG_ROOM, new RoomConfig());
+        return new DefaultConfig();
     }
 
     @Override
-    protected ImageComponent createComponent()
+    protected void onLoad(ShaderFactory factory)
+    {
+        addConfig("character", new CharacterConfig());
+        addConfig("rock", new RockConfig());
+    }
+
+    @Override
+    protected ImageComponent createIdentifiable()
     {
         return new DemoImageComponent(DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_TEXTURE);
     }
 
-    @Override
-    protected void makeDefault(ImageComponent component)
-    {
-
-    }
-
-    private class CharacterConfig implements ImageConfig
+    private class CharacterConfig implements Config<ImageComponent, ShaderFactory>
     {
         @Override
         public void configure(ImageComponent object, ShaderFactory resource)
         {
             final Texture tex = resource.getTexture("demo_character.png");
             object.setTexture(tex.getId());
-            object.setWidth(tex.getWidth());
-            object.setHeight(tex.getHeight());
+            object.setWidth(0.5f);
+            object.setHeight(1.8f);
         }
     }
 
-    private class RoomConfig implements ImageConfig
+    private class RockConfig implements Config<ImageComponent, ShaderFactory>
     {
         @Override
         public void configure(ImageComponent object, ShaderFactory resource)
         {
-            object.moveTo(0, 0, -Float.MAX_VALUE);
+            final Texture tex = resource.getTexture("demo_rock.png");
+            object.setTexture(tex.getId());
+            object.setWidth(14f);
+            object.setHeight(21f);
+        }
+    }
+
+    private class DefaultConfig implements Config<ImageComponent, ShaderFactory>
+    {
+        @Override
+        public void configure(ImageComponent image, ShaderFactory resource)
+        {
+            image.moveTo(0f, 0f);
+            image.setWidth(1f);
+            image.setHeight(1f);
+            image.setVisible(true);
+            image.rotateTo(0f);
+            image.setFlipHorizontally(false);
+            image.setFlipVertically(false);
+            image.setTexture(Texture.NULL);
+            image.setTint(1f, 1f, 1f);
+            image.setTransparency(1f);
         }
     }
 
     /**
-     * <p>Comparison to be used when sorting an array of GObjects for
-     * drawing. The comparison is made with "Painter's Algorithm" in mind,
-     * except with objects further from the screen being represented with
-     * smaller z values. Further, GObjects are grouped by texture ids and
-     * GObjects without RenderComponents are associated with greater values.</p>
+     * <p>Comparison to be used when sorting an array of GObjects for drawing. The comparison is made with "Painter's
+     * Algorithm" in mind, except with objects further from the screen being represented with smaller z values.
+     * Further, GObjects are grouped by texture ids and GObjects without RenderComponents are associated with greater
+     * values.</p>
      */
     private static class PainterOrder implements Comparison<ImageComponent>
     {
