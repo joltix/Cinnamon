@@ -9,7 +9,7 @@ import com.cinnamon.utils.PooledQueue;
  *     {@link Scene} implementation providing drawable data in {@link Batch}es for batch drawing.
  * </p>
  */
-public final class BatchedScene implements Scene<Batch<Drawable>>
+final class BatchedScene implements Scene<Batch<Drawable>>
 {
     // Drawables for the Canvas to draw
     private final ImageLite[] mDrawables;
@@ -202,12 +202,12 @@ public final class BatchedScene implements Scene<Batch<Drawable>>
             final ImageBatch batch = mBatchPool.poll();
 
             // Empty batch means was never filled when Scene was filled
+            batch.resetPolling();
             if (batch.isEmpty()) {
                 continue;
             }
 
-            // Move polling cursor back to start and make batch available
-            batch.resetPolling();
+            // Make batch available
             mBatchesInUse.add(batch);
         }
     }
