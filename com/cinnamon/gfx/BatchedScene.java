@@ -6,31 +6,43 @@ import com.cinnamon.utils.PooledQueue;
 
 /**
  * <p>
- *     {@link Scene} implementation with an object pool to curb rising memory
- *     usage from the drawing data's node backing.
+ *     {@link Scene} implementation providing drawable data in {@link Batch}es for batch drawing.
  * </p>
  */
-public class PooledScene implements Scene<Batch<Drawable>>
+public final class BatchedScene implements Scene<Batch<Drawable>>
 {
-    // Pool of reusable Drawables
-    private PooledQueue<ImageLite> mDrawablePool = new PooledQueue<ImageLite>();
-
-    private ImageLite[] mDrawables;
+    // Drawables for the Canvas to draw
+    private final ImageLite[] mDrawables;
 
     // Pool of reusable Batches
-    private PooledQueue<ImageBatch> mBatchPool = new PooledQueue<ImageBatch>();
+    private final PooledQueue<ImageBatch> mBatchPool = new PooledQueue<ImageBatch>();
 
-    // Current Batches active as PooledScene's contents
-    private PooledQueue<ImageBatch> mBatchesInUse = new PooledQueue<ImageBatch>();
+    // Current Batches active as BatchedScene's contents
+    private final PooledQueue<ImageBatch> mBatchesInUse = new PooledQueue<ImageBatch>();
 
     // Total num of Drawables across all Groups
     private int mDrawableCount = 0;
 
-    public PooledScene(int load)
+    /**
+     * <p>Constructs a BatchedScene with a specific {@link Drawable} capacity.</p>
+     *
+     * @param capacity number of Drawables that can be stored.
+     */
+    public BatchedScene(int capacity)
     {
-        mDrawables = new ImageLite[load];
+        mDrawables = new ImageLite[capacity];
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>All {@link ImageComponent}s eligible for drawing will be copied from the {@link ImageFactory}. The given
+     * {@link View} will be used to filter {@link Drawable}s that cannot be seen and apply transformations to those
+     * being drawn as per the View's configuration.</p>
+     *
+     * @param factory factory storing drawing data.
+     * @param view View for filtering and transformations.
+     */
     @Override
     public void add(ImageFactory factory, View view)
     {
@@ -72,18 +84,21 @@ public class PooledScene implements Scene<Batch<Drawable>>
             final int currentTexture = comp.getTexture();
             if (lastTexture != currentTexture) {
 
-                // Save ending index for old batch
+                // Save ending index for old batch and reset cursor for polling
                 batch.mEnd = to;
                 batch.mCursor = batch.mBegin;
 
+                // Get a new batch for the next Texture sequence
                 lastTexture = currentTexture;
                 batch = getBatch();
                 batch.mBegin = to;
                 batch.mTexture = currentTexture;
             }
 
-            // Add Drawable to ImageBatch
+            // Add Drawable to Scene's arr
             final Drawable drawable = copyImageTo(to++, comp);
+
+            // Apply View's transforms and update Scene size
             view.transform(drawable);
             mDrawableCount++;
         }
@@ -94,9 +109,7 @@ public class PooledScene implements Scene<Batch<Drawable>>
     }
 
     /**
-     * <p>Copies a given {@link ImageComponent} to a specific index in the Scene. If no {@link ImageLite} exists at
-     * the given index, one will be retrieved from an object pool. If the pool has none available, one will be
-     * instantiated.</p>
+     * <p>Copies a given {@link ImageComponent} to a specific index in the Scene.</p>
      *
      * @param index index in drawing order to copy to.
      * @param component ImageComponent to copy.
@@ -105,17 +118,10 @@ public class PooledScene implements Scene<Batch<Drawable>>
     private Drawable copyImageTo(int index, ImageComponent component)
     {
         ImageLite img = mDrawables[index];
+
+        // Instantiate new ImageLite if none before
         if (img == null) {
-
-            // Make Drawable copy
-            if (mDrawablePool.isEmpty()) {
-                img = new ImageLite();
-            } else {
-
-                // Reuse old Drawable
-                img = mDrawablePool.poll();
-            }
-
+            img = new ImageLite();
             mDrawables[index] = img;
         }
 
@@ -126,8 +132,7 @@ public class PooledScene implements Scene<Batch<Drawable>>
     }
 
     /**
-     * <p>Checks whether or not an {@link ImageComponent} is viewable within
-     * the area of the given {@link View}.</p>
+     * <p>Checks whether or not an {@link ImageComponent} is viewable within the area of the given {@link View}.</p>
      *
      * @param view View.
      * @param component drawing data.
@@ -143,16 +148,15 @@ public class PooledScene implements Scene<Batch<Drawable>>
     /**
      * <p>Gets the next {@link Batch} of {@link Drawable}s.</p>
      *
-     * <p>The returned Batch and its contents are reused in future
-     * {@link Scene}s so neither Batch nor its contents should be referenced
-     * .</p>
+     * <p>The returned Batch and its contents are reused in future {@link Scene}s so neither Batch nor its contents
+     * should be referenced outside the Scene.</p>
      *
      * @return Batch.
      */
     @Override
     public Batch<Drawable> poll()
     {
-        // Move PooledBatch to obj pool for reuse
+        // Move ImageBatch to obj pool for reuse
         final ImageBatch batch = mBatchesInUse.poll();
         mBatchPool.add(batch);
 
@@ -160,17 +164,16 @@ public class PooledScene implements Scene<Batch<Drawable>>
     }
 
     /**
-     * <p>Gets a PooledBatch from an object pool or instantiates a new one
-     * if none can be reused.</p>
+     * <p>Gets an {@link ImageBatch} from an object pool or instantiates a new one if none can be reused.</p>
      *
-     * @return PooledBatch.
+     * @return ImageBatch.
      */
     private ImageBatch getBatch()
     {
         // Create a new group if none can be reused
         final ImageBatch batch = (mBatchPool.isEmpty()) ? new ImageBatch() : mBatchPool.poll();
 
-        // Add group to PooledScene
+        // Add group to BatchedScene
         mBatchesInUse.add(batch);
         return batch;
     }
@@ -178,11 +181,13 @@ public class PooledScene implements Scene<Batch<Drawable>>
     @Override
     public void clear()
     {
+        // Move all in use Batches to the object pool
         for (int i = 0, sz = mBatchesInUse.size(); i < sz; i++) {
             // Move batch to object pool for reuse
             final ImageBatch batch = mBatchesInUse.poll();
             mBatchPool.add(batch);
 
+            // Erase indices
             batch.clear();
         }
 
@@ -192,25 +197,40 @@ public class PooledScene implements Scene<Batch<Drawable>>
     @Override
     public void reset()
     {
+        // Move back to use all recently used Batches
         for (int i = 0, sz = mBatchPool.size(); i < sz; i++) {
             final ImageBatch batch = mBatchPool.poll();
-            batch.resetPolling();
 
             // Empty batch means was never filled when Scene was filled
             if (batch.isEmpty()) {
                 continue;
             }
 
+            // Move polling cursor back to start and make batch available
+            batch.resetPolling();
             mBatchesInUse.add(batch);
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This count represents the Scene's size when it was filled and does not diminish with calls to
+     * {@link #poll()}.</p>
+     *
+     * @return instance count.
+     */
     @Override
     public int size()
     {
         return mDrawableCount;
     }
 
+    /**
+     * <p>Checks whether or not the BatchedScene has any {@link Batch}es left.</p>
+     *
+     * @return true if at least one Batch remains to be polled.
+     */
     @Override
     public boolean isEmpty()
     {
@@ -222,7 +242,7 @@ public class PooledScene implements Scene<Batch<Drawable>>
      *     {@link Batch} with an object pool to limit node instantiation.
      * </p>
      */
-    public final class ImageBatch implements Batch<Drawable>
+    private final class ImageBatch implements Batch<Drawable>
     {
         // Beginning index (inclusive)
         private int mBegin;
@@ -290,11 +310,9 @@ public class PooledScene implements Scene<Batch<Drawable>>
 
     /**
      * <p>
-     *     Represents the bare-bones data needed to draw a game object.
-     *     ImageLites are meant to copy {@link ImageComponent}s and be passed
-     *     around in {@link PooledScene} as part of a large object pool.
+     *     Represents the bare-bones data needed to draw a game object. ImageLites are meant to copy
+     *     {@link ImageComponent}s and be passed around in {@link BatchedScene} as part of a large object pool.
      * </p>
-     *
      */
     private class ImageLite implements Drawable
     {
@@ -303,6 +321,7 @@ public class PooledScene implements Scene<Batch<Drawable>>
         private boolean mFlipV;
         private boolean mFlipH;
 
+        // Dimensions and rotation angle
         private float mWidth;
         private float mHeight;
         private double mAngle;
@@ -318,8 +337,7 @@ public class PooledScene implements Scene<Batch<Drawable>>
         private float mY;
 
         /**
-         * <p>Copies the drawing data from an {@link ImageComponent} with an
-         * optional position shift.</p>
+         * <p>Copies the drawing data from an {@link ImageComponent} with an optional position shift.</p>
          *
          * @param component ImageComponent to copy.
          */
