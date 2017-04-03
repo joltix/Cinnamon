@@ -5,7 +5,8 @@ import com.cinnamon.system.Game;
 /**
  * <p>
  *     ConcurrentSceneBuffer allows {@link Drawable} data to be safely passed from the game's update {@link Thread} to
- *     the drawing Thread. Below is a simple use example between {@link Game} and {@link Canvas}.
+ *     the drawing Thread. Below is a simple use example between {@link Game} and {@link Canvas}. Only one Thread
+ *     must write to a {@link Scene} (update thread) and one Thread must read (drawing thread).
  * </p>
  *
  * <br>
