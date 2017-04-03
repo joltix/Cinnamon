@@ -4,15 +4,13 @@ import com.cinnamon.system.View;
 
 /**
  * <p>
- *     Container for a "snapshot" of a moment in the game. Scenes are to be
- *     filled with enough drawing information to transfer from the game's
- *     main update thread to the drawing thread with the {@link Canvas}.
+ *     Container for a "snapshot" of a moment in the game. Scenes are to be filled with enough drawing information to
+ *     transfer from the game's main update thread to the drawing thread.
  * </p>
  *
  * <p>
- *     The drawing details should not be references to mutable data that may
- *     be modified at any moment from the game's update thread. For mutable
- *     data, lightweight copies are recommended.
+ *     The drawing data should not be references to data that may be modified at any moment from the game's update
+ *     thread as the data will be accessed by the drawing thread. Lightweight copies are recommended.
  * </p>
  *
  * @param <E> object delivering drawing data.
@@ -38,6 +36,13 @@ public interface Scene<E>
      * <p>Empties the Scene of all drawing data.</p>
      */
     void clear();
+
+    /**
+     * <p>Makes available all previously polled drawing data and moves the polling cursor back to the beginning. The
+     * Scene is reset to the state before {@link #poll()} was called. This method will have no effect if
+     * {@link #clear()} has already been called.</p>
+     */
+    void reset();
 
     /**
      * <p>Gets the number of drawable instances.</p>
