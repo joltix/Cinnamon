@@ -8,20 +8,20 @@ import org.lwjgl.opengl.GL11;
  * <p>
  *     Demo {@link Canvas2D}.
  * </p>
- *
- *
  */
-public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
-        ShaderFactory>
+public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer, ShaderFactory>
 {
-    // Indices for specifying triangle vertices (2) within a quad
-    private static final int[] QUAD_INDICES = new int[]{
-            0, 1, 2, // First triangle
-            0, 2, 3 // Second triangle
-    };
-
     // Max number of instances in a Batch to allocate memory for
-    private static final int INSTANCING_CAPACITY = 2000;
+    private static final int INSTANCING_CAPACITY = 500;
+
+    // Array for holding translation matrix
+    private static final float[] TRANSLATION = new float[16];
+
+    // Array for holding x and y scaling values
+    private static final float[] SCALE = new float[2];
+
+    // Array for holding color tinting values (RGBA)
+    private final float[] TINT = new float[4];
 
     // ShaderProgram for everything to draw
     private ShaderProgram mColorShader;
@@ -30,11 +30,14 @@ public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
     // GLBuffer to facilitate VBOs and binding
     private DemoVBOBuffer mBuffer;
 
-
-    private final float[] TINT = new float[4];
-
-    public DemoCanvas(Window window, ConcurrentSceneBuffer input,
-                      ShaderFactory shaders)
+    /**
+     * <p>Constructs a DemoCanvas for drawing the demo.</p>
+     *
+     * @param window Window.
+     * @param input SceneBuffer.
+     * @param shaders ShaderFactory.
+     */
+    public DemoCanvas(Window window, ConcurrentSceneBuffer input, ShaderFactory shaders)
     {
         super(window, input, shaders);
     }
@@ -42,7 +45,7 @@ public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
     @Override
     protected void onLoad()
     {
-        // Block until shaders have been loaded
+        // Load shaders
         ShaderFactory shaderFactory = getShaderFactory();
         shaderFactory.load();
 
@@ -51,8 +54,14 @@ public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
         mTextureShader = shaderFactory.getShader("demo_texture");
         mColorShader.use();
 
-        final float[] proj = this.getProjection();
-        mBuffer = new DemoVBOBuffer(INSTANCING_CAPACITY, proj, QUAD_INDICES);
+        // Get projection, vertices, vertex indices, and texture coordinates for all drawing
+        final float[] projection = this.getProjectionMatrix();
+        final float[] vertices = this.getQuadVertices();
+        final int[] indices = this.getQuadIndices();
+        final float[] textureCoords = this.getQuadTextureCoordinates();
+
+        // Use a GLBuffer to obfuscate drawing details
+        mBuffer = new DemoVBOBuffer(INSTANCING_CAPACITY, projection, vertices, indices, textureCoords);
 
         // Allow transparency
         GL11.glEnable(GL11.GL_BLEND);
@@ -63,20 +72,22 @@ public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
     protected void onResize()
     {
         // Update GLBuffer's projection matrix since resolution changed
-        mBuffer.setProjection(getProjection());
+        mBuffer.setProjection(getProjectionMatrix());
     }
 
     @Override
     protected void draw(ConcurrentSceneBuffer input, ShaderFactory factory)
     {
-        // Fill window background with color
+        // Fill window background with black
         setBackgroundColor(0, 0, 0, 255);
 
+        // Get next Scene to draw
         final Scene<Batch<Drawable>> scene = input.getReadScene();
 
         // Draw each Batch until Scene has none left
         while (!scene.isEmpty()) {
 
+            // Pull Batch and its Drawables' texture
             final Batch<Drawable> batch = scene.poll();
             final int texId = batch.getTexture();
 
@@ -102,31 +113,48 @@ public final class DemoCanvas extends Canvas2D<ConcurrentSceneBuffer,
         }
     }
 
-    private void writeToBuffer(Drawable obj)
+    /**
+     * <p>Writes the {@link Drawable}'s drawing data to the {@link DemoVBOBuffer}.</p>
+     *
+     * @param drawable Drawable.
+     */
+    private void writeToBuffer(Drawable drawable)
     {
-        // Setup instance data
-        final float[] quad = this.getQuad(obj.getWidth(), obj.getHeight());
-        final float[] texCoords = this.getTextureCoordinates();
-
-        // Alter coordinates based on world origin or screen origin
-        float y = obj.getY();
-        final float[] translation = this.getTranslationMatrix(obj.getX(), y);
+        // Get transformation info
+        this.getTranslationMatrix(TRANSLATION, drawable.getX(), drawable.getY());
+        SCALE[0] = drawable.getWidth();
+        SCALE[1] = drawable.getHeight();
+        final float rotation = (float) drawable.getRotation();
 
         // Pull color data
-        TINT[0] = obj.getRed();
-        TINT[1] = obj.getGreen();
-        TINT[2] = obj.getBlue();
-        TINT[3] = obj.getTransparency();
+        TINT[0] = drawable.getRed();
+        TINT[1] = drawable.getGreen();
+        TINT[2] = drawable.getBlue();
+        TINT[3] = drawable.getTransparency();
+
+        // Get texture flip toggles
+        final boolean flipH = drawable.isFlippedHorizontally();
+        final boolean flipV = drawable.isFlippedVertically();
 
         // Put draw data in intermediate buffer
-        mBuffer.add(quad, texCoords, TINT, translation);
+        mBuffer.add(TINT, flipH, flipV, TRANSLATION, SCALE, rotation);
+
+        Canvas.checkForOpenGLErrors();
     }
 
+    /**
+     * <p>Applies either the textured or non textured shader depending on the given {@link Texture} id.</p>
+     *
+     * @param texture Texture id.
+     */
     private void applyTexture(int texture)
     {
+        // Use non-textured shader (color only)
         if (texture == Texture.NULL) {
             mColorShader.use();
         } else {
+
+            // Use textured shader and bind image data
             mTextureShader.use();
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
         }
