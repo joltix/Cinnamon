@@ -15,8 +15,6 @@ import org.lwjgl.opengl.GL11;
  * <p>
  *     <b>No OpenGL calls should be made in the this class' constructor.</b>
  * </p>
- *
- *
  */
 public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFactory>
 {
@@ -26,10 +24,9 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
                                                          0, 0, 1, 0,
                                                          0, 0, 0, 1};
 
-    // Translation matrix
-    private final float[] TRANSLATION = IDENTITY.clone();
-
-    // OpenGL uses column-major ordering so XYZ is at mat bottom
+    /**
+     * Indices for translation matrix modification; OpenGL uses column-major ordering so XYZ is at mat bottom
+     */
     private static final int TRANSLATION_X = 12;
     private static final int TRANSLATION_Y = 13;
     private static final int TRANSLATION_Z = 14;
@@ -64,7 +61,7 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
     private int mHeight;
 
     // Whether or not the framebuffer has resized (changed the drawing area)
-    private volatile boolean mHasResized = false;
+    private volatile boolean mHasResized = true;
 
     // Whether or not the Canvas has stopped drawing ops
     private volatile boolean mStopped = false;
@@ -92,7 +89,7 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
         mRateLogger = new RateLogger(rateSamples);
 
         // Create a new projection matrix each time the Window size changes
-        mWindow.setOnFramebufferResizeListener(new OnResizeListener()
+        mWindow.addOnFramebufferResizeListener(new OnResizeListener()
         {
             @Override
             public void onResize(float oldWidth, float oldHeight, float width, float height)
@@ -118,7 +115,7 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
     /**
      * <p>Begins the drawing loop. This method blocks.</p>
      */
-    protected final void loop()
+    private void loop()
     {
         // Create projection and translation matrices
         mProjectionMat = createProjectionMatrix();
@@ -168,15 +165,14 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
     }
 
     /**
-     * <p>Allows one-time rendering setup operations before drawing. This method
-     * will be called after OpenGL has been initialized and related functions
-     * may be used.</p>
+     * <p>Allows one-time rendering setup operations before drawing. This method will be called after OpenGL has been
+     * initialized and related functions may be used.</p>
      */
     protected abstract void onLoad();
 
     /**
-     * <p>Each call to this method will draw an individual frame. Typically,
-     * transformations for all objects in a frame should be applied here.</p>
+     * <p>Each call to this method will draw an individual frame. Typically, transformations for all objects in a
+     * frame should be applied here.</p>
      */
     protected abstract void draw(E input, ShaderFactory factory);
 
@@ -191,19 +187,27 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
     }
 
     /**
-     * <p>Constructs a translation matrix with the given shift values.</p>
+     * <p>Fills a given array with a translation matrix modified for the given x, y, and z values.</p>
      *
      * @param x x.
      * @param y y.
      * @param z z.
-     * @return a 4x4 column major matrix.
+     * @throws IllegalArgumentException if the given array is not of length 16 (the length of a flattened 4x4 matrix).
      */
-    protected float[] getTranslationMatrix(float x, float y, float z)
+    protected final void getTranslationMatrix(float[] container, float x, float y, float z)
     {
-        TRANSLATION[TRANSLATION_X] = x;
-        TRANSLATION[TRANSLATION_Y] = y;
-        TRANSLATION[TRANSLATION_Z] = z;
-        return TRANSLATION;
+        // Check length is a 4x4 matrix
+        if (container.length != IDENTITY.length) {
+            throw new IllegalArgumentException("Container must have a length of 16 (4x4 matrix)");
+        }
+
+        // Ensure container has identity matrix as base
+        System.arraycopy(IDENTITY, 0, container, 0, IDENTITY.length);
+
+        // Modify proper indices for given coordinates
+        container[TRANSLATION_X] = x;
+        container[TRANSLATION_Y] = y;
+        container[TRANSLATION_Z] = z;
     }
 
     /**
@@ -213,42 +217,35 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
      * @param g green.
      * @param b blue.
      * @param a alpha.
-     * @throws IllegalArgumentException if any of the color values are < 0 or >
-     *                                  255.
+     * @throws IllegalArgumentException if any of the color values are < 0 or > 255.
      */
     public void setBackgroundColor(int r, int g, int b, int a)
     {
-        checkColorValues(r, g, b, a, 0, 255, "Colors must be 0.0-1.0 "
-                + "inclusive");
+        checkColorValues(r, g, b, a, 0, 255, "Colors must be 0.0-1.0 inclusive");
 
-        GL11.glClearColor((float) r / 255, (float) g / 255, (float) b /
-                255, (float) a / 255);
+        GL11.glClearColor((float) r / 255, (float) g / 255, (float) b / 255, (float) a / 255);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
     }
 
     /**
-     * <p>Sets the background color using normalized values 0.0f - 1.0f
-     * inclusive.</p>
+     * <p>Sets the background color using normalized values 0.0f - 1.0f inclusive.</p>
      *
      * @param r red.
      * @param g green.
      * @param b blue.
      * @param a alpha.
-     * @throws IllegalArgumentException if any of the color values are < 0.0f or
-     *                                  > 1.0f.
+     * @throws IllegalArgumentException if any of the color values are < 0.0f or > 1.0f.
      */
     public void setBackgroundColorPercent(float r, float g, float b,
                                           float a)
     {
-        checkColorValues(r, g, b, a, 0, 1, "Colors must be 0-255 " +
-                "inclusive");
+        checkColorValues(r, g, b, a, 0, 1, "Colors must be 0-255 inclusive");
         GL11.glClearColor(r, g, b, a);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
     }
 
     /**
-     * <p>Throws an Exception if any of the given color values are out of a
-     * desired range.</p>
+     * <p>Throws an Exception if any of the given color values are out of a desired range.</p>
      *
      * @param r   red.
      * @param g   green.
@@ -257,8 +254,7 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
      * @param lo  lower bound.
      * @param hi  upper bound.
      * @param msg error.
-     * @throws IllegalArgumentException if any of the color values surpass the
-     *                                  range.
+     * @throws IllegalArgumentException if any of the color values surpass the range.
      */
     private void checkColorValues(float r, float g, float b, float a,
                                   float lo, float hi, String msg)
@@ -300,13 +296,12 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
     }
 
     /**
-     * <p>Gets the projection matrix applied to each image drawn on the
-     * Canvas. This method returns a copy of the desired matrix instead of a
-     * reference to the original.</p>
+     * <p>Gets the projection matrix applied to each image drawn on the Canvas. This method returns a copy of the
+     * desired matrix instead of a reference to the original.</p>
      *
      * @return projection matrix.
      */
-    protected final float[] getProjection()
+    protected final float[] getProjectionMatrix()
     {
         // Create on first call and store
         if (mProjectionMat == null) {
@@ -322,8 +317,8 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
     }
 
     /**
-     * <p>This method is called when the Canvas' drawing area has been resized. Calling {@link #getProjection()} wil
-     * return a new projection matrix updated for the new dimensions.</p>
+     * <p>This method is called when the Canvas' drawing area has been resized. Calling
+     * {@link #getProjectionMatrix()} will return a new projection matrix updated for the new dimensions.</p>
      */
     protected abstract void onResize();
 
@@ -338,8 +333,7 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
     }
 
     /**
-     * <p>Gets the {@link ShaderFactory} used for shader selection when drawing
-     * .</p>
+     * <p>Gets the {@link ShaderFactory} used for shader selection when drawing.</p>
      *
      * @return ShaderFactory.
      */
@@ -349,18 +343,16 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
     }
 
     /**
-     * <p>Creates the projection matrix to map objects drawn by the Canvas
-     * onto the screen.</p>
+     * <p>Creates the projection matrix to map objects drawn by the Canvas onto the screen.</p>
      *
      * @return a 4x4 matrix.
      */
     protected abstract float[] createProjectionMatrix();
 
     /**
-     * <p>Queries OpenGL for any errors and prints them to the console if any
-     * are found.</p>
+     * <p>Queries OpenGL for any errors and prints them to the console if any are found.</p>
      */
-    public static final void checkOpenGLErrors()
+    public static final void checkForOpenGLErrors()
     {
         final int err = GL11.glGetError();
         if (err != GL11.GL_NO_ERROR) {
@@ -422,12 +414,9 @@ public abstract class Canvas<E extends Canvas.SceneBuffer, T extends ShaderFacto
 
     /**
      * <p>
-     *     SceneBuffer acts as an intermediary between the
-     *     {@link Game}'s updating and the {@link Canvas}'s drawing.
-     *     {@link Scene}s to be drawn are retrieved with
-     *     {@link #getWriteScene()}, populated, then sent to be drawn
-     *     with {@link #flush()}. In turn, the Canvas retrieves an available
-     *     Scene with {@link #getReadScene()}.
+     *     SceneBuffer acts as an intermediary between the {@link Game}'s updating and the {@link Canvas}'s drawing.
+     *     {@link Scene}s to be drawn are retrieved with {@link #getWriteScene()}, populated, then sent to be drawn
+     *     with {@link #flush()}. In turn, the Canvas retrieves an available Scene with {@link #getReadScene()}.
      * </p>
      *
      * @param <E> drawing data to be moved from
