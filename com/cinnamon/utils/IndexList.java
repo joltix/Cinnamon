@@ -19,7 +19,10 @@ public class IndexList<E>
 
     // Lookup array and obj count
     private E[] mObjs;
-    private int mSize;
+    private int mSize = 0;
+
+    // Next index that has never been used
+    private int mNextAvailableIndex = 0;
 
     /**
      * <p>Constructor for an IndexList with an initial capacity and a normalized growth factor (0.0 - 1.0).</p>
@@ -55,6 +58,7 @@ public class IndexList<E>
     {
         final int index = getAvailableIndex();
         mObjs[index] = object;
+        mSize++;
         return index;
     }
 
@@ -105,7 +109,7 @@ public class IndexList<E>
         }
 
         // Choose new index or reuse an old one if possible
-        return (mIndexPool.isEmpty()) ? mSize++ : mIndexPool.poll();
+        return (mIndexPool.isEmpty()) ? mNextAvailableIndex++ : mIndexPool.poll();
     }
 
     /**
