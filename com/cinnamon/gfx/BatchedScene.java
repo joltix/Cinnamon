@@ -463,6 +463,18 @@ final class BatchedScene implements Scene<Batch<Drawable>>
         }
 
         @Override
+        public void rotateTo(double angle)
+        {
+            mAngle = angle;
+        }
+
+        @Override
+        public void rotateBy(double angle)
+        {
+            mAngle += angle;
+        }
+
+        @Override
         public int getTexture()
         {
             return mTexId;
