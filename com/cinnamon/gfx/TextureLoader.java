@@ -3,6 +3,7 @@ package com.cinnamon.gfx;
 import com.cinnamon.utils.ResourceLoader;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.stb.STBImage;
 
@@ -16,11 +17,8 @@ import java.util.List;
 
 /**
  * <p>
- *     TextureLoader loads images from a jar's resources and prepares it for
- *     OpenGL use.
+ *     TextureLoader loads images from a jar's resources and prepares it for OpenGL use.
  * </p>
- *
- *
  */
 public class TextureLoader extends ResourceLoader<Texture>
 {
@@ -64,14 +62,14 @@ public class TextureLoader extends ResourceLoader<Texture>
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, id);
 
         // Configure Texture
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL13.GL_CLAMP_TO_BORDER);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL13.GL_CLAMP_TO_BORDER);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
 
         // Push Texture data
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0,GL11.GL_RGBA, width, height, 0,
-                GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pxData);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0,GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA,
+                GL11.GL_UNSIGNED_BYTE, pxData);
 
         // Create mipmaps and unbind
         GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
@@ -81,8 +79,7 @@ public class TextureLoader extends ResourceLoader<Texture>
     }
 
     /**
-     * <p>Reads the bytes from an {@link InputStream} into a
-     * {@link ByteBuffer} for later extracting the pixel data.</p>
+     * <p>Reads the bytes from an {@link InputStream} into a {@link ByteBuffer} for later extracting the pixel data.</p>
      *
      * @param stream InputStream to resource.
      * @return resource's bytes.
@@ -118,8 +115,8 @@ public class TextureLoader extends ResourceLoader<Texture>
     }
 
     /**
-     * <p>Attempts to decode a given ByteBuffer as an image. The returned
-     * ByteBuffer is ready for OpenGL rendering.</p>
+     * <p>Attempts to decode a given {@link ByteBuffer} as an image. The returned ByteBuffer is ready for OpenGL
+     * rendering.</p>
      *
      * @param bytes bytes as image.
      * @param w width container.
@@ -145,9 +142,8 @@ public class TextureLoader extends ResourceLoader<Texture>
     }
 
     /**
-     * <p>Loads all {@link Texture}s in the directory whose filename is on a
-     * given list. If a file on the list is not found in the directory, this
-     * method continues on to attempt to load the next filename.</p>
+     * <p>Loads all {@link Texture}s in the directory whose filename is on a given list. If a file on the list is not
+     * found in the directory, this method continues on to attempt to load the next filename.</p>
      *
      * @param filenames image filenames to load.
      * @param textureMap container for loaded Textures.
