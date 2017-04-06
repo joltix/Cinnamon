@@ -3,33 +3,29 @@ package com.cinnamon.object;
 import com.cinnamon.gfx.ImageComponent;
 import com.cinnamon.gfx.Texture;
 import com.cinnamon.system.ComponentFactory;
+import com.cinnamon.system.IndexedFactory;
 import com.cinnamon.system.MouseEvent;
-import com.cinnamon.utils.Identifiable;
 import com.cinnamon.utils.OnClickListener;
+import com.cinnamon.utils.Point3F;
+import com.cinnamon.utils.Rotatable;
 
 /**
  * <p>
- *     GObjects are the generalization of all game objects. A GObject is
- *     represented in-game as the combination of its set
- *     {@link ComponentFactory.Component}s like its visuals
- *     ({@link ImageComponent}) or collision model {@link BodyComponent}.
+ *     GObjects are the generalization of all game objects. A GObject is represented in-game as the combination of
+ *     its set {@link ComponentFactory.Component}s like its visuals ({@link ImageComponent}) or collision model
+ *     {@link BodyComponent}.
  * </p>
  *
  * <p>
- *     When handling specific GObject instances, it is recommended to refer
- *     to the instance by the combination of its id and version, retrieved by
- *     {@link #getId()} and {@link #getVersion()}, respectively. The id is
- *     distinct and may be used to identify an instance amongst many. However,
- *     the version is needed to differentiate between an instance referenced
- *     as a game object but later destroyed and reused as another. Since a
- *     GObject's id is retained across life cycles, in these cases where
- *     recycling occurs, the version refers to a GObject instance as it
- *     was within a period of time.
+ *     When handling specific GObject instances, it is recommended to refer to the instance by the combination of its
+ *     id and version, retrieved by {@link #getId()} and {@link #getVersion()}, respectively. The id is distinct and
+ *     may be used to identify an instance amongst many. However, the version is needed to differentiate between an
+ *     instance referenced as a game object but later destroyed and reused as another. Since a GObject's id is
+ *     retained across life cycles, in these cases where recycling occurs, the version refers to a GObject instance
+ *     as it was within its relevant period of time.
  * </p>
- *
- *
  */
-public class GObject implements Identifiable, Positional
+public class GObject extends IndexedFactory.Identifiable implements Positional, Rotatable
 {
     // Callback for on click events
     private OnClickListener mOnClickListener;
@@ -40,15 +36,6 @@ public class GObject implements Identifiable, Positional
     // Visual
     private ImageComponent mImgComp;
 
-    // Offset from position
-    private float mOffX = 0f;
-    private float mOffY = 0f;
-    private float mOffZ = 0f;
-
-    // Instance id
-    private int mId;
-    private int mVersion;
-
     /**
      * <p>Constructs an empty game object.</p>
      */
@@ -57,57 +44,35 @@ public class GObject implements Identifiable, Positional
     }
 
     /**
-     * <p>Gets the unique id.</p>
+     * {@inheritDoc}
      *
-     * @return id.
+     * <p>The returned position belongs to either the {@link BodyComponent} or the {@link ImageComponent} with
+     * preference given to the BodyComponent. If neither are set, this method returns null.</p>
+     *
+     * @return position.
      */
     @Override
-    public final int getId()
+    public final Point3F getPosition()
     {
-        return mId;
+        if (mBodyComp != null) {
+            return mBodyComp.getPosition();
+        } else if (mImgComp != null) {
+            return mImgComp.getPosition();
+        } else {
+            return null;
+        }
     }
 
     /**
-     * <p>Sets the unique id.</p>
+     * {@inheritDoc}
      *
-     * @param id id.
-     */
-    final void setId(int id)
-    {
-        mId = id;
-    }
-
-    /**
-     * <p>Gets the version number.</p>
-     *
-     * @return version.
-     */
-    public final int getVersion()
-    {
-        return mVersion;
-    }
-
-    /**
-     * <p>Sets the version number.</p>
-     * @param version version.
-     */
-    final void setVersion(int version)
-    {
-        mVersion = version;
-    }
-
-    /**
-     * <p>Gets the x coordinate.</p>
-     *
-     * <p>The x is the same as the GObject's {@link BodyComponent}'s x
-     * position. If there is no BodyComponent, the returned value will be x
-     * of the {@link ImageComponent}. If neither are available, this method
-     * returns 0.</p>
+     * <p>The returned value belongs to either the {@link BodyComponent} or the {@link ImageComponent} with
+     * preference given to the BodyComponent. If neither are set, this method returns 0.</p>
      *
      * @return x.
      */
     @Override
-    public float getX()
+    public final float getX()
     {
         if (mBodyComp != null) {
             return mBodyComp.getX();
@@ -118,17 +83,15 @@ public class GObject implements Identifiable, Positional
     }
 
     /**
-     * <p>Gets the y coordinate.</p>
+     * {@inheritDoc}
      *
-     * <p>The y is the same as the GObject's {@link BodyComponent}'s y
-     * position. If there is no BodyComponent, the returned value will be y
-     * of the {@link ImageComponent}. If neither are available, this method
-     * returns 0.</p>
+     * <p>The returned value belongs to either the {@link BodyComponent} or the {@link ImageComponent} with
+     * preference given to the BodyComponent. If neither are set, this method returns 0.</p>
      *
      * @return y.
      */
     @Override
-    public float getY()
+    public final float getY()
     {
         if (mBodyComp != null) {
             return mBodyComp.getY();
@@ -139,17 +102,15 @@ public class GObject implements Identifiable, Positional
     }
 
     /**
-     * <p>Gets the z coordinate.</p>
+     * {@inheritDoc}
      *
-     * <p>The z is the same as the GObject's {@link BodyComponent}'s z
-     * position. If there is no BodyComponent, the returned value will be z
-     * of the {@link ImageComponent}. If neither are available, this method
-     * returns 0.</p>
+     * <p>The returned value belongs to either the {@link BodyComponent} or the {@link ImageComponent} with
+     * preference given to the BodyComponent. If neither are set, this method returns 0.</p>
      *
      * @return z.
      */
     @Override
-    public float getZ()
+    public final float getZ()
     {
         if (mBodyComp != null) {
             return mBodyComp.getZ();
@@ -160,28 +121,53 @@ public class GObject implements Identifiable, Positional
     }
 
     /**
-     * <p>Moves the GObject's components to the given (x,y) position.</p>
+     * {@inheritDoc}
+     *
+     * <p>This move requires either a {@link BodyComponent} or {@link ImageComponent} set. If neither are set, this
+     * method does nothing.</p>
      *
      * @param x x.
      * @param y y;
      */
     @Override
-    public void moveTo(float x, float y)
+    public final void moveTo(float x, float y)
     {
-        moveTo(x, y, getZ());
+        // Move BodyComponent to match pos
+        if (mBodyComp != null) {
+            // Bail out if not allowed to move
+            if (mBodyComp.isStatic()) {
+                return;
+            }
+
+            mBodyComp.moveTo(x, y);
+        }
+
+        // Move ImageComponent to match pos
+        if (mImgComp != null) {
+            mImgComp.moveTo(x, y);
+        }
     }
 
     /**
-     * <p>Moves the GObject's components to the given (x,y,z) position.</p>
+     * {@inheritDoc}
+     *
+     * <p>This move requires either a {@link BodyComponent} or {@link ImageComponent} set. If neither are set, this
+     * method does nothing.</p>
      *
      * @param x x.
      * @param y y.
      * @param z z.
      */
+    @Override
     public final void moveTo(float x, float y, float z)
     {
         // Move BodyComponent to match pos
         if (mBodyComp != null) {
+            // Bail out if not allowed to move
+            if (mBodyComp.isStatic()) {
+                return;
+            }
+
             mBodyComp.moveTo(x, y, z);
         }
 
@@ -191,76 +177,229 @@ public class GObject implements Identifiable, Positional
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This move requires either a {@link BodyComponent} or {@link ImageComponent} set. If neither are set, this
+     * method does nothing.</p>
+     *
+     * @param x amount along x.
+     * @param y amount along y.
+     */
     @Override
-    public void setOffset(float x, float y)
+    public final void moveBy(float x, float y)
     {
-        setOffset(x, y, mOffZ);
-    }
-
-    @Override
-    public void setOffset(float x, float y, float z)
-    {
-        mOffX = x;
-        mOffY = y;
-        mOffZ = z;
-    }
-
-    @Override
-    public float getOffsetX()
-    {
-        return mOffX;
-    }
-
-    @Override
-    public float getOffsetY()
-    {
-        return mOffY;
-    }
-
-    @Override
-    public float getOffsetZ()
-    {
-        return mOffZ;
+        moveBy(x, y, 0);
     }
 
     /**
-     * <p>Gets the width coordinate.</p>
+     * {@inheritDoc}
      *
-     * <p>The width is the same as the GObject's {@link BodyComponent}'s
-     * width. If there is no BodyComponent, the returned value will be
-     * the width of the {@link ImageComponent}. If neither are available,
-     * this method returns 0.</p>
+     * <p>This move requires either a {@link BodyComponent} or {@link ImageComponent} set. If neither are set, this
+     * method does nothing.</p>
+     *
+     * @param x amount along x.
+     * @param y amount along y.
+     * @param z amount along z.
+     */
+    @Override
+    public final void moveBy(float x, float y, float z)
+    {
+        // Move BodyComponent to match pos
+        if (mBodyComp != null) {
+            // Bail out if not allowed to move
+            if (mBodyComp.isStatic()) {
+                return;
+            }
+
+            mBodyComp.moveBy(x, y, z);
+        }
+
+        // Move ImageComponent to match pos
+        if (mImgComp != null) {
+            mImgComp.moveBy(x, y, z);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This move requires either a {@link BodyComponent} or {@link ImageComponent} set. If neither are set, this
+     * method does nothing.</p>
+     * *
+     * @param x x.
+     * @param y y.
+     */
+    @Override
+    public final void moveToCenter(float x, float y)
+    {
+        // Get representative positional; either body or image
+        final Positional pos = (mBodyComp != null) ? mBodyComp : mImgComp;
+
+        // Compute bottom left position and move
+        moveTo(x - (pos.getWidth() / 2f), y - (pos.getHeight() / 2f));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The width is that of the {@link BodyComponent} or the {@link ImageComponent} with preference given
+     * to the BodyComponent. If neither are set, this method returns 0.</p>
      *
      * @return width.
      */
-    public float getWidth()
+    @Override
+    public final float getWidth()
     {
         if (mBodyComp != null) {
             return mBodyComp.getWidth();
         } else if (mImgComp != null) {
             return mImgComp.getWidth();
         }
-        return 0;
+        return 0f;
     }
 
     /**
-     * <p>Gets the height coordinate.</p>
+     * {@inheritDoc}
      *
-     * <p>The height is the same as the GObject's {@link BodyComponent}'s
-     * height. If there is no BodyComponent, the returned value will be
-     * the height of the {@link ImageComponent}. If neither are available,
-     * this method returns 0.</p>
+     * <p>The width is applied to both the {@link BodyComponent} and {@link ImageComponent}.</p>
+     *
+     * @param width width.
+     */
+    @Override
+    public final void setWidth(float width)
+    {
+        // Resize collision to width
+        if (mBodyComp != null) {
+            mBodyComp.setWidth(width);
+        }
+
+        // Resize visual to width
+        if (mImgComp != null) {
+            mImgComp.setWidth(width);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The height is that of the {@link BodyComponent} or the {@link ImageComponent} with preference given
+     * to the BodyComponent. If neither are set, this method returns 0.</p>
      *
      * @return height.
      */
-    public float getHeight()
+    @Override
+    public final float getHeight()
     {
         if (mBodyComp != null) {
             return mBodyComp.getHeight();
         } else if (mImgComp != null) {
             return mImgComp.getHeight();
         }
-        return 0;
+        return 0f;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The height is applied to both the {@link BodyComponent} and {@link ImageComponent}.</p>
+     *
+     * @param height height.
+     */
+    @Override
+    public final void setHeight(float height)
+    {
+        // Resize collision to height
+        if (mBodyComp != null) {
+            mBodyComp.setHeight(height);
+        }
+
+        // Resize visual to height
+        if (mImgComp != null) {
+            mImgComp.setHeight(height);
+        }
+    }
+
+    @Override
+    public final float getCenterX()
+    {
+        if (mBodyComp != null) {
+            return mBodyComp.getCenterX();
+        } else if (mImgComp != null) {
+            return mImgComp.getCenterX();
+        } else {
+            return 0f;
+        }
+    }
+
+    @Override
+    public final float getCenterY()
+    {
+        if (mBodyComp != null) {
+            return mBodyComp.getCenterY();
+        } else if (mImgComp != null) {
+            return mImgComp.getCenterY();
+        } else {
+            return 0f;
+        }
+    }
+
+    @Override
+    public final double getRotation()
+    {
+        if (mBodyComp != null) {
+            return mBodyComp.getRotation();
+        } else if (mImgComp != null) {
+            return mImgComp.getRotation();
+        } else {
+            return 0d;
+        }
+    }
+
+    @Override
+    public final void rotateTo(double angle)
+    {
+        // Rotate body if available
+        final boolean hasBody = mBodyComp != null;
+        if (hasBody) {
+            mBodyComp.rotateTo(angle);
+        }
+
+        // Rotate image if available
+        if (mImgComp != null) {
+            mImgComp.rotateTo(angle);
+
+            // Center image onto body
+            if (hasBody) {
+                final float bodyCenterX = mBodyComp.getX() + (mBodyComp.getWidth() / 2f);
+                final float bodyCenterY = mBodyComp.getY() + (mBodyComp.getHeight() / 2f);
+
+                mImgComp.moveToCenter(bodyCenterX, bodyCenterY);
+            }
+        }
+    }
+
+    @Override
+    public final void rotateBy(double angle)
+    {
+        // Rotate body if available
+        final boolean hasBody = mBodyComp != null;
+        if (hasBody) {
+            mBodyComp.rotateBy(angle);
+        }
+
+        // Rotate image if available
+        if (mImgComp != null) {
+            mImgComp.rotateBy(angle);
+
+            // Center image onto body
+            if (hasBody) {
+                final float bodyCenterX = mBodyComp.getX() + (mBodyComp.getWidth() / 2f);
+                final float bodyCenterY = mBodyComp.getY() + (mBodyComp.getHeight() / 2f);
+
+                mImgComp.moveToCenter(bodyCenterX, bodyCenterY);
+            }
+        }
     }
 
     /**
@@ -276,9 +415,8 @@ public class GObject implements Identifiable, Positional
     /**
      * <p>Sets the {@link ImageComponent} to use when drawing.</p>
      *
-     * <p>Any previously set ImageComponent will lose its GObject id and
-     * version, resetting to {@link ComponentFactory.Component#NULL}. The newly
-     * set component adopts the id and version.
+     * <p>Any previously set ImageComponent will lose its GObject id and version, resetting to
+     * {@link ComponentFactory.Component#NULL}. The newly set component adopts the id and version.
      *
      * @param component ImageComponent.
      */
@@ -295,7 +433,6 @@ public class GObject implements Identifiable, Positional
         }
 
         // Apply new component's ownership
-        final ImageComponent oldImg = mImgComp;
         mImgComp = component;
         if (mImgComp != null) {
 
@@ -317,9 +454,8 @@ public class GObject implements Identifiable, Positional
     /**
      * <p>Sets the {@link BodyComponent} to use for collision operations.</p>
      *
-     * <p>Any previously set BodyComponent will lose its GObject id and
-     * version, resetting to {@link ComponentFactory.Component#NULL}. The
-     * newly set component adopts the id and version.
+     * <p>Any previously set BodyComponent will lose its GObject id and version, resetting to
+     * {@link ComponentFactory.Component#NULL}. The newly set component adopts the id and version.
      *
      * @param component BodyComponent.
      */
@@ -346,8 +482,7 @@ public class GObject implements Identifiable, Positional
     }
 
     /**
-     * <p>Moves the {@link ImageComponent} to match positions with the
-     * {@link BodyComponent}.</p>
+     * <p>Moves the {@link ImageComponent} to match positions with the {@link BodyComponent}.</p>
      *
      * <p>If either components have not been set, this method does nothing.</p>
      */
@@ -371,32 +506,29 @@ public class GObject implements Identifiable, Positional
      * @param y y.
      * @return true if the point is contained.
      */
-    public boolean contains(float x, float y)
+    public final boolean contains(float x, float y)
     {
         return (mBodyComp != null && mBodyComp.contains(x, y));
     }
 
     /**
-     * <p>Notifies a listener attached via
-     * {@link #setOnClickListener(OnClickListener)} that the GObject was
-     * clicked on and returns whether or not the given {@link MouseEvent} was
-     * consumed.</p>
+     * <p>Notifies a listener attached via {@link #setOnClickListener(OnClickListener)} that the GObject was clicked
+     * on and returns whether or not the given {@link MouseEvent} was consumed.</p>
      *
-     * <p>This method returns false unless a listener is notified. In that
-     * case, the returned value is deferred to the listener and its
-     * implementation.</p>
+     * <p>This method returns false unless a listener is notified. In that case, the returned value is deferred to
+     * the listener and its implementation.</p>
      *
      * @param event MouseEvent.
      * @return true if the MouseEvent was used.
      */
-    public boolean click(MouseEvent event)
+    public final boolean click(MouseEvent event)
     {
         return (mOnClickListener != null && mOnClickListener.onClick(event));
     }
 
     /**
-     * <p>Sets the {@link OnClickListener} to be notified of
-     * {@link MouseEvent}s used during calls to {@link #click(MouseEvent)}.</p>
+     * <p>Sets the {@link OnClickListener} to be notified of {@link MouseEvent}s used during calls to
+     * {@link #click(MouseEvent)}.</p>
      *
      * @param listener OnClickListener.
      */
@@ -406,10 +538,9 @@ public class GObject implements Identifiable, Positional
     }
 
     @Override
-    protected Object clone() throws CloneNotSupportedException
+    protected final Object clone() throws CloneNotSupportedException
     {
-        throw new CloneNotSupportedException("Copy operations must go through" +
-                " GObjectFactory");
+        throw new CloneNotSupportedException("Copy operations must go through GObjectFactory");
     }
 
     @Override
@@ -423,7 +554,7 @@ public class GObject implements Identifiable, Positional
         }
 
         final Positional anchor;
-        anchor = (mImgComp == null) ? mBodyComp : mImgComp;
+        anchor = (mBodyComp != null) ? mBodyComp : mImgComp;
 
         String position = "(NULL)";
         if (anchor != null) {
@@ -431,8 +562,6 @@ public class GObject implements Identifiable, Positional
                     anchor.getZ() + ")";
         }
 
-        return "[id(" + mId + ")," + "locat" + position + ",tex(" +
-            texture + ")," + ((mBodyComp == null) ? "no collision" :
-                mBodyComp.getShape()) + "]";
+        return "[id(" + getId() + ")," + "locat" + position + ",tex(" + texture + ")," + ((mBodyComp == null) ? "no collision" : mBodyComp.getShape()) + "]";
     }
 }
