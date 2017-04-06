@@ -13,11 +13,8 @@ import java.util.Stack;
  *     detection by comparing axis aligned {@link Rect2D}s surrounding each BodyComponent before more complex
  *     detection algorithms are used.
  * </p>
- *
- * @param <E> kind of BodyComponent to store.
  */
-@SuppressWarnings("unchecked")
-public final class BoundingTree<E extends BodyComponent>
+public final class BoundingTree
 {
     // Root
     private Node mRoot;
@@ -41,7 +38,7 @@ public final class BoundingTree<E extends BodyComponent>
      * @param body BodyComponent to test against.
      * @throws IllegalArgumentException if the given List is not empty.
      */
-    public void getCollisions(List<E> collisions, E body)
+    public void getCollisions(List<BodyComponent> collisions, BodyComponent body)
     {
         // Ensure incoming list is ready to be filled
         if (!collisions.isEmpty()) {
@@ -91,7 +88,7 @@ public final class BoundingTree<E extends BodyComponent>
      * @param body BodyComponent.
      * @return true if the body was successfully added, false if already in the tree.
      */
-    public boolean add(E body)
+    public boolean add(BodyComponent body)
     {
         // Can't add if already in tree
         if (contains(body)) {
@@ -132,7 +129,7 @@ public final class BoundingTree<E extends BodyComponent>
      *
      * @param body BodyComponent.
      */
-    public boolean remove(E body)
+    public boolean remove(BodyComponent body)
     {
         // Remove container from body
         final BoundingTree.Node container = body.getContainer();
@@ -187,7 +184,7 @@ public final class BoundingTree<E extends BodyComponent>
      * @param body {@link BodyComponent} to update.
      * @return true if the BodyComponent's in-tree position had to be updated.
      */
-    public boolean update(E body)
+    public boolean update(BodyComponent body)
     {
         // Bail out if no owning tree or owned by another
         final Node container = body.getContainer();
@@ -324,9 +321,8 @@ public final class BoundingTree<E extends BodyComponent>
      *
      * @param sibling sibling Node in tree.
      * @param child Node to be added.
-     * @return container Node.
      */
-    private Node containChildren(Node sibling, Node child)
+    private void containChildren(Node sibling, Node child)
     {
         assert (isLeaf(sibling) && isLeaf(child));
 
@@ -355,8 +351,6 @@ public final class BoundingTree<E extends BodyComponent>
         container.mRight = sibling;
         child.mParent = container;
         sibling.mParent = container;
-
-        return container;
     }
 
     /**
@@ -410,7 +404,7 @@ public final class BoundingTree<E extends BodyComponent>
      * @param body to be added.
      * @return sibling Node.
      */
-    private Node findSibling(E body)
+    private Node findSibling(BodyComponent body)
     {
         // Public methods should only call this if tree's non-empty
         assert (!isEmpty());
@@ -516,7 +510,7 @@ public final class BoundingTree<E extends BodyComponent>
      * @param body BodyComponent.
      * @return true if in tree.
      */
-    public boolean contains(E body)
+    public boolean contains(BodyComponent body)
     {
         final Node container = body.getContainer();
         return container != null && container.isOwnedBy(this);
@@ -562,7 +556,7 @@ public final class BoundingTree<E extends BodyComponent>
     {
         // Box to check collisions against
         private Rect2D mBox;
-        private E mBody;
+        private BodyComponent mBody;
 
         // Subtree height
         private int mHeight;
@@ -617,7 +611,7 @@ public final class BoundingTree<E extends BodyComponent>
          *
          * @return body.
          */
-        public E getBody()
+        public BodyComponent getBody()
         {
             return mBody;
         }
