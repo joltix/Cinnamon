@@ -591,7 +591,7 @@ public final class BodyComponent extends ComponentFactory.Component implements P
             return;
         }
 
-        mOldAccel.copy(mAccel);
+        // Update current acceleration
         mAccel.copy(acceleration);
     }
 
