@@ -1,6 +1,7 @@
 package com.cinnamon.object;
 
 
+import com.cinnamon.gfx.ImageComponent;
 import com.cinnamon.system.Config;
 import com.cinnamon.system.Game;
 import com.cinnamon.system.IndexedFactory;
@@ -70,7 +71,16 @@ public abstract class GObjectFactory<E extends GObject> extends IndexedFactory<E
     @Override
     public final E remove(int id)
     {
-        return super.remove(id);
+        final E obj = super.remove(id);
+        if (obj == null) {
+            return null;
+        }
+
+        // Remove body and image
+        obj.setBodyComponent(null);
+        obj.setImageComponent(null);
+
+        return obj;
     }
 
     @Override
