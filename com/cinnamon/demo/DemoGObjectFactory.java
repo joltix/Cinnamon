@@ -29,7 +29,7 @@ public class DemoGObjectFactory extends GObjectFactory<GObject>
     @Override
     protected void onRemove(GObject object)
     {
-
+        
     }
 
     @Override
@@ -76,6 +76,7 @@ public class DemoGObjectFactory extends GObjectFactory<GObject>
         {
             final ImageFactory imgFact = resource.getImageFactory();
             final ImageComponent img = imgFact.get("character");
+            img.setOffsets(0f, -0.25f);
             object.setImageComponent(img);
 
             object.setBodyComponent(resource.getBodyFactory().get("character"));
@@ -91,7 +92,9 @@ public class DemoGObjectFactory extends GObjectFactory<GObject>
         public void configure(GObject object, Game.Resources resource)
         {
             super.configure(object, resource);
-            object.getImageComponent().setTint(1f, 0f, 0f);
+            final ImageComponent image = object.getImageComponent();
+            image.setTint(1f, 0f, 0f);
+            image.setOffsets(0f, -0.25f);
         }
     }
 
@@ -101,7 +104,9 @@ public class DemoGObjectFactory extends GObjectFactory<GObject>
         public void configure(GObject object, Game.Resources resource)
         {
             super.configure(object, resource);
-            object.getImageComponent().setTint(0f, 1f, 0f);
+            final ImageComponent image = object.getImageComponent();
+            image.setTint(0f, 1f, 0f);
+            image.setOffsets(0f, -0.25f);
         }
     }
 
@@ -111,7 +116,9 @@ public class DemoGObjectFactory extends GObjectFactory<GObject>
         public void configure(GObject object, Game.Resources resource)
         {
             super.configure(object, resource);
-            object.getImageComponent().setTint(0f, 0f, 1f);
+            final ImageComponent image = object.getImageComponent();
+            image.setTint(0f, 0f, 1f);
+            image.setOffsets(0f, -0.25f);
         }
     }
 
@@ -120,10 +127,13 @@ public class DemoGObjectFactory extends GObjectFactory<GObject>
         @Override
         public void configure(GObject object, Game.Resources resource)
         {
-            object.setImageComponent(resource.getImageFactory().get("rock"));
+            final ImageComponent image = resource.getImageFactory().get("rock");
+            image.setOffsets(0f, -1f);
+            object.setImageComponent(image);
+
             object.setBodyComponent(resource.getBodyFactory().get("rock"));
-            object.setWidth(10f);
-            object.setHeight(10f);
+            object.setWidth(5f);
+            object.setHeight(5f);
         }
     }
 }
