@@ -43,8 +43,8 @@ public abstract class ComponentFactory<E extends ComponentFactory.Component, R> 
         private OnOrphanChangedListener mOnOrphanChangedListener;
 
         // Owning GObject's id and version
-        private int mOwnerId;
-        private int mOwnerVersion;
+        private int mOwnerId = NULL;
+        private int mOwnerVersion = NULL;
 
         /**
          * <p>Gets the owning {@link GObject}'s id.</p>
@@ -73,29 +73,28 @@ public abstract class ComponentFactory<E extends ComponentFactory.Component, R> 
          */
         public final void setGObject(GObject object)
         {
-            // Assign id/version or NULL if abandoned
-            if (object == null) {
-                mOwnerId = NULL;
-                mOwnerVersion = NULL;
+            final boolean orphan = isOrphan();
+            final boolean statusChanged;
 
-                // Notify listener of orphan status
-                if (mOnOrphanChangedListener != null) {
-                    mOnOrphanChangedListener.onOrphanChanged(getId(), true);
-                }
-
-            } else {
-
-                // Check if was already orphan before gaining new owner
-                final boolean gainedOwner = mOwnerId != NULL && mOwnerVersion != NULL;
-
-                // Update id and version to new
+            // Gaining owner
+            if (orphan && object != null) {
                 mOwnerId = object.getId();
                 mOwnerVersion = object.getVersion();
+                statusChanged = true;
 
-                // Notify no longer an orphan after gaining an owner
-                if (gainedOwner && mOnOrphanChangedListener != null) {
-                    mOnOrphanChangedListener.onOrphanChanged(getId(), false);
-                }
+                // Losing owner
+            } else if (!orphan && object == null) {
+                mOwnerId = NULL;
+                mOwnerVersion = NULL;
+                statusChanged = true;
+            } else {
+                // Didn't gain or lose an owner
+                statusChanged = false;
+            }
+
+            // Notify orphan listener if there's been a change in orphan status
+            if (statusChanged && mOnOrphanChangedListener != null) {
+                mOnOrphanChangedListener.onOrphanChanged(getId(), object == null);
             }
         }
 
