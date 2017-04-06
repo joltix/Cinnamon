@@ -38,7 +38,7 @@ public abstract class GObjectFactory<E extends GObject> extends IndexedFactory<E
     }
 
     @Override
-    public E get()
+    public final E get()
     {
         return super.get();
     }
@@ -62,7 +62,7 @@ public abstract class GObjectFactory<E extends GObject> extends IndexedFactory<E
     }
 
     @Override
-    public E remove(int id, int version)
+    public final E remove(int id, int version)
     {
         return super.remove(id, version);
     }
@@ -86,7 +86,7 @@ public abstract class GObjectFactory<E extends GObject> extends IndexedFactory<E
     }
 
     @Override
-    public Config<E, Game.Resources> removeConfig(String name)
+    public final Config<E, Game.Resources> removeConfig(String name)
     {
         return super.removeConfig(name);
     }
