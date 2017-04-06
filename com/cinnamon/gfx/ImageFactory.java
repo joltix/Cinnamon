@@ -66,6 +66,19 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent, Shad
     }
 
     @Override
+    protected final ImageComponent createIdentifiable()
+    {
+        return new ImageComponent();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Overriding classes must call super for {@link ImageComponent}s to be properly setup.</p>
+     *
+     * @param object ImageComponent.
+     */
+    @Override
     protected void onRequisition(ImageComponent object)
     {
         // Expand drawing arr if constrained
@@ -121,6 +134,13 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent, Shad
         mDrawChanged = true;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Overriding classes must call super for {@link ImageComponent}s to be properly drawn.</p>
+     *
+     * @param object ImageComponent.
+     */
     @Override
     protected void onRemove(ImageComponent object)
     {
@@ -155,7 +175,7 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent, Shad
      *     {@link #notifyDrawOrderChanged()} have been called at any time during the frame.
      * </p>
      */
-    public class OnFrameEndListener
+    public final class OnFrameEndListener
     {
         public void onFrameEnd()
         {
@@ -236,7 +256,7 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent, Shad
          *
          * @param comparison {@link Comparison} submitted to order drawing data.
          */
-        public OrphanFilter(Comparison<ImageComponent> comparison)
+        OrphanFilter(Comparison<ImageComponent> comparison)
         {
             mUserCmp = comparison;
         }
@@ -251,7 +271,7 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent, Shad
                 return 1;
             } else if (!null0 && null1) {
                 return -1;
-            } else if (null0 && null1) {
+            } else if (null0) {
                 return 0;
             }
 
@@ -262,7 +282,7 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent, Shad
                 return 1;
             } else if (!orphan0 && orphan1) {
                 return -1;
-            } else if (orphan0 && orphan1) {
+            } else if (orphan0) {
                 return 0;
             }
 
