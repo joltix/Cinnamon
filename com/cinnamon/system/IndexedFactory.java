@@ -1,10 +1,8 @@
 package com.cinnamon.system;
 
 import com.cinnamon.utils.IndexList;
-import com.cinnamon.utils.OnRemoveListener;
 import com.cinnamon.utils.PooledQueue;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
 
