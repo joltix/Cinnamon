@@ -1,26 +1,22 @@
 package com.cinnamon.object;
 
-import com.cinnamon.utils.Point2F;
+import com.cinnamon.utils.Point3F;
 
 /**
  * <p>
- *     Positional describes an object in 3D space through access and
- *     manipulation of an (x,y,z) point.
+ *     Positional describes a 2D object in 3D space. This also adds dimension setting methods to the
+ *     {@link Dimensional} interface, which allow only reading of an object's width and height.
  * </p>
- *
- * <p>
- *     A secondary point is maintained as offset values to be added to the
- *     Positional's true position through
- *     {@link #setOffset(float, float, float)}. Position getter methods that
- *     return a value and not a {@link Point2F} are treated with the offset
- *     automatically applied. Those returning Point2Fs return the true positions
- *     and have not had the offsets applied.
- * </p>
- *
- *
  */
-public interface Positional
+public interface Positional extends Dimensional
 {
+    /**
+     * <p>Gets the position. Changes to the {@link Point3F} will not affect the Positional's position.</p>
+     *
+     * @return position.
+     */
+    Point3F getPosition();
+
     /**
      * <p>Gets the x coordinate.</p>
      *
@@ -43,6 +39,14 @@ public interface Positional
     float getZ();
 
     /**
+     * <p>Moves the position to a specific (x,y) point while leaving the z dimension as-is.</p>
+     *
+     * @param x x.
+     * @param y y;
+     */
+    void moveTo(float x, float y);
+
+    /**
      * <p>Moves the position to a specific (x,y,z) point.</p>
      *
      * @param x x.
@@ -52,55 +56,41 @@ public interface Positional
     void moveTo(float x, float y, float z);
 
     /**
-     * <p>Moves the position to a specific (x,y) point while leaving the z
-     * dimension as-is.</p>
+     * <p>Moves the position by an x and y amount. The values are added to the respective coordinates.</p>
+     *
+     * @param x amount along x.
+     * @param y amount along y.
+     */
+    void moveBy(float x, float y);
+
+    /**
+     * <p>Moves the position by an x, y, and z amount. The values are added to the respective coordinates.</p>
+     *
+     * @param x amount along x.
+     * @param y amount along y.
+     * @param z amount along z.
+     */
+    void moveBy(float x, float y, float z);
+
+    /**
+     * <p>Moves the position to center on a specific (x,y) point.</p>
      *
      * @param x x.
-     * @param y y;
+     * @param y y.
      */
-    void moveTo(float x, float y);
+    void moveToCenter(float x, float y);
 
     /**
-     * <p>Sets offset values for the x, y, and z coordinates.</p>
+     * <p>Sets the width.</p>
      *
-     * <p>These values are added to target destinations for methods such as
-     * {@link #moveTo(float, float, float)}.</p>
-     *
-     * @param x x offset.
-     * @param y y offset.
-     * @param z z offset.
+     * @param width width.
      */
-    void setOffset(float x, float y, float z);
+    void setWidth(float width);
 
     /**
-     * <p>Sets offset values for the x and y coordinates.</p>
+     * <p>Sets the height.</p>
      *
-     * <p>These values are added to target destinations for methods such as
-     * {@link #moveTo(float, float)}.</p>
-     *
-     * @param x x offset.
-     * @param y y offset.
+     * @param height height.
      */
-    void setOffset(float x, float y);
-
-    /**
-     * <p>Gets the x offset.</p>
-     *
-     * @return x offset.
-     */
-    float getOffsetX();
-
-    /**
-     * <p>Gets the y offset.</p>
-     *
-     * @return y offset.
-     */
-    float getOffsetY();
-
-    /**
-     * <p>Gets the z offset.</p>
-     *
-     * @return z offset.
-     */
-    float getOffsetZ();
+    void setHeight(float height);
 }
