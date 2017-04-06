@@ -45,12 +45,6 @@ public class DemoBodyFactory extends BodyFactory
         addConfig("character", new CharacterConfig());
     }
 
-    @Override
-    protected BodyComponent createIdentifiable()
-    {
-        return new BodyComponent(new Shape(10, 10));
-    }
-
     private class CharacterConfig implements Config<BodyComponent, Object>
     {
         @Override
