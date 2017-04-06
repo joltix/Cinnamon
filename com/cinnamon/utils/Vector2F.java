@@ -374,7 +374,14 @@ public class Vector2F
      */
     public final double getAngle()
     {
-        return Math.atan2(mY, mX);
+        double rads = Math.atan2(mY, mX);
+
+        // Subtract from circle as difference as if continuous 0 -> 2PI
+        if (rads < 0d) {
+            rads = (2d * Math.PI) - Math.abs(rads);
+        }
+
+        return rads;
     }
 
     @Override
