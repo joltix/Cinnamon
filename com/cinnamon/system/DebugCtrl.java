@@ -1,10 +1,15 @@
 package com.cinnamon.system;
 
 import com.cinnamon.gfx.Canvas;
+import com.cinnamon.gfx.ImageComponent;
+import com.cinnamon.object.BodyComponent;
 import com.cinnamon.object.GObject;
 import com.cinnamon.object.GObjectFactory;
 import com.cinnamon.object.Room;
+import com.cinnamon.utils.Point3F;
+import com.cinnamon.utils.Shape;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -78,6 +83,12 @@ public final class DebugCtrl
     // Print basic info about View
     private static final String GET_VIEW = "get view";
 
+    // Print info on select's ImageComponent
+    private static final String GET_IMAGE = "get image";
+
+    // Print info on selected's BodyComponent
+    private static final String GET_BODY = "get body";
+
     /**
      * The following action commands affect the game and are not simply getting information.
      */
@@ -88,11 +99,62 @@ public final class DebugCtrl
     // Destroys the currently selected GObject
     private static final String DESTROY_SELECTED = "destroy selected";
 
+    // Selects a GObject, command format: "select <id> <version>"
+    private static final String SELECT = "select";
+
     // Calls view.setRoomConstrained(boolean);
     private static final String SET_VIEW_CONSTRAINT = "constrain view";
 
     // Shuts down the game
     private static final String SHUTDOWN = "shutdown";
+
+    /**
+     * Messages to print for query commands
+     */
+
+    private static final String HELP_TICKRATE = " - gets the tickrate\n";
+
+    private static final String HELP_FRAMERATE = " - gets the framerate\n";
+
+    private static final String HELP_META = " - gets the game title, developer, and build\n";
+
+    private static final String HELP_GL_VERSION = " - gets the OpenGL version\n";
+
+    private static final String HELP_GPU = " - gets the gpu's vendor and model\n";
+
+    private static final String HELP_PROCESSORS = " - gets the number of processors\n";
+
+    private static final String HELP_MEMORY = " - gets current memory stats\n";
+
+    private static final String HELP_RESOLUTION = " - gets drawing resolution\n";
+
+    private static final String HELP_GOBJECT_CONFIGS = " - lists available object configurations\n";
+
+    private static final String HELP_GOBJECT_COUNT = " - counts number of objects\n";
+
+    private static final String HELP_SELECTED = " - gets info on selected object\n";
+
+    private static final String HELP_IMAGE = " - gets image info on selected object\n";
+
+    private static final String HELP_BODY = " - gets body info on selected object\n";
+
+    private static final String HELP_ROOM = " - gets info on current Room\n";
+
+    private static final String HELP_VIEW = " - gets info on View\n";
+
+    private static final String HELP_CREATE_GOBJ = " - creates an object and centers on View. Example: " +
+            CREATE_GOBJ + " <configuration>\n";
+
+    private static final String HELP_DESTROY_SELECTED = " - destroys selected object\n";
+
+    private static final String HELP_SELECT = " - selects an object. Example: " + SELECT + " <id> <version>\n";
+
+    private static final String HELP_SET_VIEW_CONSTRAINT = " - toggles locking View from leaving room. Example: " +
+            SET_VIEW_CONSTRAINT + " <true|false>\n";
+
+    private static final String HELP_SHUTDOWN = " - ends the game\n";
+
+    private static final String HELP_STOP = " - stops receiving console input\n";
 
     // Threaded console input
     private final ConcurrentConsoleInput<String> mConsole = new DebugConsole();
@@ -144,29 +206,34 @@ public final class DebugCtrl
      */
     private void printManual()
     {
-        StringBuilder builder = new StringBuilder();
+        // Setup help intro
+        final StringBuilder builder = new StringBuilder();
         builder.append("<supported commands>\n");
-        builder.append(GET_TICKRATE).append(" - gets the tickrate\n");
-        builder.append(GET_FRAMERATE).append(" - gets the framerate\n");
-        builder.append(GET_META).append(" - gets the game title, developer, and build\n");
-        builder.append(GET_GL_VERSION).append(" - gets the OpenGL version\n");
-        builder.append(GET_GPU).append(" - gets the gpu's vendor and model\n");
-        builder.append(GET_PROCESSORS).append(" - gets the number of processors\n");
-        builder.append(GET_MEMORY).append(" - gets current memory stats\n");
-        builder.append(GET_RESOLUTION).append(" - gets drawing resolution\n");
-        builder.append(GET_GOBJECT_CONFIGS).append(" - lists available object configurations\n");
-        builder.append(GET_GOBJECT_COUNT).append(" - counts number of objects\n");
-        builder.append(GET_SELECTED).append(" - gets info on selected object\n");
-        builder.append(GET_ROOM).append(" - gets info on current Room\n");
-        builder.append(GET_VIEW).append(" - gets info on View\n");
-        builder.append(CREATE_GOBJ).append(" - creates an object and centers on View. Example: ").append(CREATE_GOBJ)
-                .append(" <configuration>\n");
-        builder.append(DESTROY_SELECTED).append(" - destroys selected object\n");
-        builder.append(SET_VIEW_CONSTRAINT).append(" - toggles locking View from leaving Room. Example: ").append
-                (SET_VIEW_CONSTRAINT).append(" <true|false>\n");
-        builder.append(SHUTDOWN).append(" - ends the game\n");
-        builder.append(DebugConsole.STOP_CMD).append(" - stops receiving console input");
 
+        // Build command list
+        builder.append(GET_TICKRATE).append(HELP_TICKRATE);
+        builder.append(GET_FRAMERATE).append(HELP_FRAMERATE);
+        builder.append(GET_META).append(HELP_META);
+        builder.append(GET_GL_VERSION).append(HELP_GL_VERSION);
+        builder.append(GET_GPU).append(HELP_GPU);
+        builder.append(GET_PROCESSORS).append(HELP_PROCESSORS);
+        builder.append(GET_MEMORY).append(HELP_MEMORY);
+        builder.append(GET_RESOLUTION).append(HELP_RESOLUTION);
+        builder.append(GET_GOBJECT_CONFIGS).append(HELP_GOBJECT_CONFIGS);
+        builder.append(GET_GOBJECT_COUNT).append(HELP_GOBJECT_COUNT);
+        builder.append(GET_SELECTED).append(HELP_SELECTED);
+        builder.append(GET_IMAGE).append(HELP_IMAGE);
+        builder.append(GET_BODY).append(HELP_BODY);
+        builder.append(GET_ROOM).append(HELP_ROOM);
+        builder.append(GET_VIEW).append(HELP_VIEW);
+        builder.append(CREATE_GOBJ).append(HELP_CREATE_GOBJ);
+        builder.append(DESTROY_SELECTED).append(HELP_DESTROY_SELECTED);
+        builder.append(SELECT).append(HELP_SELECT);
+        builder.append(SET_VIEW_CONSTRAINT).append(HELP_SET_VIEW_CONSTRAINT);
+        builder.append(SHUTDOWN).append(HELP_SHUTDOWN);
+        builder.append(DebugConsole.STOP_CMD).append(HELP_STOP);
+
+        // Print command list
         System.out.printf("%s\n", format(builder.toString()));
     }
 
@@ -234,6 +301,12 @@ public final class DebugCtrl
             // Print basic info about the selected GObject
             case GET_SELECTED:
                 printSelectedGObject(); break;
+            // Print info on selected's visual
+            case GET_IMAGE:
+                printImage(); break;
+            // Print info on selected's collision
+            case GET_BODY:
+                printBody(); break;
             // Print basic info about the Room
             case GET_ROOM:
                 printRoom(); break;
@@ -331,7 +404,7 @@ public final class DebugCtrl
     }
 
     /**
-     * <p>Prints all {@link GObjectFactory.GObjectConfig}s available to use when creating {@link GObject}s.</p>
+     * <p>Prints all {@link Config}s available to use when creating {@link GObject}s.</p>
      */
     private void printGObjectConfigs()
     {
@@ -343,18 +416,12 @@ public final class DebugCtrl
 
         // Set config count as first line
         configList.append("count(");
-        configList.append(configNames.size() - 1);
+        configList.append(configNames.size());
         configList.append(")\n");
 
         // Add each config as its own line
         int i = 0;
-        for (String name : factory.getConfigNames()) {
-
-            // Don't report "room" config - shouldn't be spawned through here
-            if (name.equals(GObjectFactory.CONFIG_ROOM)) {
-                continue;
-            }
-
+        for (String name : configNames) {
             configList.append("    [");
             configList.append(i++);
             configList.append("] \"");
@@ -388,13 +455,13 @@ public final class DebugCtrl
             System.out.printf(format(info));
         } else {
 
-            info = "id(%d), version(%d), position(%d,%d,%d), img(%s), collision(%s)";
+            info = "object[id(%d), version(%d), @(%f,%f,%f), image(%s), body(%s)]";
 
             final int id = obj.getId();
             final int ver = obj.getVersion();
-            final int x = (int) obj.getX();
-            final int y = (int) obj.getY();
-            final int z = (int) obj.getZ();
+            final float x = obj.getX();
+            final float y = obj.getY();
+            final float z = obj.getZ();
             final boolean hasImg = (obj.getImageComponent() != null);
             final boolean hasBod = (obj.getBodyComponent() != null);
 
@@ -415,6 +482,81 @@ public final class DebugCtrl
         final int y = (int) view.getY();
 
         System.out.printf(format("width(%d), height(%d), position(%d, %d)"), width, height, x, y);
+    }
+
+    /**
+     * <p>Prints information about the selected {@link GObject}'s {@link ImageComponent}.</p>
+     */
+    private void printImage()
+    {
+        final GObject obj = mGame.getSelected();
+        if (obj == null) {
+            System.out.printf(format("no object selected"));
+        }
+
+        final ImageComponent img = obj.getImageComponent();
+        if (img == null) {
+            System.out.printf(format("object has no image"));
+        } else {
+            final String line = "image[visible(%s), flipH(%s), flipV(%s), rotation(%.2f), @(%.2f, %.2f, %.2f), " +
+                    "offset(%.2f, %.2f), width(%.2f), height(%.2f), r(%.2f), g(%.2f), b(%.2f), a(%.2f)]";
+            final Point3F pos = img.getPosition();
+            System.out.printf(format(line), img.isVisible(), img.isFlippedHorizontally(), img.isFlippedVertically(),
+                    img.getRotation(), pos.getX(), pos.getY(), pos.getZ(), img.getOffsetX(), img.getOffsetY(),
+                    img.getWidth(), img.getHeight(), img.getRed(), img.getGreen(), img.getBlue(),
+                    img.getTransparency());
+        }
+    }
+
+    /**
+     * <p>Prints information about the selected {@link GObject}'s {@link BodyComponent}.</p>
+     */
+    private void printBody()
+    {
+        final GObject obj = mGame.getSelected();
+        if (obj == null) {
+            System.out.printf(format("no object selected"));
+            return;
+        }
+
+        final BodyComponent body = obj.getBodyComponent();
+        if (body == null) {
+            System.out.printf(format("object has no body"));
+        }
+
+        final String bodyInfo = "body[id(%d), version(%d), selectable(%s), static(%s), collidable(%s), speed(%.2f), " +
+                "shape[rotation(%.2f), @(%.2f, %.2f, %.2f), width(%.2f), height(%.2f))]]";
+
+        final Solver solver = mGame.getSolver();
+        final List<BodyComponent> collisions = solver.getBoundingBoxCollisions(body);
+        if (collisions.isEmpty()) {
+            final Shape shape = body.getShape();
+            System.out.printf(format(bodyInfo + ": no collisions"), body.getId(), body.getVersion(),
+                    body.isSelectable(), body.isStatic(), body.isCollidable(), body.getSpeed(), shape.getRotation(),
+                    shape.getX(), shape.getY(), shape.getZ(), shape.getWidth(), shape.getHeight());
+        } else {
+            final StringBuilder builder = new StringBuilder();
+            builder.append(bodyInfo);
+            builder.append("\n<collisions>\n");
+            for (BodyComponent other : collisions) {
+                builder.append("    w/ object id(");
+                builder.append(other.getGObjectId());
+                builder.append(") version(");
+                builder.append(other.getGObjectVersion());
+                builder.append(") @(");
+                builder.append(other.getX());
+                builder.append(",");
+                builder.append(other.getY());
+                builder.append(",");
+                builder.append(other.getZ());
+                builder.append(")\n");
+            }
+
+            final Shape shape = body.getShape();
+            System.out.printf(format(builder.toString()), body.getId(), body.getVersion(), body.isSelectable(),
+                    body.isStatic(), body.isCollidable(), body.getSpeed(), shape.getRotation(), shape.getX(),
+                    shape.getY(), shape.getZ(), shape.getWidth(), shape.getHeight());
+        }
     }
 
     /**
@@ -441,6 +583,10 @@ public final class DebugCtrl
         } else if (input.equals(DESTROY_SELECTED)) {
             destroySelected();
 
+            // Selects the GObject with a specific id and version
+        } else if (input.contains(SELECT)) {
+            select(input);
+
             // Sets whether or not the View should be room constrained
         } else if (input.contains(SET_VIEW_CONSTRAINT)) {
             setViewConstraint(input);
@@ -455,7 +601,7 @@ public final class DebugCtrl
     }
 
     /**
-     * <p>Creates a {@link GObject} based off of a specified {@link GObjectFactory.GObjectConfig}.</p>
+     * <p>Creates a {@link GObject} based off of a specified {@link Config}.</p>
      *
      * @param input console input.
      */
@@ -471,23 +617,23 @@ public final class DebugCtrl
         // Retrieve GObjectConfig
         final String configName = tokens[2];
         final GObjectFactory factory = mGame.getGObjectFactory();
-        final GObjectFactory.GObjectConfig config = factory.getConfig(configName);
+        final Config<GObject, Game.Resources> config = factory.getConfig(configName);
 
         // Don't allow GObjectFactory.CONFIG_ROOM to be used here
-        if (config == null || configName.equals(GObjectFactory.CONFIG_ROOM)) {
+        if (config == null) {
             System.out.printf(format("no config named \"%s\""), configName);
         } else {
 
             final View view = mGame.getView();
-            final GObject obj = factory.getGObject(configName);
-
-            // Compute center of View
-            final float centerX = (view.getX() + (view.getWidth()) / 2) - (obj.getX() + (obj.getWidth()) / 2);
-            final float centerY = (view.getY() + (view.getHeight()) / 2) - (obj.getY() + (obj.getHeight()) / 2);
+            final GObject obj = factory.get(configName);
 
             // Move obj to View's center and notify on console
-            obj.moveTo(centerX, centerY);
-            System.out.printf(format("object created at (%d, %d)"), (int) centerX, (int) centerY);
+            obj.moveToCenter(view.getCenterX(), view.getCenterY());
+            obj.moveBy(0f, 0f, -Float.MAX_VALUE);
+
+            // Print creation confirmation
+            System.out.printf(format("object[id(%d) version(%d)] created @(%.2f, %.2f)"), obj.getId(), obj
+                            .getVersion(), obj.getX(), obj.getY());
         }
     }
 
@@ -512,6 +658,41 @@ public final class DebugCtrl
         // Reset selection
         mGame.setSelected(null);
         System.out.printf(format("(id(%d), version(%d) destroyed"), id, ver);
+    }
+
+    /**
+     * <p>Selects a {@link GObject} matching an id and version specified in the input.</p>
+     *
+     * @param input input.
+     */
+    private void select(String input)
+    {
+        // Check format
+        if (!input.matches(SELECT + " [0-9]+ [0-9]+")) {
+            return;
+        }
+
+        // Separate by spaces
+        final String[] tokens = input.split(" ");
+
+        try {
+            // Get id and version from input String
+            final int id = Integer.parseInt(tokens[1]);
+            final int version = Integer.parseInt(tokens[2]);
+
+            // Select GObject only if id and version's reference exists
+            final GObjectFactory factory = mGame.getGObjectFactory();
+            if (factory.get(id, version) != null) {
+                mGame.setSelected(id, version);
+                System.out.printf(format("selected id(%d) version(%d)"), id, version);
+            } else {
+                System.out.printf(format("cannot select non-existent object: id(%d) version(%d)"), id, version);
+            }
+
+        } catch (NumberFormatException e) {
+            // Print exception and bail out
+            e.printStackTrace();
+        }
     }
 
     /**
