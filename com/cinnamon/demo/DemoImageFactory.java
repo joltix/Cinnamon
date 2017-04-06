@@ -15,10 +15,6 @@ public class DemoImageFactory extends ImageFactory
     private static final int LOAD = 100;
     private static final float GROWTH = 0.15f;
 
-    private static final Float DEFAULT_WIDTH = 5f;
-    private static final Float DEFAULT_HEIGHT = 5f;
-    private static final int DEFAULT_TEXTURE = Texture.NULL;
-
     public DemoImageFactory(ShaderFactory factory)
     {
         super(factory, new Merge<ImageComponent>(new PainterOrder()), LOAD,
@@ -36,12 +32,6 @@ public class DemoImageFactory extends ImageFactory
     {
         addConfig("character", new CharacterConfig());
         addConfig("rock", new RockConfig());
-    }
-
-    @Override
-    protected ImageComponent createIdentifiable()
-    {
-        return new DemoImageComponent(DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_TEXTURE);
     }
 
     private class CharacterConfig implements Config<ImageComponent, ShaderFactory>
@@ -98,10 +88,8 @@ public class DemoImageFactory extends ImageFactory
         public int compare(ImageComponent obj0, ImageComponent obj1)
         {
             // Determine whether or not the L and R objs can be drawn
-            final boolean drawable0 = obj0 != null && obj0.isVisible()
-                    && obj0.getTransparency() > 0f;
-            final boolean drawable1 = obj1 != null && obj1.isVisible()
-                    && obj1.getTransparency() > 0f;
+            final boolean drawable0 = obj0.isVisible() && obj0.getTransparency() > 0f;
+            final boolean drawable1 = obj1.isVisible() && obj1.getTransparency() > 0f;
 
             // Compare 'z' values and texture ids if both can be drawn
             if (drawable0 && drawable1) {
