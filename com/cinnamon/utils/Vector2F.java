@@ -1,30 +1,37 @@
 package com.cinnamon.utils;
 
-import com.cinnamon.object.Positional;
 
 /**
- * <p>Representation of a two dimension vector of floats.</p>
- *
- *
+ * <p>Representation of a two dimensional vector of floats.</p>
  */
-public class Vector2F implements Positional
+public class Vector2F
 {
-    // Number of elements
+    // Number of values
     private static final int SIZE = 2;
 
-    // Element indices
-    private static final int X = 0;
-    private static final int Y = 1;
-
-    // Elements
-    private final float[] mValues = new float[SIZE];
+    // Values
+    private float mX;
+    private float mY;
 
     /**
-     * <p>Constructor for a Vector2F.</p>
+     * <p>Constructor for a zero Vector2F.</p>
      */
     public Vector2F()
     {
+        mX = 0f;
+        mY = 0f;
+    }
 
+    /**
+     * <p>Constructor for a Vector2F with specific x and y values.</p>
+     *
+     * @param x x.
+     * @param y y.
+     */
+    public Vector2F(float x, float y)
+    {
+        mX = x;
+        mY = y;
     }
 
     /**
@@ -34,134 +41,174 @@ public class Vector2F implements Positional
      */
     public Vector2F(Vector2F vector)
     {
-        mValues[X] = vector.mValues[X];
-        mValues[Y] = vector.mValues[Y];
+        copy(vector);
     }
 
     /**
-     * <p>Copies another Vector2F's values.</p>
+     * <p>Copies another vector's values.</p>
      *
      * @param vector vector to copy.
      */
     public void copy(Vector2F vector)
     {
-        mValues[X] = vector.mValues[X];
-        mValues[Y] = vector.mValues[Y];
-    }
-
-    @Override
-    public float getX() {
-        return mValues[X];
-    }
-
-    @Override
-    public float getY() {
-        return mValues[Y];
-    }
-
-    @Override
-    public float getZ() {
-        return 0;
-    }
-
-    @Override
-    public void moveTo(float x, float y, float z) {
-        moveTo(x, y, 0);
-    }
-
-    @Override
-    public void moveTo(float x, float y) {
-        mValues[X] = x;
-        mValues[Y] = y;
+        mX = vector.mX;
+        mY = vector.mY;
     }
 
     /**
-     * <p>This method has no effect.</p>
+     * <p>Gets the x value.</p>
      *
-     * @param x x offset.
-     * @param y y offset.
+     * @return x.
      */
-    @Override
-    public void setOffset(float x, float y) {
-
+    public final float getX() {
+        return mX;
     }
 
     /**
-     * <p>This method has no effect.</p>
+     * <p>Sets the x value.</p>
      *
-     * @param x x offset.
-     * @param y y offset.
-     * @param z z offset.
+     * @param x x.
      */
-    @Override
-    public void setOffset(float x, float y, float z)
+    public final void setX(float x)
     {
-
+        mX = x;
     }
 
     /**
-     * <p>This method always returns 0.</p>
+     * <p>Gets the y value.</p>
      *
-     * @return 0.
+     * @return y.
      */
-    @Override
-    public float getOffsetX() {
-        return 0;
+    public final float getY() {
+        return mY;
     }
 
     /**
-     * <p>This method always returns 0.</p>
+     * <p>Sets the y value.</p>
      *
-     * @return 0.
+     * @param y y.
      */
-    @Override
-    public float getOffsetY() {
-        return 0;
-    }
-
-    /**
-     * <p>This method always returns 0.</p>
-     *
-     * @return 0.
-     */
-    @Override
-    public float getOffsetZ()
+    public final void setY(float y)
     {
-        return 0;
+        mY = y;
     }
 
     /**
-     * <p>Performs the dot product operation with another Vector2F.</p>
+     * <p>Gets the vector's x and y values as a {@link Point2F}.</p>
+     *
+     * @return point.
+     */
+    public Point2F getPoint()
+    {
+        return new Point2F(mX, mY);
+    }
+
+    /**
+     * <p>Sets the x and y values.</p>
+     *
+     * @param x x.
+     * @param y y.
+     */
+    public final void set(float x, float y)
+    {
+        mX = x;
+        mY = y;
+    }
+
+    /**
+     * <p>Performs the dot product, also known as scalar product, operation with another vector.</p>
      *
      * @param vector other Vector2F.
      * @return dot product.
      */
     public float dotProduct(Vector2F vector)
     {
-        // Multiply corresponding elements and sum all
-        float dotProd = 0f;
-        for (int i = 0, len = size(); i < len; i++) {
-            dotProd += (mValues[i] * vector.mValues[i]);
-        }
-
-        return dotProd;
+        return (mX * vector.mX) + (mY * vector.mY);
     }
 
     /**
-     * <p>Multiplies the Vector2F with a scalar.</p>
+     * <p>Multiplies the vector with a scalar.</p>
      *
      * @param scalar scalar.
+     * @return vector.
      */
-    public void multiply(float scalar)
+    public Vector2F multiply(float scalar)
     {
-        // Multiply scalar against each element
-        for (int i = 0; i < mValues.length; i++) {
-            mValues[i] *= scalar;
-        }
+        mX *= scalar;
+        mY *= scalar;
+        return this;
     }
 
     /**
-     * <p>Gets a unit vector representing the direction of the Vector2F.</p>
+     * <p>Divides the vector with a scalar. This is equivalent to calling {@link #multiply(float)} and passing in
+     * <i>"1f / scalar"</i>.</p>
+     *
+     * @param scalar scalar.
+     * @return vector.
+     */
+    public Vector2F divide(float scalar)
+    {
+        mX /= scalar;
+        mY /= scalar;
+        return this;
+    }
+
+    /**
+     * <p>Adds another vector.</p>
+     *
+     * @param vector other vector.
+     * @return calling vector.
+     */
+    public Vector2F add(Vector2F vector)
+    {
+        mX += vector.mX;
+        mY += vector.mY;
+        return this;
+    }
+
+    /**
+     * <p>Adds an x and y value.</p>
+     *
+     * @param x x.
+     * @param y y.
+     * @return vector.
+     */
+    public Vector2F add(float x, float y)
+    {
+        mX += x;
+        mY += y;
+        return this;
+    }
+
+    /**
+     * <p>Subtracts another vector.</p>
+     *
+     * @param vector other vector.
+     * @return calling vector.
+     */
+    public Vector2F subtract(Vector2F vector)
+    {
+        mX -= vector.mX;
+        mY -= vector.mY;
+        return this;
+    }
+
+    /**
+     * <p>Subtracts an x and y value.</p>
+     *
+     * @param x x.
+     * @param y y.
+     * @return vector.
+     */
+    public Vector2F subtract(float x, float y)
+    {
+        mX -= x;
+        mY -= y;
+        return this;
+    }
+
+    /**
+     * <p>Gets a unit vector representing the calling vector's direction.</p>
      *
      * @return unit vector.
      */
@@ -171,8 +218,7 @@ public class Vector2F implements Positional
     }
 
     /**
-     * <p>Transforms a given Vector2F into a unit vector representing the
-     * direction of the calling vector.</p>
+     * <p>Transforms a given vector into a unit vector representing the direction of the calling vector.</p>
      *
      * @param container Vector2F to transform to unit vector.
      * @return unit vector.
@@ -193,14 +239,27 @@ public class Vector2F implements Positional
 
     /**
      * <p>Transforms a Vector2F into a unit vector.</p>
+     *
      * @param unitVector
-     * @return
+     * @return unit vector.
      */
     private Vector2F computeUnitVector(Vector2F unitVector)
     {
         final float magnitude = magnitude();
-        unitVector.multiply((1 / magnitude));
+        if (Point2F.isEqual(magnitude, 0f)) {
+            unitVector.set(0f, 0f);
+        } else {
+            unitVector.divide(magnitude);
+        }
         return unitVector;
+    }
+
+    /**
+     * <p>Negates the direction.</p>
+     */
+    public final void negate()
+    {
+        multiply(-1f);
     }
 
     /**
@@ -216,8 +275,7 @@ public class Vector2F implements Positional
     }
 
     /**
-     * <p>Transforms a given container vector whose direction is
-     * perpendicular to the calling vector.</p>
+     * <p>Transforms a given container vector whose direction is perpendicular to the calling vector.</p>
      *
      * @param container vector to become perpendicular.
      * @param right true to create a right-hand normal, false for left.
@@ -229,8 +287,7 @@ public class Vector2F implements Positional
     }
 
     /**
-     * <p>Transforms the calling vector into a vector perpendicular to the
-     * original direction.</p>
+     * <p>Transforms the calling vector into a vector perpendicular to the original direction.</p>
      *
      * @param right true to make a right-hand normal, false for left.
      */
@@ -240,8 +297,7 @@ public class Vector2F implements Positional
     }
 
     /**
-     * <p>Transforms the calling vector into a vector perpendicular to the
-     * original direction.</p>
+     * <p>Transforms the calling vector into a vector perpendicular to the original direction.</p>
      *
      * @param container vector to become perpendicular.
      * @param right true to make a right-hand normal, false for left.
@@ -249,18 +305,18 @@ public class Vector2F implements Positional
     private static Vector2F makePerpendicular(Vector2F container, boolean right)
     {
         // Pull vector point
-        final float x = container.mValues[X];
-        final float y = container.mValues[Y];
+        final float x = container.mX;
+        final float y = container.mY;
 
         // Flip to the right
         if (right) {
-            container.mValues[X] = -y;
-            container.mValues[Y] = x;
+            container.mX = -y;
+            container.mY = x;
         } else {
 
             // Flip to left perpendicular
-            container.mValues[X] = y;
-            container.mValues[Y] = -x;
+            container.mX = y;
+            container.mY = -x;
         }
 
         return container;
@@ -273,21 +329,13 @@ public class Vector2F implements Positional
      */
     public float magnitude()
     {
-        // Square each element and sum
-        double toSqrt = 0d;
-        for (int i = 0; i < mValues.length; i++) {
-            final double val = mValues[i];
-            toSqrt += (val * val);
-        }
-
-        // Final square root op for magnitude
-        return (float) Math.sqrt(toSqrt);
+        return (float) Math.sqrt((mX * mX) + (mY * mY));
     }
 
     /**
-     * <p>Gets the number of elements.</p>
+     * <p>Gets the number of values.</p>
      *
-     * @return element count.
+     * @return value count.
      */
     public int size()
     {
@@ -295,47 +343,54 @@ public class Vector2F implements Positional
     }
 
     /**
-     * <p>Computes a vector that is the projection of the caller onto
-     * another vector.</p>
+     * <p>Checks if the {@link Vector2F} is the zero vector (magnitude is 0). This method uses
+     * {@link Point2F#PRECISION} for fp comparison.</p>
      *
-     * @param vector vector to project on to.
-     * @return projected vector.
+     * @return true if zero vector.
      */
-    public Vector2F projectOn(Vector2F vector)
+    public boolean isZero()
     {
-        return projectOn(new Vector2F(vector), new Vector2F());
+        return Point2F.isEqual(mX, 0f) && Point2F.isEqual(mY, 0f);
     }
 
     /**
-     * <p>Computes a vector that is the projection of the caller onto
-     * another vector.</p>
+     * <p>Gets a {@link Vector2F} that forms a specific angle counterclockwise from the direction (1,0).</p>
      *
-     * @param vector vector to project on to.
-     * @param container vector to use as projected vector.
-     * @return projected vector.
+     * @param radians angle.
+     * @param magnitude magnitude.
+     * @return vector.
      */
-    public Vector2F projectOn(Vector2F vector, Vector2F container)
+    public static Vector2F fromAngle(double radians, double magnitude)
     {
-        container.copy(vector);
+        final double x = (Math.sin(radians) * magnitude);
+        final double y = (Math.cos(radians) * magnitude);
+        return new Vector2F((float) x, (float) y);
+    }
 
-        // Dot product against itself
-        final float selfDot = container.dotProduct(container);
+    /**
+     * <p>Gets the angle between 0 (direction vector (1,0)) and the vector's (x,y) in radians.</p>
+     *
+     * @return angle in radians.
+     */
+    public final double getAngle()
+    {
+        double rads = Math.atan2(mY, mX);
 
-        // Dot product against calling vector
-        final float dot = dotProduct(container) / selfDot;
-        container.multiply(dot);
+        // Subtract from circle as difference as if continuous 0 -> 2PI
+        if (rads < 0d) {
+            rads = (2d * Math.PI) - Math.abs(rads);
+        }
 
-        return container;
+        return rads;
     }
 
     @Override
     public String toString() {
         final StringBuilder builder = new StringBuilder();
         builder.append("(");
-        for (double val : mValues) {
-            builder.append(val);
-            builder.append(",");
-        }
+        builder.append(mX);
+        builder.append(",");
+        builder.append(mY);
         return builder.substring(0, builder.length() - 1) + ") [mag=" + magnitude() + "]";
     }
 }

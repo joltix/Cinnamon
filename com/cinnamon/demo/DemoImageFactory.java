@@ -1,9 +1,7 @@
 package com.cinnamon.demo;
 
-import com.cinnamon.gfx.ImageComponent;
-import com.cinnamon.gfx.ImageFactory;
-import com.cinnamon.gfx.ShaderFactory;
-import com.cinnamon.gfx.Texture;
+import com.cinnamon.gfx.*;
+import com.cinnamon.system.Config;
 import com.cinnamon.utils.Comparison;
 import com.cinnamon.utils.Merge;
 
@@ -11,17 +9,11 @@ import com.cinnamon.utils.Merge;
  * <p>
  *     Demo {@link ImageFactory}.
  * </p>
- *
- *
  */
 public class DemoImageFactory extends ImageFactory
 {
     private static final int LOAD = 100;
     private static final float GROWTH = 0.15f;
-
-    private static final Float DEFAULT_WIDTH = 100f;
-    private static final Float DEFAULT_HEIGHT = 100f;
-    private static final int DEFAULT_TEXTURE = 0;
 
     public DemoImageFactory(ShaderFactory factory)
     {
@@ -30,51 +22,65 @@ public class DemoImageFactory extends ImageFactory
     }
 
     @Override
+    protected Config<ImageComponent, ShaderFactory> createDefaultConfig()
+    {
+        return new DefaultConfig();
+    }
+
+    @Override
     protected void onLoad(ShaderFactory factory)
     {
         addConfig("character", new CharacterConfig());
-        addConfig(ImageFactory.CONFIG_ROOM, new RoomConfig());
+        addConfig("rock", new RockConfig());
     }
 
-    @Override
-    protected ImageComponent createComponent()
-    {
-        return new DemoImageComponent(DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_TEXTURE);
-    }
-
-    @Override
-    protected void makeDefault(ImageComponent component)
-    {
-
-    }
-
-    private class CharacterConfig implements ImageConfig
+    private class CharacterConfig implements Config<ImageComponent, ShaderFactory>
     {
         @Override
         public void configure(ImageComponent object, ShaderFactory resource)
         {
             final Texture tex = resource.getTexture("demo_character.png");
             object.setTexture(tex.getId());
-            object.setWidth(tex.getWidth());
-            object.setHeight(tex.getHeight());
+            object.setWidth(0.5f);
+            object.setHeight(1.8f);
         }
     }
 
-    private class RoomConfig implements ImageConfig
+    private class RockConfig implements Config<ImageComponent, ShaderFactory>
     {
         @Override
         public void configure(ImageComponent object, ShaderFactory resource)
         {
-            object.moveTo(0, 0, -Float.MAX_VALUE);
+            final Texture tex = resource.getTexture("demo_rock.png");
+            object.setTexture(tex.getId());
+            object.setWidth(14f);
+            object.setHeight(21f);
+        }
+    }
+
+    private class DefaultConfig implements Config<ImageComponent, ShaderFactory>
+    {
+        @Override
+        public void configure(ImageComponent image, ShaderFactory resource)
+        {
+            image.moveTo(0f, 0f);
+            image.setWidth(1f);
+            image.setHeight(1f);
+            image.setVisible(true);
+            image.rotateTo(0f);
+            image.setFlipHorizontally(false);
+            image.setFlipVertically(false);
+            image.setTexture(Texture.NULL);
+            image.setTint(1f, 1f, 1f);
+            image.setTransparency(1f);
         }
     }
 
     /**
-     * <p>Comparison to be used when sorting an array of GObjects for
-     * drawing. The comparison is made with "Painter's Algorithm" in mind,
-     * except with objects further from the screen being represented with
-     * smaller z values. Further, GObjects are grouped by texture ids and
-     * GObjects without RenderComponents are associated with greater values.</p>
+     * <p>Comparison to be used when sorting an array of GObjects for drawing. The comparison is made with "Painter's
+     * Algorithm" in mind, except with objects further from the screen being represented with smaller z values.
+     * Further, GObjects are grouped by texture ids and GObjects without RenderComponents are associated with greater
+     * values.</p>
      */
     private static class PainterOrder implements Comparison<ImageComponent>
     {
@@ -82,10 +88,8 @@ public class DemoImageFactory extends ImageFactory
         public int compare(ImageComponent obj0, ImageComponent obj1)
         {
             // Determine whether or not the L and R objs can be drawn
-            final boolean drawable0 = obj0 != null && obj0.isVisible()
-                    && obj0.getTransparency() > 0f;
-            final boolean drawable1 = obj1 != null && obj1.isVisible()
-                    && obj1.getTransparency() > 0f;
+            final boolean drawable0 = obj0.isVisible() && obj0.getTransparency() > 0f;
+            final boolean drawable1 = obj1.isVisible() && obj1.getTransparency() > 0f;
 
             // Compare 'z' values and texture ids if both can be drawn
             if (drawable0 && drawable1) {

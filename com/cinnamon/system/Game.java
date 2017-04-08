@@ -5,7 +5,9 @@ import com.cinnamon.object.*;
 import com.cinnamon.system.EventDispatcher.EventFilter;
 import com.cinnamon.system.InputEvent.Action;
 import com.cinnamon.system.MouseEvent.Button;
+import com.cinnamon.utils.Point2F;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -15,7 +17,7 @@ import java.util.Map;
  *     {@link #getControlMap()} to change keyboard or mouse control bindings.
  * </p>
  */
-public abstract class Game
+public abstract class Game<E extends GObject>
 {
     /**
      * <p>Constant value for enabling a property whose expected value is a toggle.</p>
@@ -62,6 +64,9 @@ public abstract class Game
      */
     public static final String DEBUG_MODE = "debug_mode";
 
+    // Initial number of pixels per world unit for View scalings
+    private static final float DEFAULT_VIEW_SCALE = 60f;
+
     // Conversion constant # of nanosec in 1 sec
     private static final long NS_PER_SEC = 1000000000L;
 
@@ -84,6 +89,13 @@ public abstract class Game
 
     // Performs debug commands from console input
     private DebugCtrl mDCtrl;
+
+    /**
+     * Utils
+     */
+
+    // Point surrogate to hold mouse position during getMousePosition()
+    private final Point2F mMousePos = new Point2F(0f, 0f);
 
     /**
      * Current game area
@@ -112,18 +124,18 @@ public abstract class Game
     // Event queue for processing system wide Events
     private final EventHub mEventHub;
 
+    // Physics and collision handler
+    private final Solver mSolver;
+
     // Device input mapping to Actions
     private final ControlMap mControlMap;
-
-    // Handler processing mouse GObject selection
-    private final MouseSelectHandler mMouseSelection = new MouseSelectHandler();
 
     /**
      * Resources
      */
 
     // Factories
-    private final Resources mResDir;
+    private final Resources<E> mResDir;
 
     // Listener to be notified of a pending scene snapshot to be drawn
     private ImageFactory.OnFrameEndListener mOnFrameEndListener;
@@ -132,7 +144,7 @@ public abstract class Game
     private volatile boolean mContinue = true;
 
     // Game metadata
-    private final Map<String, String> mProperties;
+    private final Map<String, String> mProperties = new HashMap<String, String>();
 
     /**
      * <p>Constructor for a Game.</p>
@@ -141,10 +153,10 @@ public abstract class Game
      * @param services Services for running various game systems.
      * @param properties game properties such as {@link Game#TITLE} and {@link Game#VSYNC}.
      */
-    public Game(Resources resources, Services services, Canvas canvas, Map<String, String> properties)
+    public Game(Resources<E> resources, Services services, Canvas canvas, Map<String, String> properties)
     {
         mCanvas = canvas;
-        mProperties = properties;
+        mProperties.putAll(properties);
 
         // Check if minimum required meta data was provided
         checkBasicProperties(properties);
@@ -167,14 +179,15 @@ public abstract class Game
             mDCtrl = new DebugCtrl(this);
         }
 
-        // Pull user submitted Services
-        final EventHub hub = services.getEventHub();
-        final ControlMap ctrl = services.getControlMap();
+        // Init physics and collision
+        mSolver = new Solver(getBodyFactory(), mTickRate);
 
         // Use given EventHub or use default if none provided
-        mEventHub = (hub == null) ? new DefaultEventHub() : hub;
+        final EventHub eventHub = services.getEventHub();
+        mEventHub = (eventHub == null) ? new DefaultEventHub() : eventHub;
 
         // Use given ControlMap or use default if none provided
+        final ControlMap ctrl = services.getControlMap();
         mControlMap = (ctrl == null) ? new DefaultControlMap() : ctrl;
 
         // Create default Window.Input if none was set
@@ -183,8 +196,34 @@ public abstract class Game
         window.setInput(mWinInput);
 
         // Create fullscreen View
-        mView = new View(window);
+        mView = new View(window, DEFAULT_VIEW_SCALE);
 
+        installSystemListeners();
+    }
+
+    /**
+     * <p>Install listeners for various system functions such as updating drawing order at the end of a frame or
+     * updating the {@link View}'s dimensions when the {@link Window}'s framebuffer resizes.</p>
+     */
+    private void installSystemListeners()
+    {
+        // Attach resize listener to update View's scaling limits with Window
+        getCanvas().getWindow().addOnFramebufferResizeListener(new OnResizeListener()
+        {
+            @Override
+            public void onResize(float oldWidth, float oldHeight, float width, float height)
+            {
+                // Update the View's dimensions to match Window's new framebuffer size
+                final View view = getView();
+                view.setWidth(width);
+                view.setHeight(height);
+
+                // Reapplying scale forces room scale limit when view is room constrained
+                view.setScale(view.getScale());
+            }
+        });
+
+        // Listener that updates image component drawing order at the end of each frame
         mOnFrameEndListener = getImageFactory().newOnFrameEndListener();
     }
 
@@ -249,19 +288,19 @@ public abstract class Game
     }
 
     /**
-     * <p>Copies the Objects returned by the methods declared in {@link Resources} to a new instance of Resources.
-     * This protects against cases where the given Resources does not instantiate a new resource with each call
+     * <p>Copies the resources returned by the methods declared in {@link Resources} to a new instance of Resources.
+     * This protects against cases where the given Resources object instantiates a new resource with each call
      * to its getter methods.</p>
      *
      * @param resources Resources.
      * @return new Resources.
      */
-    private static Resources copy(Resources resources)
+    private Resources<E> copy(Resources<E> resources)
     {
-        return new Resources()
+        return new Resources<E>()
         {
             private final ShaderFactory mShaderFactory = resources.getShaderFactory();
-            private final GObjectFactory mGObjectFactory = resources.getGObjectFactory();
+            private final GObjectFactory<E> mGObjectFactory = resources.getGObjectFactory();
             private final BodyFactory mBodyFactory = resources.getBodyFactory();
             private final ImageFactory mImageFactory = resources.getImageFactory();
 
@@ -272,7 +311,7 @@ public abstract class Game
             }
 
             @Override
-            public GObjectFactory getGObjectFactory()
+            public GObjectFactory<E> getGObjectFactory()
             {
                 return mGObjectFactory;
             }
@@ -311,7 +350,7 @@ public abstract class Game
         }
 
         // Installs commonly used EventHandlers
-        addBasicHandlers();
+        installSystemHandlers();
 
         run();
     }
@@ -365,7 +404,7 @@ public abstract class Game
      * <p>Installs basic {@link EventHandler}s expected to be commonly needed such as selecting a {@link GObject}
      * instance.</p>
      */
-    private void addBasicHandlers()
+    private void installSystemHandlers()
     {
         final EventDispatcher dispatcher = mEventHub.getDispatcher();
 
@@ -388,18 +427,14 @@ public abstract class Game
         // Install image configs
         getImageFactory().load();
 
+        // Install body configs
+        getBodyFactory().load();
+
         // Install GObject configs
         getGObjectFactory().load();
 
-        // Attach a listener for Window sizing changes then open
+        // Open the window
         final Window window = mCanvas.getWindow();
-        window.setOnResizeListener(new OnResizeListener(){
-            @Override
-            public void onResize(float oldWidth, float oldHeight, float width, float height)
-            {
-                mView.setSize(width, height);
-            }
-        });
         window.show();
 
         // Notify loop beginning
@@ -552,6 +587,9 @@ public abstract class Game
 
         // Execute commands attached to specific InputEvents
         mControlMap.fire();
+
+        // Perform AABB collision tests
+        mSolver.update(getGObjectFactory());
     }
 
     /**
@@ -647,6 +685,19 @@ public abstract class Game
     }
 
     /**
+     * <p>Gets the mouse's current screen coordinates.</p>
+     *
+     * <p>This method should only be called from the main thread.</p>
+     *
+     * @return mouse's (x,y).
+     */
+    protected final Point2F getMousePosition()
+    {
+        mWinInput.pollMouse(mMousePos);
+        return mMousePos;
+    }
+
+    /**
      * <p>Gets the {@link ControlMap} responsible for mapping operations to the mouse and keyboard.</p>
      *
      * @return ControlMap.
@@ -654,6 +705,16 @@ public abstract class Game
     protected final ControlMap getControlMap()
     {
         return mControlMap;
+    }
+
+    /**
+     * <p>Gets the {@link Solver} responsible for all {@link BodyComponent}'s physics computations.</p>
+     *
+     * @return Solver.
+     */
+    protected final Solver getSolver()
+    {
+        return mSolver;
     }
 
     /**
@@ -667,8 +728,7 @@ public abstract class Game
     }
 
     /**
-     * <p>Gets the {@link ImageFactory} responsible for generating
-     * {@link ImageComponent}s.</p>
+     * <p>Gets the {@link ImageFactory} responsible for generating {@link ImageComponent}s.</p>
      *
      * @return ImageFactory.
      */
@@ -688,8 +748,8 @@ public abstract class Game
     }
 
     /**
-     * <p>Gets the {@link ShaderFactory} providing {@link ShaderProgram}s
-     * and {@link Texture}s for constructing imagery.</p>
+     * <p>Gets the {@link ShaderFactory} providing {@link ShaderProgram}s and {@link Texture}s for constructing
+     * imagery.</p>
      *
      * @return ShaderFactory.
      */
@@ -699,19 +759,17 @@ public abstract class Game
     }
 
     /**
-     * <p>Gets the {@link GObjectFactory} responsible for generating
-     * {@link GObject}s.</p>
+     * <p>Gets the {@link GObjectFactory} responsible for generating {@link GObject}s.</p>
      *
      * @return GObjectFactory.
      */
-    protected final GObjectFactory getGObjectFactory()
+    protected final GObjectFactory<E> getGObjectFactory()
     {
         return mResDir.getGObjectFactory();
     }
 
     /**
-     * <p>Gets the {@link BodyFactory} responsible for generating
-     * {@link BodyComponent}s.</p>
+     * <p>Gets the {@link BodyFactory} responsible for generating {@link BodyComponent}s.</p>
      *
      * @return BodyFactory.
      */
@@ -783,22 +841,11 @@ public abstract class Game
     }
 
     /**
-     * <p>Gets a game property associated with the following key.</p>
-     *
-     * @param key property key.
-     * @return value.
-     */
-    public final String getProperty(String key)
-    {
-        return mProperties.get(key);
-    }
-
-    /**
      * <p>Gets the {@link Resources} given to the Game's constructor.</p>
      *
      * @return Resources.
      */
-    protected final Resources getResources()
+    protected final Resources<E> getResources()
     {
         return mResDir;
     }
@@ -825,16 +872,14 @@ public abstract class Game
 
             // Retrieve factories to check obj selection status
             final ImageFactory imgFactory = getImageFactory();
-            final GObjectFactory objFactory = getGObjectFactory();
+            final GObjectFactory<E> objFactory = getGObjectFactory();
 
             // Test all objects from front to back
-            final int size = imgFactory.size();
+            final int size = imgFactory.getVisibleCount();
             for (int i = size - 1; i >= 0; i--) {
 
                 // Get img info at specific z dist from screen
                 final ImageComponent rend = imgFactory.getAtDistance(i);
-
-                // Get BodyComponent for containment testing
 
                 // Skip orphaned Components
                 if (rend.isOrphan()) {
@@ -894,7 +939,7 @@ public abstract class Game
      *     {@link IllegalArgumentException} and will not safely execute.
      * </p>
      */
-    public static abstract class Resources
+    public static abstract class Resources<E extends GObject>
     {
         /**
          * <p>Gets the {@link ShaderFactory} to use for providing shaders and textures.</p>
@@ -908,7 +953,7 @@ public abstract class Game
          *
          * @return GObjectFactory.
          */
-        public abstract GObjectFactory getGObjectFactory();
+        public abstract GObjectFactory<E> getGObjectFactory();
 
         /**
          * <p>Gets the {@link BodyFactory} to use for providing collision operations.</p>

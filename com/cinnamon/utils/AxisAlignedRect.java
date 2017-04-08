@@ -2,17 +2,14 @@ package com.cinnamon.utils;
 
 /**
  * <p>Axis-aligned implementation of {@link Rect2D}.</p>
- *
- *
  */
 public final class AxisAlignedRect implements Rect2D
 {
-    // Offset point
-    private final Point2F mOffset;
+    // Origin point
+    private final Point3F mPosition;
 
-    // Origin and opposite corner point form rectangle
-    private final Point2F mOrigin;
-    private final Point2F mCorner;
+    // Corner point forming rectangle with origin
+    private final Point3F mCorner;
 
     /**
      * <p>Constructor to copy another {@link Rect2D}.</p>
@@ -21,25 +18,23 @@ public final class AxisAlignedRect implements Rect2D
      */
     public AxisAlignedRect(Rect2D rect)
     {
-        mOffset = new Point2F(rect.getOffsetX(), rect.getOffsetY());
-        mOrigin = new Point2F(rect.getOrigin());
-        mCorner = new Point2F(rect.getCorner());
+        mPosition = new Point3F(rect.getPosition());
+        mCorner = new Point3F(rect.getCorner());
     }
 
     /**
-     * <p>Constructor for an AxisAlignedRect of a specific width and height.</p>
+     * <p>Constructor for an AxisAlignedRect of a specific width and height positioned at (0,0).</p>
      *
      * @param width width.
      * @param height height.
      */
     public AxisAlignedRect(float width, float height)
     {
-        this(width, height, 0, 0);
+        this(width, height, 0f, 0f);
     }
 
     /**
-     * <p>Constructor for an AxisAlignedRect of a specific width and height
-     * at a specific (x,y) position.</p>
+     * <p>Constructor for an AxisAlignedRect of a specific width and height positioned at a specific (x,y) point.</p>
      *
      * @param width width.
      * @param height height.
@@ -48,144 +43,174 @@ public final class AxisAlignedRect implements Rect2D
      */
     public AxisAlignedRect(float width, float height, float x, float y)
     {
-        mOffset = new Point2F(0, 0);
-        mOrigin = new Point2F(x, y);
-        mCorner = new Point2F(x + width, y + height);
-    }
-
-    @Override
-    public Point2F getOrigin()
-    {
-        return mOrigin;
-    }
-
-    @Override
-    public Point2F getCorner()
-    {
-        return mCorner;
-    }
-
-    @Override
-    public float getX()
-    {
-        return mOrigin.getX() + mOffset.getX();
-    }
-
-    @Override
-    public float getWidth()
-    {
-        return mCorner.getX() - mOrigin.getX();
-    }
-
-    @Override
-    public float getY()
-    {
-        return mOrigin.getY() + mOffset.getY();
-    }
-
-    @Override
-    public void setWidth(float width)
-    {
-        mCorner.setX(getX() + width);
-    }
-
-    @Override
-    public float getZ()
-    {
-        return 0;
-    }
-
-    @Override
-    public float getHeight()
-    {
-        return mCorner.getY() - mOrigin.getY();
-    }
-
-    @Override
-    public void setHeight(float height)
-    {
-        mCorner.setY(getY() + height);
-    }
-
-    @Override
-    public void moveTo(float x, float y, float z)
-    {
-        mCorner.translateBy(x - mOrigin.getX(), y - mOrigin.getY());
-        mOrigin.set(x, y);
-    }
-
-    @Override
-    public void moveTo(float x, float y)
-    {
-        moveTo(x, y, 0);
+        mPosition = new Point3F(x, y, 0f);
+        mCorner = new Point3F(x + width, y + height, 0f);
     }
 
     @Override
     public boolean contains(float x, float y)
     {
         // Test if point is outside rectangle
-        if (x < getX()
-                || y < getY()
-                || x > (mCorner.getX() + mOffset.getX())
-                || y > (mCorner.getY() + mOffset.getY())) {
+        return !(x < getX() || y < getY() || x > getCornerX() || y > getCornerY());
+    }
+
+    @Override
+    public boolean contains(float x, float y, float z)
+    {
+        // Z must be the same for containment
+        if (Point2F.isEqual(getZ(), z)) {
             return false;
         }
 
-        return true;
+        return contains(x, y);
+    }
+
+    @Override
+    public boolean contains(Rect2D rect)
+    {
+        return contains(rect.getX(), rect.getY(), rect.getCornerX(), rect.getCornerY());
+    }
+
+    @Override
+    public boolean contains(float x, float y, float cornerX, float cornerY)
+    {
+        // Check if origin point is within AxisAlignedRect
+        final boolean originContained = x >= getX() && y >= getY();
+
+        // Check if corner point is within as well
+        return originContained && cornerX <= getCornerX() && cornerY <= getCornerY();
     }
 
     @Override
     public boolean intersects(Rect2D rect)
     {
-        // Get other rect's corner, offset adjusted
-        final Point2F corner = rect.getCorner();
-        final float cornerX = corner.getX() + rect.getOffsetX();
-        final float cornerY = corner.getY() + rect.getOffsetY();
-
-        // Test for intersection
-        return intersects(rect.getX(), getY(), cornerX, cornerY);
+        return intersects(rect.getX(), rect.getY(), rect.getCornerX(), rect.getCornerY());
     }
 
     @Override
-    public boolean intersects(float originX, float originY, float cornerX,
-                              float cornerY)
+    public boolean intersects(float x, float y, float cornerX, float cornerY)
     {
         // Adjust calling Rect2D's corner with offset
-        final float cornerXA = mCorner.getX() + mOffset.getX();
-        final float cornerYA = mCorner.getY() + mOffset.getY();
+        final float cornerXA = getCornerX();
+        final float cornerYA = getCornerY();
 
         // Test if corners are separated
-        return !(cornerX < getX() || cornerY < getY())
-                && !(cornerXA < originX || cornerYA < originY);
+        return !(cornerX < getX() || cornerY < getY() || cornerXA < x || cornerYA < y);
     }
 
     @Override
-    public void setOffset(float x, float y)
+    public Point3F getPosition()
     {
-        setOffset(x, y, 0);
+        return new Point3F(mPosition);
     }
 
     @Override
-    public void setOffset(float x, float y, float z)
+    public Point3F getCorner()
     {
-        mOffset.set(x, y);
+        return new Point3F(mCorner);
     }
 
     @Override
-    public float getOffsetX()
+    public float getX()
     {
-        return mOffset.getX();
+        return mPosition.getX();
     }
 
     @Override
-    public float getOffsetY()
+    public float getY()
     {
-        return mOffset.getY();
+        return mPosition.getY();
     }
 
     @Override
-    public float getOffsetZ()
+    public float getZ()
     {
-        return 0;
+        return mPosition.getZ();
+    }
+
+    @Override
+    public float getCornerX()
+    {
+        return mCorner.getX();
+    }
+
+    @Override
+    public float getCornerY()
+    {
+        return mCorner.getY();
+    }
+
+    @Override
+    public float getCornerZ()
+    {
+        return mCorner.getZ();
+    }
+
+    @Override
+    public void moveTo(float x, float y)
+    {
+        moveTo(x, y, mPosition.getZ());
+    }
+
+    @Override
+    public void moveTo(float x, float y, float z)
+    {
+        mCorner.translateBy(x - mPosition.getX(), y - mPosition.getY(), z - mPosition.getZ());
+        mPosition.set(x, y, z);
+    }
+
+    @Override
+    public void moveBy(float x, float y)
+    {
+        moveBy(x, y, 0f);
+    }
+
+    @Override
+    public void moveBy(float x, float y, float z)
+    {
+        mPosition.set(mPosition.getX() + x, mPosition.getY() + y, mPosition.getZ() + z);
+        mCorner.set(mCorner.getX() + x, mCorner.getY() + y, mCorner.getZ() + z);
+    }
+
+    @Override
+    public void moveToCenter(float x, float y)
+    {
+        moveTo(x - (getWidth() / 2f), y - (getHeight() / 2f));
+    }
+
+    @Override
+    public float getWidth()
+    {
+        return mCorner.getX() - mPosition.getX();
+    }
+
+    @Override
+    public void setWidth(float width)
+    {
+        mCorner.setX(mPosition.getX() + width);
+    }
+
+    @Override
+    public float getHeight()
+    {
+        return mCorner.getY() - mPosition.getY();
+    }
+
+    @Override
+    public void setHeight(float height)
+    {
+        mCorner.setY(mPosition.getY() + height);
+    }
+
+    @Override
+    public float getCenterX()
+    {
+        return getX() + (getWidth() / 2f);
+    }
+
+    @Override
+    public float getCenterY()
+    {
+        return getY() + (getHeight() / 2f);
     }
 }

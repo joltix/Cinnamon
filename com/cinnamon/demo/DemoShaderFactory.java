@@ -20,7 +20,8 @@ public class DemoShaderFactory extends ShaderFactory
     private static final String[] SHADERS = new String[] {"demo.vert",
             "demo_texture.frag", "demo_color.frag"};
     private static final String[] TEXTURES = new String[] {"demo_character.png",
-            "demo_background.png"};
+            "demo_background.png", "demo_rock.png", "demo_cloud.png", "demo_grass.png", "demo_projectile.png",
+            "demo_mountain.png"};
 
     private static final String SHADER_PATH = "com/cinnamon/demo/shaders";
     private static final String TEXTURE_PATH = "com/cinnamon/demo/images";

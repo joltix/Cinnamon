@@ -1,9 +1,8 @@
 package com.cinnamon.object;
 
 /**
- * Describes an object which has an inherent width and height.
- *
- *
+ * Describes an object which has an inherent width and height. Whether the width or height can be publicly set is up
+ * to implementing classes.
  */
 public interface Dimensional
 {
@@ -15,13 +14,6 @@ public interface Dimensional
     float getWidth();
 
     /**
-     * <p>Sets the width.</p>
-     *
-     * @param width width.
-     */
-    void setWidth(float width);
-
-    /**
      * <p>Gets the height.</p>
      *
      * @return height.
@@ -29,9 +21,16 @@ public interface Dimensional
     float getHeight();
 
     /**
-     * <p>Sets the height.</p>
+     * <p>Gets the center's x coordinate.</p>
      *
-     * @param height height.
+     * @return center x.
      */
-    void setHeight(float height);
+    float getCenterX();
+
+    /**
+     * <p>Gets the center's y coordinate.</p>
+     *
+     * @return center y.
+     */
+    float getCenterY();
 }

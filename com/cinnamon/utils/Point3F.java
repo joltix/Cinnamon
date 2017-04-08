@@ -2,11 +2,8 @@ package com.cinnamon.utils;
 
 /**
  * <p>
- *     Represents a point in space of three dimensions and facilitates passing
- *     around points from one object to another.
+ *     Represents a point in space of three dimensions and facilitates passing around coordinates.
  * </p>
- *
- *
  */
 public class Point3F extends Point2F
 {
@@ -88,19 +85,34 @@ public class Point3F extends Point2F
      * @param point other Point3F.
      * @return distance.
      */
-    public final float distanceTo(Point3F point)
+    public final double distanceTo(Point3F point)
     {
-        float x = (float) Math.abs(Math.pow(getX() - point.getX(), 2));
-        float y = (float) Math.abs(Math.pow(getY() - point.getY(), 2));
-        float z = (float) Math.abs(Math.pow(mZ - point.mZ, 2));
-        return (float) Math.sqrt(x + y + z);
+        return Point3F.distanceBetween(getX(), getY(), mZ, point.getX(), point.getY(), point.mZ);
+    }
+
+    /**
+     * <p>Computes the distance between two (x,y,z) points.</p>
+     *
+     * @param x0 x.
+     * @param y0 y.
+     * @param z0 z.
+     * @param x1 other x.
+     * @param y1 other y.
+     * @param z1 other z.
+     * @return distance between.
+     */
+    public static final double distanceBetween(float x0, float y0, float z0, float x1, float y1, float z1)
+    {
+        final double x = Math.abs(x0 - x1);
+        final double y = Math.abs(y0 - y1);
+        final double z = Math.abs(z0 - z1);
+        return Math.sqrt((x * x) + (y * y) + (z * z));
     }
 
     @Override
     protected Object clone() throws CloneNotSupportedException
     {
-        throw new CloneNotSupportedException("Use the copy constructor " +
-                "instead");
+        throw new CloneNotSupportedException("Use the copy constructor instead");
     }
 
     @Override

@@ -1,9 +1,7 @@
 package com.cinnamon.gfx;
 
 import com.cinnamon.object.GObject;
-import com.cinnamon.object.Room;
 import com.cinnamon.system.ComponentFactory;
-import com.cinnamon.system.Config;
 import com.cinnamon.system.Game;
 import com.cinnamon.system.OnOrphanChangedListener;
 import com.cinnamon.utils.Comparison;
@@ -11,22 +9,17 @@ import com.cinnamon.utils.Sort;
 
 /**
  * <p>
- *     ImageFactory is responsible for not only producing
- *     {@link ImageComponent}s to provide a visual representation for
- *     {@link GObject}s, but also supplying the {@link Canvas} with drawing
- *     information.
+ *     ImageFactory is responsible for not only producing {@link ImageComponent}s to provide a visual representation for
+ *     {@link GObject}s, but also supplying the {@link Canvas} with drawing information.
  * </p>
  */
-public abstract class ImageFactory extends ComponentFactory<ImageComponent,
-        ShaderFactory>
+public abstract class ImageFactory extends ComponentFactory<ImageComponent, ShaderFactory>
 {
-    /**
-     * <p>Configuration name for {@link Room}s.</p>
-     */
-    public static final String CONFIG_ROOM = "room";
-
     // Listener for ImageComponent visibility changes
     private final OnDrawVisibilityChangedListener mVisibilityListener = new VisibilitySentry();
+
+    // Listener for drawing order needing sort
+    private final OnDrawOrderChangeListener mDrawOrderListener = new DrawOrderSentry();
 
     // Listener for orphan status - implies visibility change
     private final OnOrphanChangedListener mOrphanVisibilityListener = new OrphanChangedVisibilitySentry();
@@ -68,12 +61,25 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
         mFrameEndListener = new OnFrameEndListener();
 
         // Wrap user provided compare with outer layer pushing null and orphaned components to the arr's right
-        final Comparison<ImageComponent> cmp = new ValidityFilter(mDrawSorter.getComparison());
+        final Comparison<ImageComponent> cmp = new OrphanFilter(mDrawSorter.getComparison());
         mDrawSorter.setComparison(cmp);
     }
 
     @Override
-    protected void onRequisition(ImageComponent component)
+    protected final ImageComponent createIdentifiable()
+    {
+        return new ImageComponent();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Overriding classes must call super for {@link ImageComponent}s to be properly setup.</p>
+     *
+     * @param object ImageComponent.
+     */
+    @Override
+    protected void onRequisition(ImageComponent object)
     {
         // Expand drawing arr if constrained
         if (mVisibleCount >= mDrawOrder.length) {
@@ -81,13 +87,17 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
             increaseDrawCapacity(newCap);
         }
 
-        component.setOnOrphanChangedListener(mOrphanVisibilityListener);
+        // Attach listener for orphan status changes
+        object.setOnOrphanChangedListener(mOrphanVisibilityListener);
 
-        // Attach listener for changes to drawing order
-        component.setOnVisibilityChangeListener(mVisibilityListener);
+        // Attach listener for changes to visibility such as transparency or toggles
+        object.setOnVisibilityChangeListener(mVisibilityListener);
+
+        // Attach listener for changes to the z position
+        object.setOnDrawOrderChangeListener(mDrawOrderListener);
 
         // Add new component to be sorted for drawing
-        mDrawOrder[mVisibleCount] = component;
+        mDrawOrder[mVisibleCount] = object;
         notifyDrawOrderChanged();
     }
 
@@ -104,9 +114,8 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
     }
 
     /**
-     * <p>Gets an {@link ImageComponent} of a certain distance away from the
-     * front-most ImageComponent on the screen. The given index is the n-th
-     * ImageComponent from the front.</p>
+     * <p>Gets an {@link ImageComponent} of a certain distance away from the front-most ImageComponent on the screen.
+     * The given index is the n-th ImageComponent from the front.</p>
      *
      * @param index n-th from the front.
      * @return ImageComponent.
@@ -117,8 +126,8 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
     }
 
     /**
-     * <p>Notifies the ImageFactory that an {@link ImageComponent} has
-     * changed such that the drawing order is affected.</p>
+     * <p>Notifies the ImageFactory that an {@link ImageComponent} has changed such that the drawing order is
+     * affected.</p>
      */
     public final void notifyDrawOrderChanged()
     {
@@ -126,18 +135,14 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
     }
 
     /**
-     * <p>Checks whether or not the ImageFactory's drawing order needs to be
-     * resorted.</p>
+     * {@inheritDoc}
      *
-     * @return true if drawing data has changed.
+     * <p>Overriding classes must call super for {@link ImageComponent}s to be properly drawn.</p>
+     *
+     * @param object ImageComponent.
      */
-    private boolean hasDrawOrderChanged()
-    {
-        return mDrawChanged;
-    }
-
     @Override
-    protected void onRemove(ImageComponent component)
+    protected void onRemove(ImageComponent object)
     {
         notifyDrawOrderChanged();
     }
@@ -153,17 +158,8 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
     }
 
     /**
-     * <p>
-     *     {@link Config} for assembling an {@link ImageComponent}.
-     * </p>
-     */
-    public interface ImageConfig extends Config<ImageComponent, ShaderFactory>
-    {
-    }
-
-    /**
-     * <p>Gets an {@link OnFrameEndListener} to be be called whenever drawing
-     * data is about to be sent to the {@link Canvas}.</p>
+     * <p>Gets an {@link OnFrameEndListener} to be be called whenever drawing data is about to be sent to the
+     * {@link Canvas}.</p>
      *
      * @return OnFrameEndListener.
      */
@@ -174,19 +170,17 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
 
     /**
      * <p>
-     *     Listener to be called by {@link Game} at the end of a frame but
-     *     before the drawing data is requested to be sent for rendering.
-     *     This is where the drawing order may be resorted, should
-     *     {@link #notifyDrawOrderChanged()} have been called at any time
-     *     during the frame.
+     *     Listener to be called by {@link Game} at the end of a frame but before the drawing data is requested to be
+     *     sent for rendering. This is where the drawing order may be resorted, should
+     *     {@link #notifyDrawOrderChanged()} have been called at any time during the frame.
      * </p>
      */
-    public class OnFrameEndListener
+    public final class OnFrameEndListener
     {
         public void onFrameEnd()
         {
             final ImageFactory factory = ImageFactory.this;
-            if (factory.hasDrawOrderChanged()) {
+            if (factory.mDrawChanged) {
                 factory.mDrawSorter.sort(factory.mDrawOrder);
                 factory.mDrawChanged = false;
             }
@@ -195,10 +189,8 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
 
     /**
      * <p>
-     *     Private listener instance for
-     *     {@link OnDrawVisibilityChangedListener}. This class is to be set on
-     *     each {@link ImageComponent} produced by the {@link ImageFactory} in
-     *     order to notify the factory whenever the draw order needs sorting.
+     *     This class is to be set on each {@link ImageComponent} produced by the {@link ImageFactory} in order to
+     *     notify the factory of transparency or toggle changes and the need to sort the drawing order.
      * </p>
      */
     private class VisibilitySentry implements OnDrawVisibilityChangedListener
@@ -207,9 +199,24 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
         public void onChange(boolean visible)
         {
             // Update visible count based off of current visibility
-            mVisibleCount = (visible) ? (mVisibleCount - 1) : (mVisibleCount + 1);
+            mVisibleCount = (visible) ? (mVisibleCount + 1) : (mVisibleCount - 1);
 
             // Notify ImageFactory drawing order needs resort
+            ImageFactory.this.notifyDrawOrderChanged();
+        }
+    }
+
+    /**
+     * <p>
+     *     This class is to be set on each {@link ImageComponent} produced by the {@link ImageFactory} in order to
+     *     notify the factory of changes to the z position and the need to sort the drawing order.
+     * </p>
+     */
+    private class DrawOrderSentry implements OnDrawOrderChangeListener
+    {
+        @Override
+        public void onChange()
+        {
             ImageFactory.this.notifyDrawOrderChanged();
         }
     }
@@ -233,11 +240,23 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
         }
     }
 
-    private class ValidityFilter implements Comparison<ImageComponent>
+    /**
+     * <p>
+     *     Wraps the {@link Comparison} used to order drawing data and adds the {@link Component}'s orphan status as
+     *     a factor in the sorting.
+     * </p>
+     */
+    private class OrphanFilter implements Comparison<ImageComponent>
     {
+        // Original drawing order decider
         private final Comparison<ImageComponent> mUserCmp;
 
-        public ValidityFilter(Comparison<ImageComponent> comparison)
+        /**
+         * <p>Constructs an OrphanFilter.</p>
+         *
+         * @param comparison {@link Comparison} submitted to order drawing data.
+         */
+        OrphanFilter(Comparison<ImageComponent> comparison)
         {
             mUserCmp = comparison;
         }
@@ -252,7 +271,7 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
                 return 1;
             } else if (!null0 && null1) {
                 return -1;
-            } else if (null0 && null1) {
+            } else if (null0) {
                 return 0;
             }
 
@@ -263,7 +282,7 @@ public abstract class ImageFactory extends ComponentFactory<ImageComponent,
                 return 1;
             } else if (!orphan0 && orphan1) {
                 return -1;
-            } else if (orphan0 && orphan1) {
+            } else if (orphan0) {
                 return 0;
             }
 

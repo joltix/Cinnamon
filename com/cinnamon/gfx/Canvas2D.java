@@ -6,32 +6,28 @@ import com.cinnamon.system.Window;
  * <p>
  *     {@link Canvas} setup for 2D sprite drawing.
  * </p>
- *
- *
  */
-public abstract class Canvas2D<E extends Canvas.SceneBuffer,
-        T extends ShaderFactory> extends Canvas<E, T>
+public abstract class Canvas2D<E extends Canvas.SceneBuffer, T extends ShaderFactory> extends Canvas<E, T>
 {
-    // QUAD value indices for resizing
-    private static final int VERTEX_TOP_LEFT_Y = 4;
-    private static final int VERTEX_TOP_RIGHT_X = 6;
-    private static final int VERTEX_TOP_RIGHT_Y = 7;
-    private static final int VERTEX_BOTTOM_RIGHT = 9;
+    // Quad vertices                                   x   y    z
+    private final float[] QUAD_VERTICES = new float[] {0f, 0f, -1f,  // Bottom left
+                                                       0f, 1f, -1f,  // Top left
+                                                       1f, 1f, -1f,  // Top right
+                                                       1f, 0f, -1f}; // Bottom right
 
-    // Quad vertices                          x   y    z
-    private final float[] QUAD = new float[] {0f, 0f, -1f,  // Bottom left
-                                              0f, 0f, -1f,  // Top left
-                                              0f, 0f, -1f,  // Top right
-                                              0f, 0f, -1f}; // Bottom right
 
-    // Texture coordinates for the quad
-    private final float[] TEXTURE_COORDS = new float[] {0f, 1f,
-                                                        0f, 0f,
-                                                        1f, 0f,
-                                                        1f, 1f};
+    // Indices for specifying triangle vertices (2 of them) within a quad
+    private static final int[] QUAD_INDICES = new int[]{0, 1, 2,    // First triangle
+                                                        0, 2, 3};   // Second triangle
+
+    // Each quad's texture coordinates                         s   t
+    private static final float[] TEXTURE_COORDS = new float[] {0f, 1f,  // Top left
+                                                               0f, 0f,  // Bottom left
+                                                               1f, 0f,  // Bottom right
+                                                               1f, 1f}; // Top right
 
     /**
-     * <p>Constructor for a Canvas2D.</p>
+     * <p>Constructs a Canvas2D.</p>
      *
      * @param window host {@link Window}.
      * @param input {@link SceneBuffer} providing draw data.
@@ -65,43 +61,47 @@ public abstract class Canvas2D<E extends Canvas.SceneBuffer,
     }
 
     /**
-     * <p>Constructs a translation matrix for translating only along the x
-     * and y axes.</p>
+     * <p>Fills a given array with a translation matrix modified for the given x and y values.</p>
      *
-     * @param x x translation.
-     * @param y y translation.
-     * @return a 4x4 matrix.
+     * @param x x.
+     * @param y y.
+     * @throws IllegalArgumentException if the given array is not of length 16 (the length of a flattened 4x4 matrix).
      */
-    protected final float[] getTranslationMatrix(float x, float y)
+    protected final void getTranslationMatrix(float[] container, float x, float y)
     {
-        return this.getTranslationMatrix(x, y, 0f);
+        this.getTranslationMatrix(container, x, y, 0f);
     }
 
     /**
-     * <p>Gets a 1D array of texture coordinates formatted as a 2x4 matrix
-     * .</p>
+     * <p>Gets a 1D 8-float-long array of texture coordinates for a quad. Coordinates begin from top left corner (0,
+     * 1) and rotate counter-clockwise.</p>
      *
      * @return texture coordinates.
      */
-    protected float[] getTextureCoordinates()
+    protected final float[] getQuadTextureCoordinates()
     {
         return TEXTURE_COORDS;
     }
 
     /**
-     * <p>Returns a 1D array of vertices formatted as a 3x4 matrix.</p>
+     * <p>Gets a 1D 12-float-long array of vertices forming a quad. Vertices begin from bottom left corner (0,0)
+     * and rotate clockwise.</p>
      *
-     * @param width quad width.
-     * @param height quad height.
-     * @return quad vertices.
+     * @return a quad's vertices.
      */
-    protected final float[] getQuad(float width, float height)
+    protected final float[] getQuadVertices()
     {
-        QUAD[VERTEX_TOP_LEFT_Y] = height;
-        QUAD[VERTEX_TOP_RIGHT_X] = width;
-        QUAD[VERTEX_TOP_RIGHT_Y] = height;
-        QUAD[VERTEX_BOTTOM_RIGHT] = width;
+        return QUAD_VERTICES.clone();
+    }
 
-        return QUAD;
+    /**
+     * <p>Gets a 1D 6-int-long array of indices designating the order of vertices for forming two triangles that make
+     * up a quad.</p>
+     *
+     * @return a quad's vertex indices.
+     */
+    protected final int[] getQuadIndices()
+    {
+        return QUAD_INDICES.clone();
     }
 }

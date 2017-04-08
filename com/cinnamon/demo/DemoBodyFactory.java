@@ -2,14 +2,13 @@ package com.cinnamon.demo;
 
 import com.cinnamon.object.BodyComponent;
 import com.cinnamon.object.BodyFactory;
+import com.cinnamon.system.Config;
 import com.cinnamon.utils.Shape;
 
 /**
  * <p>
  *     Demo {@link BodyFactory}.
  * </p>
- *
- *
  */
 public class DemoBodyFactory extends BodyFactory
 {
@@ -22,13 +21,19 @@ public class DemoBodyFactory extends BodyFactory
     }
 
     @Override
-    protected void onRequisition(BodyComponent component)
+    protected Config<BodyComponent, Object> createDefaultConfig()
+    {
+        return new DefaultConfig();
+    }
+
+    @Override
+    protected void onRequisition(BodyComponent object)
     {
 
     }
 
     @Override
-    protected void makeDefault(BodyComponent component)
+    protected void onRemove(BodyComponent object)
     {
 
     }
@@ -36,49 +41,54 @@ public class DemoBodyFactory extends BodyFactory
     @Override
     protected void onLoad(Object resource)
     {
-        addConfig("actor", new ActorConfig());
-        addConfig("background", new BackgroundConfig());
+        addConfig("rock", new RockConfig());
+        addConfig("character", new CharacterConfig());
     }
 
-    @Override
-    protected void onRemove(BodyComponent component)
-    {
-
-    }
-
-    @Override
-    protected BodyComponent createComponent()
-    {
-        return new DemoBodyComponent();
-    }
-
-    private class ActorConfig implements BodyConfig
+    private class CharacterConfig implements Config<BodyComponent, Object>
     {
         @Override
         public void configure(BodyComponent object, Object resource)
         {
-            final float w = 100f;
-            final float h = 100f;
-
-            object.setWidth(100f);
-            object.setHeight(100f);
-            object.setOffset(0f, 0f);
-            object.setShape(new Shape(Shape.Type.RECTANGLE, w, w));
+            object.setWidth(1.5f);
+            object.setHeight(2f);
+            object.setMass(70f);
+            object.setFriction(0.7f);
+            object.setRestitution(0.6f);
+            object.setCollidable(true);
+            object.setStatic(false);
         }
     }
 
-    private class BackgroundConfig implements BodyConfig
+    private class RockConfig implements Config<BodyComponent, Object>
     {
         @Override
         public void configure(BodyComponent object, Object resource)
         {
-            final float w = 3840f;
-            final float h = 2160f;
+            object.setShape(new Shape(10f, 10f));
+            object.setMass(700f);
+            object.setFriction(0.9f);
+            object.setRestitution(0.1f);
+            object.setCollidable(true);
+            object.setStatic(false);
+        }
+    }
 
-            object.setWidth(w);
-            object.setHeight(h);
-            object.setOffset(0f, 0f);
-            object.setShape(new Shape(Shape.Type.RECTANGLE, w, h));
+    private class DefaultConfig implements Config<BodyComponent, Object>
+    {
+        @Override
+        public void configure(BodyComponent body, Object resource)
+        {
+            body.setWidth(1f);
+            body.setHeight(1f);
+            body.setAcceleration(null);
+            body.setVelocity(null);
+            body.moveTo(0f, 0f, 0f);
+            body.rotateTo(0f);
+            body.setStatic(false);
+            body.setMass(1f);
+            body.setFriction(0.6f);
+            body.setRestitution(0.4f);
         }
     }
 }

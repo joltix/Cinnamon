@@ -1,15 +1,16 @@
 package com.cinnamon.gfx;
 
 
+import com.cinnamon.object.Positional;
+import com.cinnamon.utils.Rotatable;
+
 /**
  * <p>
- *     A lightweight version of {@link ImageComponent}, Drawables are meant
- *     to relay drawing information as copies of fuller ImageComponents.
+ *     Drawables carry information needed for something to be drawn such as a {@link Texture}'s id, the size to draw
+ *     with, and more.
  * </p>
- *
- *
  */
-public interface Drawable
+public interface Drawable extends Positional, Rotatable
 {
     /**
      * <p>Gets the {@link Texture} id of the image to draw.</p>
@@ -19,18 +20,18 @@ public interface Drawable
     int getTexture();
 
     /**
-     * <p>Gets the width.</p>
+     * <p>Checks if the texture should be flipped horizontally.</p>
      *
-     * @return width.
+     * @return true to flip.
      */
-    float getWidth();
+    boolean isFlippedHorizontally();
 
     /**
-     * <p>Gets the height.</p>
+     * <p>Checks if the texture should be flipped vertically.</p>
      *
-     * @return height.
+     * @return true to flip.
      */
-    float getHeight();
+    boolean isFlippedVertically();
 
     /**
      * <p>Gets the red color value.</p>
@@ -59,32 +60,4 @@ public interface Drawable
      * @return transparency.
      */
     float getTransparency();
-
-    /**
-     * <p>Gets the x offset.</p>
-     *
-     * @return x offset.
-     */
-    float getOffsetX();
-
-    /**
-     * <p>Gets the y offset.</p>
-     *
-     * @return y offset.
-     */
-    float getOffsetY();
-
-    /**
-     * <p>Gets the x coordinate.</p>
-     *
-     * @return x.
-     */
-    float getX();
-
-    /**
-     * <p>Gets the y coordinate.</p>
-     *
-     * @return y.
-     */
-    float getY();
 }
