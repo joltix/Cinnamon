@@ -23,7 +23,7 @@ import java.util.Random;
  *
  *     <br><i>Space:</i> fire projectile from selected object to cursor</br>
  *     <br><i>Left click:</i> select object (or deselect if nothing selectable was clicked)</br>
- *     <br><i>Right click:</i> change gravity's direction towards cursor relative from center of view</br>
+ *     <br><i>Right click:</i> move View to zoom in on and look at the selected game object</br>
  * </p>
  */
 public class DemoGame extends Game
