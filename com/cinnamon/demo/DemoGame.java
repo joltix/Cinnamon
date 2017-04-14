@@ -3,8 +3,7 @@ package com.cinnamon.demo;
 import com.cinnamon.gfx.*;
 import com.cinnamon.object.*;
 import com.cinnamon.system.*;
-import com.cinnamon.utils.Point2F;
-import com.cinnamon.utils.Vector2F;
+import com.cinnamon.utils.*;
 
 import java.util.Map;
 import java.util.Random;
@@ -134,7 +133,9 @@ public class DemoGame extends Game
     private final Vector2F mImgDirection = new Vector2F();
 
     /**
-     * <p>Shuts down the game.</p>
+     * <p>
+     *     Shuts down the game.
+     * </p>
      */
     private KeyEventHandler mCloseAction = new KeyEventHandler()
     {
@@ -146,7 +147,9 @@ public class DemoGame extends Game
     };
 
     /**
-     * <p>Adds an impulse going up (relative to gravity's direction).</p>
+     * <p>
+     *     Adds an impulse going up (relative to gravity's direction).
+     * </p>
      */
     private KeyEventHandler mUpAction = new KeyEventHandler()
     {
@@ -169,7 +172,9 @@ public class DemoGame extends Game
     };
 
     /**
-     * <p>Adds an impulse to the left (relative to gravity's direction).</p>
+     * <p>
+     *     Adds an impulse to the left (relative to gravity's direction).
+     * </p>
      */
     private KeyEventHandler mLeftAction = new KeyEventHandler()
     {
@@ -195,7 +200,9 @@ public class DemoGame extends Game
 
 
     /**
-     * <p>Adds an impulse to the right (relative to gravity's direction).</p>
+     * <p>
+     *     Adds an impulse to the right (relative to gravity's direction).
+     * </p>
      */
     private KeyEventHandler mRightAction = new KeyEventHandler()
     {
@@ -220,7 +227,9 @@ public class DemoGame extends Game
     };
 
     /**
-     * <p>Zooms the {@link View} in and out with scrolling.</p>
+     * <p>
+     *     Zooms the {@link View} in and out with scrolling.
+     * </p>
      */
     private MouseEventHandler mZoom = new MouseEventHandler()
     {
@@ -240,33 +249,9 @@ public class DemoGame extends Game
     };
 
     /**
-     * <p>Changes the direction of the {@link Solver}'s global acceleration in the direction of the cursor relative
-     * to the center of the {@link View}.</p>
-     */
-    private MouseEventHandler mGravityHandler = new MouseEventHandler()
-    {
-        @Override
-        public void handle(MouseEvent event)
-        {
-            final View view = getView();
-            view.translateToWorld(event);
-
-            // Get direction from click to View's center
-            final Vector2F gravity = new Vector2F(event.getX(), event.getY());
-            gravity.subtract(view.getCenterX(), view.getCenterY());
-
-            // Scale new gravity vector's strength to 9.8 meters per second per second
-            gravity.normalize();
-            gravity.multiply(9.8f);
-
-            // Set new gravity to affect all non-static game objects
-            getSolver().setGlobalAcceleration(gravity);
-        }
-    };
-
-    /**
-     * <p>Creates a projectile at the selected {@link GObject} and applies an impulse of 30 meters per second.
-     * toward the cursor.</p>
+     * <p>
+     *     Creates a projectile at the selected and applies an impulse of 30 meters per second towards the cursor.
+     * </p>
      */
     private KeyEventHandler mFireHandler = new KeyEventHandler()
     {
@@ -293,6 +278,32 @@ public class DemoGame extends Game
         }
     };
 
+    /**
+     * <p>
+     *     Move towards and zoom in on the selected GObject.
+     * </p>
+     */
+    private MouseEventHandler mLookAtPlayerHandler = new MouseEventHandler()
+    {
+        @Override
+        public void handle(MouseEvent event)
+        {
+            // Can't home in if null
+            final GObject selected = getSelected();
+            if (selected == null) {
+                return;
+            }
+
+            // Don't try to move if already moving
+            final View view = getView();
+            final long duration = 3000L;
+
+            // Move towards and zoom in on selected object over 3 seconds
+            view.moveToCenter(selected.getCenterX(), selected.getCenterY(), duration);
+            view.setScale(view.getMaximumScale(), duration);
+        }
+    };
+
     public DemoGame(Resources resources, Services services, Canvas canvas, Map<String, String> properties)
     {
         super(resources, services, canvas, properties);
@@ -311,13 +322,17 @@ public class DemoGame extends Game
         final ShaderFactory shaders = getShaderFactory();
 
         // Create game object for user control
-        final GObject player = createPlayer(goFactory, shaders);
+        createPlayer(goFactory, shaders);
 
         // Zoom view in to fill room and center on player
         final View view = getView();
         view.setRoomConstrained(true);
+        view.moveToCenter(room.getCenterX(), room.getCenterY());
         view.setScale(1f);
-        view.moveToCenter(player);
+
+        // Enable motion by 1 meter per second by moving cursor by the edges
+        view.setEdgeMotionEnabled(true);
+        view.setSpeed(0.1f);
 
         // Generate clouds in sky
         createClouds(goFactory, shaders);
@@ -354,14 +369,14 @@ public class DemoGame extends Game
         input.attach(MouseEvent.Button.MIDDLE, mZoom);
         input.setMode(MouseEvent.Button.MIDDLE, false, true);
 
-        // Allow gravity changes
-        input.attach(MouseEvent.Button.RIGHT, mGravityHandler);
+        // Center View on player while zooming in
+        input.attach(MouseEvent.Button.RIGHT, mLookAtPlayerHandler);
         input.setMode(MouseEvent.Button.RIGHT, false, false);
     }
 
     private GObject createProjectile(GObjectFactory goFactory, ShaderFactory shaders)
     {
-        final GObject bullet = getGObjectFactory().get("char");
+        final GObject bullet = goFactory.get("char");
         final ImageComponent image = bullet.getImageComponent();
         final BodyComponent body = bullet.getBodyComponent();
 
@@ -664,12 +679,9 @@ public class DemoGame extends Game
     @Override
     protected void onUpdate()
     {
+        final View view = getView();
         final GObject selected = getSelected();
         if (selected != null) {
-            // Move View to center on selected GObject
-            final View view = getView();
-            view.moveToCenter(selected);
-
             flipObjectTowardsCursor(selected);
         }
     }
