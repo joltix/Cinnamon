@@ -196,7 +196,7 @@ public abstract class Game<E extends GObject>
         window.setInput(mWinInput);
 
         // Create fullscreen View
-        mView = new View(window, DEFAULT_VIEW_SCALE);
+        mView = new View(this, DEFAULT_VIEW_SCALE);
 
         installSystemListeners();
     }
@@ -590,6 +590,9 @@ public abstract class Game<E extends GObject>
 
         // Perform AABB collision tests
         mSolver.update(getGObjectFactory());
+
+        // Process View's operations over time (focusing, interpolation)
+        mView.update();
     }
 
     /**
