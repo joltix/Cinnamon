@@ -183,11 +183,12 @@ public abstract class Game<E extends GObject>
         mSolver = new Solver(getBodyFactory(), mTickRate);
 
         // Use given EventHub or use default if none provided
-        final EventHub eventHub = services.getEventHub();
+        final boolean noService = services == null;
+        final EventHub eventHub = (noService) ? null : services.getEventHub();
         mEventHub = (eventHub == null) ? new DefaultEventHub() : eventHub;
 
         // Use given ControlMap or use default if none provided
-        final ControlMap ctrl = services.getControlMap();
+        final ControlMap ctrl = (noService) ? null : services.getControlMap();
         mControlMap = (ctrl == null) ? new DefaultControlMap() : ctrl;
 
         // Create default Window.Input if none was set
