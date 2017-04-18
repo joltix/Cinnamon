@@ -5,9 +5,8 @@ import com.cinnamon.gfx.ConcurrentSceneBuffer;
 import com.cinnamon.gfx.ImageFactory;
 import com.cinnamon.gfx.ShaderFactory;
 import com.cinnamon.object.BodyFactory;
+import com.cinnamon.object.GObject;
 import com.cinnamon.object.GObjectFactory;
-import com.cinnamon.system.ControlMap;
-import com.cinnamon.system.EventHub;
 import com.cinnamon.system.Game;
 import com.cinnamon.system.Window;
 
@@ -112,14 +111,14 @@ public class DemoDriver
         final Window window = new Window(resolution[0], resolution[1], props.get(Game.TITLE), debugEnabled);
 
         // Prepare game resource such as factories
-        final Game.Resources res = new CustomResources();
+        final Game.Resources<GObject> res = new CustomResources();
 
         // Prepare Canvas for drawing
         final ConcurrentSceneBuffer sceneBuffer = new ConcurrentSceneBuffer();
         final Canvas canvas = new DemoCanvas(window, sceneBuffer, res.getShaderFactory());
 
         // Begin game
-        new DemoGame(res, new CustomServices(), canvas, props).start();
+        new DemoGame(res, null, canvas, props).start();
     }
 
     /**
@@ -249,11 +248,11 @@ public class DemoDriver
      *     Provides the {@link Game} with a directory of customized resources for constructing game objects.
      * </p>
      */
-    private static class CustomResources extends Game.Resources
+    private static class CustomResources extends Game.Resources<GObject>
     {
         private ShaderFactory mShaderFactory = new DemoShaderFactory();
         private ImageFactory mImgFactory = new DemoImageFactory(mShaderFactory);
-        private GObjectFactory mGObjectFactory = new DemoGObjectFactory(this);
+        private GObjectFactory<GObject> mGObjectFactory = new DemoGObjectFactory(this);
         private BodyFactory mBodyFactory = new DemoBodyFactory();
 
         @Override
@@ -269,7 +268,7 @@ public class DemoDriver
         }
 
         @Override
-        public GObjectFactory getGObjectFactory()
+        public GObjectFactory<GObject> getGObjectFactory()
         {
             return mGObjectFactory;
         }
@@ -278,27 +277,6 @@ public class DemoDriver
         public BodyFactory getBodyFactory()
         {
             return mBodyFactory;
-        }
-    }
-
-    /**
-     * <p>
-     *     Returns null for each method returning a service. This tells {@link Game} to provide its own
-     *     implementations.
-     * </p>
-     */
-    private static class CustomServices extends Game.Services
-    {
-        @Override
-        public EventHub getEventHub()
-        {
-            return null;
-        }
-
-        @Override
-        public ControlMap getControlMap()
-        {
-            return null;
         }
     }
 }
