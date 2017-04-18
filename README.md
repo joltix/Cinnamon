@@ -97,7 +97,8 @@ public class ExampleGame extends Game
             return new ExampleShaderFactory();
         }
     }
-}```
+}
+```
 
 ## License
 MIT License
