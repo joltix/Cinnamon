@@ -29,6 +29,22 @@ public abstract class BodyFactory extends ComponentFactory<BodyComponent, Object
         super(object, load, growth);
     }
 
+    /**
+     * <p>Gets a {@link BodyComponent} of a specific mass.</p>
+     *
+     * @param mass in kilograms.
+     * @return body.
+     */
+    public final BodyComponent get(float mass)
+    {
+        final BodyComponent body = super.get();
+
+        // Set mass before being used
+        body.setMass(mass);
+
+        return body;
+    }
+
     @Override
     public final BodyComponent get()
     {
