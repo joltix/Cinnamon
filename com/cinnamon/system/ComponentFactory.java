@@ -2,6 +2,7 @@ package com.cinnamon.system;
 
 import com.cinnamon.object.GObject;
 import com.cinnamon.object.GObjectFactory;
+import com.cinnamon.utils.IndexedFactory;
 
 /**
  * <p>

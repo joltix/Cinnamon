@@ -2,10 +2,7 @@ package com.cinnamon.system;
 
 import com.cinnamon.gfx.Canvas;
 import com.cinnamon.gfx.ImageComponent;
-import com.cinnamon.object.BodyComponent;
-import com.cinnamon.object.GObject;
-import com.cinnamon.object.GObjectFactory;
-import com.cinnamon.object.Room;
+import com.cinnamon.object.*;
 import com.cinnamon.utils.Point3F;
 import com.cinnamon.utils.Shape;
 
@@ -528,7 +525,7 @@ public final class DebugCtrl
                 "shape[rotation(%.2f), @(%.2f, %.2f, %.2f), width(%.2f), height(%.2f))]]";
 
         final Solver solver = mGame.getSolver();
-        final List<BodyComponent> collisions = solver.getBoundingBoxCollisions(body);
+        final List<BodyComponent> collisions = solver.getCollisions(mGame.getBodyFactory(), body);
         if (collisions.isEmpty()) {
             final Shape shape = body.getShape();
             System.out.printf(format(bodyInfo + ": no collisions"), body.getId(), body.getVersion(),

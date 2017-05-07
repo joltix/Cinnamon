@@ -1,7 +1,6 @@
 package com.cinnamon.object;
 
 import com.cinnamon.system.ComponentFactory;
-import com.cinnamon.system.Solver;
 import com.cinnamon.utils.*;
 
 import java.util.ArrayList;
@@ -34,8 +33,7 @@ import java.util.List;
  *
  * <p>
  *     Toggles are available for disabling or enabling certain features such as collision with
- *     {@link #setCollidable(boolean)} or motion with {@link #setStatic(boolean)} (note: setting a BodyComponent to
- *     static will also ignore position changes through methods like {@link #moveTo(float, float)}).
+ *     {@link #setCollidable(boolean)}.
  * </p>
  *
  * <p>
@@ -86,17 +84,20 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     // Anchor in tree that allows O(1) lookup
     private BoundingTree.Node mContainer;
 
+    // Anchor in graph for O(1) lookup
+    private ContactGraph.Node mContactNode;
+
     // Polygon for fine-grain collision checking
     private Shape mShape;
 
     // Toggle to allow selection
     private boolean mSelectable = true;
 
-    // Toggle to mark as non-moving
-    private boolean mStatic = false;
-
     // Toggle to disable collision reactions
     private boolean mCollidable = true;
+
+    // True to ignore collisions with GObject's parent
+    private boolean mIgnoreGObjectParent = false;
 
     /**
      * Physics
@@ -105,21 +106,26 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     // Kilograms
     private float mMass = 70f;
 
+    // Inverse mass (in kilograms)
+    private float mInvMass = 1f / mMass;
+
     // Meters per second
     private final Vector2F mVelocity = new Vector2F();
 
+    // Velocity from previous physics update
+    private final Vector2F mOldVelocity = new Vector2F();
+
     // Impulse vector to be applied during each move() and cleared afterwards
     private final Vector2F mImpulse = new Vector2F();
-
-    // Meters per second per second
-    private Vector2F mAccel = new Vector2F();
-    private Vector2F mOldAccel = new Vector2F();
 
     // Coefficient of friction
     private float mCOF = 0.5f;
 
     // Coefficient of restitution
     private float mCOR = 0.8f;
+
+    // Sleep optimization flag
+    private boolean mSleeping = false;
 
     /**
      * <p>Constructs a BodyComponent with a specific {@link Shape}. The stored Shape is a copy of the given Shape.</p>
@@ -491,6 +497,29 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     }
 
     /**
+     * <p>Gets the velocity from before the most recent physics update.</p>
+     *
+     * @param container container.
+     */
+    final void getPreviousVelocity(Vector2F container)
+    {
+        container.copy(mOldVelocity);
+    }
+
+    /**
+     * <p>Version of {@link #setVelocity(Vector2F)} for use in computing the new BodyComponent's new velocity during a
+     * physics update. This changes the velocity returned by {@link #getPreviousVelocity(Vector2F)} to the vector
+     * before this method is called.</p>
+     *
+     * @param velocity new velocity.
+     */
+    final void updateVelocity(Vector2F velocity)
+    {
+        mOldVelocity.copy(mVelocity);
+        mVelocity.copy(velocity);
+    }
+
+    /**
      * <p>Gets the current speed in meters per second.</p>
      *
      * @return current speed.
@@ -548,67 +577,26 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     /**
      * <p>Gets the acceleration.</p>
      *
+     * <p>This is the difference between the current and previous velocity.</p>
+     *
      * @return acceleration vector.
      */
     public final Vector2F getAcceleration()
     {
-        return new Vector2F(mAccel);
+        return new Vector2F(mVelocity).subtract(mOldVelocity);
     }
 
     /**
      * <p>Copies the acceleration into a given vector.</p>
      *
+     * <p>This is the difference between the current and previous velocity.</p>
+     *
      * @param container vector to copy to.
      */
     public final void getAcceleration(Vector2F container)
     {
-        container.copy(mAccel);
-    }
-
-    /**
-     * <p>Copies the previous acceleration into a given vector.</p>
-     *
-     * @param container vector to copy to.
-     */
-    public final void getPreviousAcceleration(Vector2F container)
-    {
-        container.copy(mOldAccel);
-    }
-
-    /**
-     * <p>Sets the acceleration. If null is given, the current acceleration is zeroed.</p>
-     *
-     * @param acceleration acceleration vector.
-     */
-    public final void setAcceleration(Vector2F acceleration)
-    {
-        // Save current acceleration as previous
-        mOldAccel.copy(mAccel);
-
-        // Clear the acceleration if given null
-        if (acceleration == null) {
-            mAccel.set(0f, 0f);
-            return;
-        }
-
-        // Update current acceleration
-        mAccel.copy(acceleration);
-    }
-
-    /**
-     * <p>Adds to the current acceleration. Passing in null has the same effect as calling this method with the zero
-     * vector.</p>
-     *
-     * @param acceleration to add.
-     */
-    public final void addAcceleration(Vector2F acceleration)
-    {
-        // Treat null as zero vector (aka null vector)
-        if (acceleration == null) {
-            return;
-        }
-
-        mAccel.add(acceleration);
+        container.copy(mVelocity);
+        container.subtract(mOldVelocity);
     }
 
     /**
@@ -625,10 +613,29 @@ public final class BodyComponent extends ComponentFactory.Component implements P
      * <p>Sets the mass in kilograms.</p>
      *
      * @param mass kilograms.
+     * @throws IllegalArgumentException if mass < 0.
      */
-    public final void setMass(float mass)
+    final void setMass(float mass)
     {
+        // Ensure no negative masses
+        if (mass < 0f) {
+            throw new IllegalArgumentException("Mass should be >= 0: " + mass);
+        }
+
         mMass = mass;
+
+        // Precompute inverse mass; store inverse infinite as 0
+        mInvMass = (mass == 0f) ? 0f : 1f / mass;
+    }
+
+    /**
+     * <p>Gets the inverse mass in kilograms. This value is often used in physics.</p>
+     *
+     * @return (1 / mass) kilograms
+     */
+    public final float getInverseMass()
+    {
+        return mInvMass;
     }
 
     @Override
@@ -658,11 +665,6 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     @Override
     public final void moveTo(float x, float y)
     {
-        // Movement isn't allowed if static
-        if (isStatic()) {
-            return;
-        }
-
         // Move shape along
         mShape.moveTo(x, y);
     }
@@ -670,11 +672,6 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     @Override
     public final void moveTo(float x, float y, float z)
     {
-        // Movement isn't allowed if static
-        if (isStatic()) {
-            return;
-        }
-
         // Move shape along
         mShape.moveTo(x, y, z);
     }
@@ -682,17 +679,12 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     @Override
     public final void moveBy(float x, float y)
     {
-        moveBy(x, y, 0);
+        moveBy(x, y, 0f);
     }
 
     @Override
     public final void moveBy(float x, float y, float z)
     {
-        // Movement isn't allowed if static
-        if (isStatic()) {
-            return;
-        }
-
         // Move shape along
         mShape.moveBy(x, y, z);
     }
@@ -700,10 +692,6 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     @Override
     public void moveToCenter(float x, float y)
     {
-        if (isStatic()) {
-            return;
-        }
-
         mShape.moveTo(mShape.getX() - (mShape.getWidth() / 2f), mShape.getY() - (mShape.getHeight() / 2f));
     }
 
@@ -728,32 +716,13 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     }
 
     /**
-     * <p>Checks if the BodyComponent is not meant to move.</p>
+     * <p>Checks if the BodyComponent has infinite mass and is not meant to move during physics updates.</p>
      *
-     * @return true if movement is disabled.
+     * @return true if not meant to move through physics.
      */
     public final boolean isStatic()
     {
-        return mStatic;
-    }
-
-    /**
-     * <p>Sets whether or not the BodyComponent should be prevented from moving. </p>
-     *
-     * <p>Making a BodyComponent static allows some optimization when computing physics in each update.</p>
-     *
-     * @param enable true to prevent movement.
-     */
-    public final void setStatic(boolean enable)
-    {
-        mStatic = enable;
-
-        // Clear motion if static
-        if (mStatic) {
-            mVelocity.set(0f, 0f);
-            mAccel.set(0f, 0f);
-            mImpulse.set(0f, 0f);
-        }
+        return mMass == 0f;
     }
 
     /**
@@ -780,6 +749,26 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     }
 
     /**
+     * <p>Checks if collisions with the owning {@link GObject}'s parent are ignored.</p>
+     *
+     * @return true if collisions with the GObject's parent are ignored.
+     */
+    public final boolean isIgnoreParentEnabled()
+    {
+        return mIgnoreGObjectParent;
+    }
+
+    /**
+     * <p>Sets whether to ignore collisions with the {@link GObject}'s parent.</p>
+     *
+     * @param enable true to ignore collisions with the GObject's parent.
+     */
+    public final void setIgnoreGObjectParent(boolean enable)
+    {
+        mIgnoreGObjectParent = enable;
+    }
+
+    /**
      * <p>Gets the {@link BoundingTree.Node} containing the BodyComponent for fast lookup.</p>
      *
      * @return BoundingTree's Node.
@@ -797,6 +786,28 @@ public final class BodyComponent extends ComponentFactory.Component implements P
     void setContainer(BoundingTree.Node container)
     {
         mContainer = container;
+    }
+
+    /**
+     * <p>Gets the {@link ContactGraph.Node} representing the BodyComponent in a {@link ContactGraph} for fast
+     * lookup.</p>
+     *
+     * @return ContactGraph's Node.
+     */
+    ContactGraph.Node getContactNode()
+    {
+        return mContactNode;
+    }
+
+    /**
+     * <p>Sets the {@link ContactGraph.Node} to represent the BodyComponent within a {@link ContactGraph}. This
+     * allows for fast lookup in the graph.</p>
+     *
+     * @param node Node.
+     */
+    void setContactNode(ContactGraph.Node node)
+    {
+        mContactNode = node;
     }
 
     @Override
@@ -1083,6 +1094,16 @@ public final class BodyComponent extends ComponentFactory.Component implements P
         }
     }
 
+    boolean isSleeping()
+    {
+        return mSleeping;
+    }
+
+    void setSleeping(boolean enable)
+    {
+        mSleeping = enable;
+    }
+
     /**
      * <p>Represents a colliding edge during contact point generation in
      * {@link #getContacts(List, List, BodyComponent, Vector2F)}.</p>
@@ -1141,8 +1162,10 @@ public final class BodyComponent extends ComponentFactory.Component implements P
      */
     public static final class Manifold
     {
-        // Contact points and penetration depths
+        // Contact points
         private final List<Vector2F> mPoints = new ArrayList<Vector2F>();
+
+        // Penetration depths for each contact point
         private final List<Float> mDepths = new ArrayList<Float>();
 
         // Contact normal
@@ -1213,6 +1236,25 @@ public final class BodyComponent extends ComponentFactory.Component implements P
         {
             mNormal.copy(normal);
             mNormal.normalize();
+        }
+
+        /**
+         * <p>Copies the collision data from another Manifold.</p>
+         *
+         * @param manifold Manifold to copy.
+         */
+        public void copy(Manifold manifold)
+        {
+            // Replace points with given Manifold's
+            mPoints.clear();
+            mPoints.addAll(manifold.mPoints);
+
+            // Replace penetration depths with given Manifold's
+            mDepths.clear();
+            mDepths.addAll(manifold.mDepths);
+
+            // Replace collision normal
+            mNormal.copy(manifold.mNormal);
         }
 
         /**

@@ -127,6 +127,19 @@ public class Vector2F
     }
 
     /**
+     * <p>Performs the cross product, also known as vector product, operation with another vector. However, because the
+     * cross product between two 2D vectors refers to a vector in the third dimension (which is not as useful in 2D),
+     * this method returns only the magnitude./p>
+     *
+     * @param vector other Vector2F.
+     * @return magnitude of cross product.
+     */
+    public float crossProduct(Vector2F vector)
+    {
+        return (mX * vector.mY) - (mY * vector.mX);
+    }
+
+    /**
      * <p>Multiplies the vector with a scalar.</p>
      *
      * @param scalar scalar.
@@ -333,6 +346,23 @@ public class Vector2F
     }
 
     /**
+     * <p>Compares two {@link Vector2F}s and returns true if the calling vector's magnitude is less than or equal to the
+     * other vector's magnitude.</p>
+     *
+     * @param vector other.
+     * @return true if magnitude is <= the given vector.
+     */
+    public boolean isLessThanEqualTo(Vector2F vector)
+    {
+        // Compute both vectors' squared lengths
+        final float sqrLen = (mX * mX) + (mY * mY);
+        final float otherSqrLen = (vector.mX * vector.mX) + (vector.mY * vector.mY);
+
+        // Compare
+        return sqrLen < otherSqrLen || Point2F.isEqual(sqrLen, otherSqrLen);
+    }
+
+    /**
      * <p>Gets the number of values.</p>
      *
      * @return value count.
@@ -382,6 +412,22 @@ public class Vector2F
         }
 
         return rads;
+    }
+
+    /**
+     * <p>Gets the smallest angle between two vectors. The returned angle is always positive.</p>
+     *
+     * @param vector other vector.
+     * @return smallest angle in radians.
+     */
+    public double angleTo(Vector2F vector)
+    {
+        // Compute cross and dot products between both vectors
+        final float cross = crossProduct(vector);
+        final float dot = dotProduct(vector);
+
+        // Discard angle's negative sign
+        return Math.abs(Math.atan2(cross, dot));
     }
 
     @Override

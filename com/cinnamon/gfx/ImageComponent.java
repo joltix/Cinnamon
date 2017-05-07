@@ -340,7 +340,7 @@ public final class ImageComponent extends ComponentFactory.Component implements 
 
         // Notify ImageFactory of visibility change
         if (visibilityChanged && mVisibilityListener != null) {
-            mVisibilityListener.onChange(mAlpha > 0f || Point2F.isEqual(mAlpha, 0f));
+            mVisibilityListener.onChange(mAlpha > 0f);
         }
     }
 

@@ -1,10 +1,9 @@
 package com.cinnamon.object;
 
 
-import com.cinnamon.gfx.ImageComponent;
 import com.cinnamon.system.Config;
 import com.cinnamon.system.Game;
-import com.cinnamon.system.IndexedFactory;
+import com.cinnamon.utils.IndexedFactory;
 
 /**
  * <p>

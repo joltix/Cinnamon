@@ -15,15 +15,16 @@ import java.util.Random;
  *
  * <p>
  *     <b>[Current controls]</b>
- *     <br><i>Left arrow:</i> move left relative to gravity</br>
- *     <br><i>Right arrow:</i> move right relative to gravity</br>
- *     <br><i>Up arrow:</i> jump relative to gravity</br>
+ *     <br><i>Left arrow:</i> move left</br>
+ *     <br><i>Right arrow:</i> move right</br>
+ *     <br><i>Up arrow:</i> jump</br>
  *
  *     <br></br>
  *
- *     <br><i>Space:</i> fire projectile from selected object to cursor</br>
+ *     <br><i>Left CTRL:</i> switch between free cam and following selected game object</br>
+ *     <br><i>Space:</i> move View to zoom in on and look at the selected game object</br>
  *     <br><i>Left click:</i> select object (or deselect if nothing selectable was clicked)</br>
- *     <br><i>Right click:</i> move View to zoom in on and look at the selected game object</br>
+ *     <br><i>Right click:</i> fire projectile from selected object to cursor</br>
  * </p>
  */
 public class DemoGame extends Game
@@ -49,7 +50,7 @@ public class DemoGame extends Game
      */
 
     // Number of grass objects to make
-    private static final int GRASS_COUNT = 30;
+    private static final int GRASS_COUNT = 7;
 
     // Minimum width allowed
     private static final float GRASS_MIN_WIDTH = 0.75f;
@@ -90,47 +91,51 @@ public class DemoGame extends Game
     private static final float PLAYER_Z = 5f;
 
     // Player's coefficient of restitution
-    private static final float PLAYER_RESTITUTION = 0.3f;
+    private static final float PLAYER_RESTITUTION = 0.2f;
 
     // Player's coefficient of friction
-    private static final float PLAYER_FRICTION = 0.8f;
+    private static final float PLAYER_FRICTION = 0.9f;
+
+    // Player's mass
+    private static final float PLAYER_MASS = 5f;
 
     // Player's left/right speed in meters per sec
-    private static final float mStepSize = 1f;
+    private static final float mStepSize = 0.35f;
 
     // Player's jump speed in meters per second
-    private static final float mJumpSize = 10f;
+    private static final float mJumpSize = 6f;
 
     /**
      * Projectile
      */
 
     // Projectile mass in kilograms
-    private static final float PROJECTILE_MASS = 1f;
+    private static final float PROJECTILE_MASS = 0.00125f;
 
     // Projectile coefficient of friction
-    private static final float PROJECTILE_FRICTION = 0.3f;
+    private static final float PROJECTILE_FRICTION = 0.8f;
 
     // Projectile coefficient of restitution
-    private static final float PROJECTILE_RESTITUTION = 0.8f;
+    private static final float PROJECTILE_RESTITUTION = 0.6f;
 
     /**
      * Walls
      */
 
     // Wall mass in kilograms
-    private static final float WALL_MASS = 1000000f;
+    private static final float WALL_MASS = 0f;
 
     // Wall coefficient of friction
-    private static final float WALL_FRICTION = 0.6f;
+    private static final float WALL_FRICTION = 0.9f;
 
     // Wall coefficient of restitution
-    private static final float WALL_RESTITUTION = 0.8f;
+    private static final float WALL_RESTITUTION = 1f;
 
-    /**
-     * Velocity vector used in onUpdate() to rotate object images towards velocity
-     */
+    // Vector for determining which direction to flip image towards
     private final Vector2F mImgDirection = new Vector2F();
+
+    // Vector used for cutting player's velocity in sudden turns
+    private final Vector2F mPlayerVelocity = new Vector2F();
 
     /**
      * <p>
@@ -190,10 +195,16 @@ public class DemoGame extends Game
             leftVector.normalize();
             leftVector.multiply(-mStepSize);
 
-            obj.getImageComponent().setFlipHorizontally(true);
-
-            // Don't add impulse if not resting on a surface
             final BodyComponent body = obj.getBodyComponent();
+            body.getVelocity(mPlayerVelocity);
+
+            // Cut speed down if changing directions
+            if (mPlayerVelocity.getX() > 0f) {
+                mPlayerVelocity.divide(1.1f);
+                body.setVelocity(mPlayerVelocity);
+            }
+
+            // Apply left impulse
             body.addImpulse(leftVector);
         }
     };
@@ -218,10 +229,16 @@ public class DemoGame extends Game
             rightVector.normalize();
             rightVector.multiply(mStepSize);
 
-            obj.getImageComponent().setFlipHorizontally(false);
-
-            // Don't add impulse if not resting on a surface
             final BodyComponent body = obj.getBodyComponent();
+            body.getVelocity(mPlayerVelocity);
+
+            // Cut speed down if changing directions
+            if (mPlayerVelocity.getX() < 0f) {
+                mPlayerVelocity.divide(1.1f);
+                body.setVelocity(mPlayerVelocity);
+            }
+
+            // Apply right impulse
             body.addImpulse(rightVector);
         }
     };
@@ -253,28 +270,32 @@ public class DemoGame extends Game
      *     Creates a projectile at the selected and applies an impulse of 30 meters per second towards the cursor.
      * </p>
      */
-    private KeyEventHandler mFireHandler = new KeyEventHandler()
+    private MouseEventHandler mFireHandler = new MouseEventHandler()
     {
         @Override
-        public void handle(KeyEvent event)
+        public void handle(MouseEvent event)
         {
             final GObject obj = getSelected();
             if (obj == null) {
                 return;
             }
 
-            final GObject projectile = createProjectile(getGObjectFactory(), getShaderFactory());
+            final GObject projectile = createProjectile();
             projectile.moveToCenter(obj.getCenterX(), obj.getCenterY());
-
             projectile.getImageComponent().setOffsets(0f, 0f);
 
             // Apply firing velocity
             final Point2F mouse = getMousePosition();
             getView().translateToWorld(mouse);
-            final Vector2F firingVector = new Vector2F(mouse.getX() - obj.getX(), mouse.getY() - obj.getY());
+            final Vector2F firingVector = new Vector2F(mouse.getX() - obj.getCenterX(), mouse.getY() - obj.getCenterY());
             firingVector.normalize();
-            firingVector.multiply(30f);
-            projectile.getBodyComponent().setVelocity(firingVector);
+            firingVector.multiply(20f);
+
+            // Add firing velocity to body and have it ignore collisions with the player
+            final BodyComponent body = projectile.getBodyComponent();
+            body.setVelocity(firingVector);
+            body.setIgnoreGObjectParent(true);
+            projectile.setParent(obj);
         }
     };
 
@@ -283,24 +304,48 @@ public class DemoGame extends Game
      *     Move towards and zoom in on the selected GObject.
      * </p>
      */
-    private MouseEventHandler mLookAtPlayerHandler = new MouseEventHandler()
+    private KeyEventHandler mLookAtPlayerHandler = new KeyEventHandler()
     {
         @Override
-        public void handle(MouseEvent event)
+        public void handle(KeyEvent event)
         {
-            // Can't home in if null
+            // Can't home in if nothing selected to move towards
             final GObject selected = getSelected();
-            if (selected == null) {
+            final View view = getView();
+
+            if (selected == null || view.isFocusing()) {
                 return;
             }
 
-            // Don't try to move if already moving
-            final View view = getView();
             final long duration = 3000L;
 
-            // Move towards and zoom in on selected object over 3 seconds
+            // Move towards and zoom in on selected object
             view.moveToCenter(selected.getCenterX(), selected.getCenterY(), duration);
             view.setScale(view.getMaximumScale(), duration);
+        }
+    };
+
+    private KeyEventHandler mViewToggle = new KeyEventHandler()
+    {
+        @Override
+        public void handle(KeyEvent event)
+        {
+            final View view = getView();
+
+            // Disable focusing if currently focusing
+            if (view.isFocusing()) {
+                view.setFocus(null);
+
+
+
+            } else {
+                final GObject selected = getSelected();
+
+                // Can only focus if something selected
+                if (selected != null) {
+                    view.setFocus(selected);
+                }
+            }
         }
     };
 
@@ -317,17 +362,13 @@ public class DemoGame extends Game
         room.setBackgroundTint(0.67f, 0.86f, 0.94f);
         this.setRoom(room);
 
-        // Fetch resources
-        final GObjectFactory goFactory = getGObjectFactory();
-        final ShaderFactory shaders = getShaderFactory();
-
         // Create game object for user control
-        createPlayer(goFactory, shaders);
+        final GObject player = createPlayer();
 
         // Zoom view in to fill room and center on player
         final View view = getView();
+        view.setFocus(player);
         view.setRoomConstrained(true);
-        view.moveToCenter(room.getCenterX(), room.getCenterY());
         view.setScale(1f);
 
         // Enable motion by 1 meter per second by moving cursor by the edges
@@ -335,19 +376,16 @@ public class DemoGame extends Game
         view.setSpeed(0.1f);
 
         // Generate clouds in sky
-        createClouds(goFactory, shaders);
+        createClouds();
 
         // Generate grass along ground
-        createGrass(goFactory, shaders);
+        createGrass();
 
         // Create ramp in left side
-        createRamp(goFactory);
+        createRamp();
 
         // Generate mountains in background
-        createMountains(goFactory, shaders);
-
-        // Create boundary walls around room to contain game objects
-        createWalls(goFactory);
+        createMountains();
 
         // Attach selected object motion to arrow keys
         final ControlMap input = getControlMap();
@@ -358,9 +396,13 @@ public class DemoGame extends Game
         input.attach(KeyEvent.Key.KEY_LEFT, mLeftAction);
         input.setMode(KeyEvent.Key.KEY_LEFT, true, true);
 
-        // Allow selected object to fire projectile
-        input.attach(KeyEvent.Key.KEY_SPACE, mFireHandler);
-        input.setMode(KeyEvent.Key.KEY_SPACE, true, false);
+        // Center View on player while zooming in
+        input.attach(KeyEvent.Key.KEY_SPACE, mLookAtPlayerHandler);
+        input.setMode(KeyEvent.Key.KEY_SPACE, false, false);
+
+        // Toggle free cam vs following selected GObject
+        input.attach(KeyEvent.Key.KEY_LEFT_CTRL, mViewToggle);
+        input.setMode(KeyEvent.Key.KEY_LEFT_CTRL, false, false);
 
         // Allow game shutdown from ESC key
         input.attach(KeyEvent.Key.KEY_ESCAPE, mCloseAction);
@@ -369,16 +411,18 @@ public class DemoGame extends Game
         input.attach(MouseEvent.Button.MIDDLE, mZoom);
         input.setMode(MouseEvent.Button.MIDDLE, false, true);
 
-        // Center View on player while zooming in
-        input.attach(MouseEvent.Button.RIGHT, mLookAtPlayerHandler);
-        input.setMode(MouseEvent.Button.RIGHT, false, false);
+        // Allow selected object to fire projectile
+        input.attach(MouseEvent.Button.RIGHT, mFireHandler);
+        input.setMode(MouseEvent.Button.RIGHT, true, false);
     }
 
-    private GObject createProjectile(GObjectFactory goFactory, ShaderFactory shaders)
+    private GObject createProjectile()
     {
-        final GObject bullet = goFactory.get("char");
-        final ImageComponent image = bullet.getImageComponent();
-        final BodyComponent body = bullet.getBodyComponent();
+        final GObject bullet = getGObjectFactory().get();
+        final ImageComponent image = getImageFactory().get();
+        final BodyComponent body = getBodyFactory().get(PROJECTILE_MASS);
+        bullet.setBodyComponent(body);
+        bullet.setImageComponent(image);
 
         // Set projectile texture
         final Texture texture = getShaderFactory().getTexture("demo_projectile.png");
@@ -389,7 +433,6 @@ public class DemoGame extends Game
         image.setTint(ranGen.nextFloat() + 0.7f, ranGen.nextFloat() + 0.7f, ranGen.nextFloat() + 0.7f);
 
         // Assemble bullet
-        body.setMass(PROJECTILE_MASS);
         body.setFriction(PROJECTILE_FRICTION);
         body.setRestitution(PROJECTILE_RESTITUTION);
         body.setCollidable(true);
@@ -403,34 +446,32 @@ public class DemoGame extends Game
 
     /**
      * <p>Creates the initial game object under user control.</p>
-     *
-     * @param goFactory {@link GObjectFactory} to produce game objects.
-     * @param shaders {@link ShaderFactory} for referencing character texture.
      */
-    private GObject createPlayer(GObjectFactory goFactory, ShaderFactory shaders)
+    private GObject createPlayer()
     {
         // Get game object to act as player
-        final GObject obj = goFactory.get("char");
-        final int texture = shaders.getTexture("demo_character.png").getId();
+        final GObject obj = getGObjectFactory().get();
+        final BodyComponent body = getBodyFactory().get(PLAYER_MASS);
+        final ImageComponent image = getImageFactory().get();
+        obj.setBodyComponent(body);
+        obj.setImageComponent(image);
 
         obj.setWidth(1.5f);
         obj.setHeight(2f);
         this.setSelected(obj);
 
         // Setup visual
-        final ImageComponent image = obj.getImageComponent();
+        final int texture = getShaderFactory().getTexture("demo_character.png").getId();
         image.setTexture(texture);
         image.setTint(0.8f, 1f, 1f);
         image.setOffsets(0f, -0.25f);
 
         // Setup collision and physics
-        final BodyComponent body = obj.getBodyComponent();
         body.setCollidable(true);
-        body.setStatic(false);
         body.setRestitution(PLAYER_RESTITUTION);
         body.setFriction(PLAYER_FRICTION);
 
-        obj.moveToCenter(getRoom().getWidth() / 2f, getRoom().getHeight() - 15f);
+        obj.moveToCenter((getRoom().getWidth() / 2f) + 5f, getRoom().getHeight() - 30f);
         obj.moveBy(0f, 0f, PLAYER_Z);
 
         return obj;
@@ -438,14 +479,11 @@ public class DemoGame extends Game
 
     /**
      * <p>Creates cloud game objects and scatters them about the room.</p>
-     *
-     * @param goFactory {@link GObjectFactory} to produce game objects.
-     * @param shaders {@link ShaderFactory} for referencing cloud texture.
      */
-    private void createClouds(GObjectFactory goFactory, ShaderFactory shaders)
+    private void createClouds()
     {
         // Get cloud texture
-        final Texture cloudTexture = shaders.getTexture("demo_cloud.png");
+        final Texture cloudTexture = getShaderFactory().getTexture("demo_cloud.png");
         final int texture = cloudTexture.getId();
         final float heightRatio = (float) cloudTexture.getHeight() / cloudTexture.getWidth();
 
@@ -457,10 +495,11 @@ public class DemoGame extends Game
 
         // Generate clouds
         for (int i = 0; i < CLOUD_COUNT; i++) {
-            final GObject cloud = goFactory.get("char");
+            final GObject cloud = getGObjectFactory().get();
+            final ImageComponent image = getImageFactory().get();
+            cloud.setImageComponent(image);
 
             // Set cloud image
-            final ImageComponent image = cloud.getImageComponent();
             image.setTexture(texture);
             image.setFlipHorizontally(mRanGen.nextBoolean());
             image.setFlipVertically(mRanGen.nextBoolean());
@@ -472,33 +511,29 @@ public class DemoGame extends Game
 
             // Place somewhere in the room's top half
             cloud.moveToCenter(mRanGen.nextInt(maxX), mRanGen.nextInt(rangeY) + minY);
-
-            // No collision or physics needed
-            cloud.setBodyComponent(null);
         }
     }
 
     /**
      * <p>Creates an untextured black ramp in the left side of the {@link Room}.</p>
-     *
-     * @param goFactory {@link GObjectFactory} to produce the ramp.
      */
-    private void createRamp(GObjectFactory goFactory)
+    private void createRamp()
     {
-        final GObject ramp = goFactory.get("char");
+        final GObject ramp = getGObjectFactory().get();
+        final BodyComponent body = getBodyFactory().get(WALL_MASS);
+        final ImageComponent image = getImageFactory().get();
+        ramp.setBodyComponent(body);
+        ramp.setImageComponent(image);
 
         // Make ramp black
-        final ImageComponent image = ramp.getImageComponent();
         image.setTexture(Texture.NULL);
         image.setTint(0f, 0f, 0f);
-        image.setTransparency(1f);
+        image.setTransparency(0.5f);
         image.setOffsets(0f, 0.2f);
 
         // Make ramp like walls (solid but not selectable)
-        final BodyComponent body = ramp.getBodyComponent();
         body.setSelectable(false);
         body.setCollidable(true);
-        body.setMass(WALL_MASS);
         body.setFriction(WALL_FRICTION);
         body.setRestitution(WALL_RESTITUTION);
 
@@ -509,19 +544,15 @@ public class DemoGame extends Game
         // Place angled in bottom left corner
         ramp.moveTo(-10f, -7f, -Float.MAX_VALUE);
         ramp.rotateTo(-Math.PI / 8d);
-        body.setStatic(true);
     }
 
     /**
      * <p>Creates static non-collidable grass in front of mountains and around the player.</p>
-     *
-     * @param goFactory {@link GObjectFactory} to produce game objects.
-     * @param shaders {@link ShaderFactory} for referencing grass texture.
      */
-    private void createGrass(GObjectFactory goFactory, ShaderFactory shaders)
+    private void createGrass()
     {
         // Get texture and height ratio for sizing
-        final Texture grassTexture = shaders.getTexture("demo_grass.png");
+        final Texture grassTexture = getShaderFactory().getTexture("demo_grass.png");
         final int texture = grassTexture.getId();
         final float heightRatio = (float) grassTexture.getHeight() / grassTexture.getWidth();
 
@@ -530,7 +561,7 @@ public class DemoGame extends Game
 
         for (int i = 0; i < GRASS_COUNT; i++) {
             // Randomize size while keeping texture's size ratio then randomize location on ground
-            final GObject object = goFactory.get("char");
+            final GObject object = getGObjectFactory().get("char");
             final float width = ((GRASS_MAX_WIDTH - GRASS_MIN_WIDTH) * mRanGen.nextFloat()) + GRASS_MIN_WIDTH;
             object.setWidth(width * 1.5f);
             object.setHeight(width * heightRatio);
@@ -551,20 +582,17 @@ public class DemoGame extends Game
 
     /**
      * <p>Creates static non-collidable mountains in the background.</p>
-     *
-     * @param goFactory {@link GObjectFactory} to produce game objects.
-     * @param shaders {@link ShaderFactory} for referencing mountain texture.
      */
-    private void createMountains(GObjectFactory goFactory, ShaderFactory shaders)
+    private void createMountains()
     {
-        final Texture mountainTexture = shaders.getTexture("demo_mountain.png");
+        final Texture mountainTexture = getShaderFactory().getTexture("demo_mountain.png");
         final int texture = mountainTexture.getId();
         final float heightRatio = (float) mountainTexture.getHeight() / mountainTexture.getWidth();
 
         final int maxX = (int) getRoom().getWidth();
 
         for (int i = 0; i < MOUNTAIN_COUNT; i++) {
-            final GObject object = goFactory.get("char");
+            final GObject object = getGObjectFactory().get("char");
             final float width = ((MOUNTAIN_MAX_WIDTH - MOUNTAIN_MIN_WIDTH) * mRanGen.nextFloat()) + MOUNTAIN_MIN_WIDTH;
             object.setWidth(width);
             object.setHeight(width * heightRatio);
@@ -582,98 +610,6 @@ public class DemoGame extends Game
             // No collision or physics needed
             object.setBodyComponent(null);
         }
-    }
-
-    /**
-     * <p>Creates 500 unit thick collidable static walls around the {@link Room} to keep other game objects inside.
-     * Each wall has an {@link ImageComponent} to draw each wall in black to hide game object's edges sticking
-     * beyond the Room's edges.</p>
-     *
-     * @param goFactory {@link GObjectFactory} to produce game objects.
-     */
-    private void createWalls(GObjectFactory goFactory)
-    {
-        final float z = -Float.MAX_VALUE;
-
-        // Create and place north wall
-        final GObject northWall = goFactory.get("char");
-
-        final ImageComponent northImage = northWall.getImageComponent();
-        northImage.setTexture(Texture.NULL);
-        northImage.setTint(0f, 0f, 0f);
-        northImage.setOffsets(0f, 0f);
-
-        final BodyComponent northBody = northWall.getBodyComponent();
-        northWall.setWidth(getRoom().getWidth() + 1000f);
-        northWall.setHeight(500f);
-        northWall.moveTo(-500f, getRoom().getHeight(), z);
-        northWall.setBodyComponent(northBody);
-        northBody.setSelectable(false);
-        northBody.setCollidable(true);
-        northBody.setStatic(true);
-        northBody.setMass(WALL_MASS);
-        northBody.setRestitution(WALL_RESTITUTION);
-        northBody.setFriction(WALL_FRICTION);
-
-        // Create and place south wall
-        final GObject southWall = goFactory.get("char");
-
-        final ImageComponent southImage = southWall.getImageComponent();
-        southImage.setTexture(Texture.NULL);
-        southImage.setTint(0f, 0f, 0f);
-        southImage.setOffsets(0f, 0f);
-
-        final BodyComponent southBody = southWall.getBodyComponent();
-        southWall.setWidth(getRoom().getWidth() + 1000f);
-        southWall.setHeight(500f);
-        southWall.moveTo(-500f, -500f, z);
-        southWall.setBodyComponent(southBody);
-        southBody.setSelectable(false);
-        southBody.setCollidable(true);
-        southBody.setStatic(true);
-        southBody.setMass(WALL_MASS);
-        southBody.setRestitution(WALL_RESTITUTION);
-        southBody.setFriction(WALL_FRICTION);
-
-        // Create and place east wall
-        final GObject eastWall = goFactory.get("char");
-
-        final ImageComponent eastImage = eastWall.getImageComponent();
-        eastImage.setTexture(Texture.NULL);
-        eastImage.setTint(0f, 0f, 0f);
-        eastImage.setOffsets(0f, 0f);
-
-        final BodyComponent eastBody = eastWall.getBodyComponent();
-        eastWall.setWidth(500f);
-        eastWall.setHeight(getRoom().getHeight() + 1000f);
-        eastWall.moveTo(getRoom().getWidth(), -500f, z);
-        eastWall.setBodyComponent(eastBody);
-        eastBody.setSelectable(false);
-        eastBody.setCollidable(true);
-        eastBody.setStatic(true);
-        eastBody.setMass(WALL_MASS);
-        eastBody.setRestitution(WALL_RESTITUTION);
-        eastBody.setFriction(WALL_FRICTION);
-
-        // Create and place west wall
-        final GObject westWall = goFactory.get("char");
-
-        final ImageComponent westImage = westWall.getImageComponent();
-        westImage.setTexture(Texture.NULL);
-        westImage.setTint(0f, 0f, 0f);
-        westImage.setOffsets(0f, 0f);
-
-        final BodyComponent westBody = westWall.getBodyComponent();
-        westWall.setWidth(500f);
-        westWall.setHeight(getRoom().getHeight() + 1000f);
-        westWall.moveTo(-500f, -500f, z);
-        westWall.setBodyComponent(westBody);
-        westBody.setSelectable(false);
-        westBody.setCollidable(true);
-        westBody.setStatic(true);
-        westBody.setMass(WALL_MASS);
-        westBody.setRestitution(WALL_RESTITUTION);
-        westBody.setFriction(WALL_FRICTION);
     }
 
     @Override

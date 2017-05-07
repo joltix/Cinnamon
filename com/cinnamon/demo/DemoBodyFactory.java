@@ -52,11 +52,9 @@ public class DemoBodyFactory extends BodyFactory
         {
             object.setWidth(1.5f);
             object.setHeight(2f);
-            object.setMass(70f);
             object.setFriction(0.7f);
             object.setRestitution(0.6f);
             object.setCollidable(true);
-            object.setStatic(false);
         }
     }
 
@@ -66,11 +64,9 @@ public class DemoBodyFactory extends BodyFactory
         public void configure(BodyComponent object, Object resource)
         {
             object.setShape(new Shape(10f, 10f));
-            object.setMass(700f);
             object.setFriction(0.9f);
             object.setRestitution(0.1f);
             object.setCollidable(true);
-            object.setStatic(false);
         }
     }
 
@@ -81,12 +77,9 @@ public class DemoBodyFactory extends BodyFactory
         {
             body.setWidth(1f);
             body.setHeight(1f);
-            body.setAcceleration(null);
             body.setVelocity(null);
             body.moveTo(0f, 0f, 0f);
             body.rotateTo(0f);
-            body.setStatic(false);
-            body.setMass(1f);
             body.setFriction(0.6f);
             body.setRestitution(0.4f);
         }

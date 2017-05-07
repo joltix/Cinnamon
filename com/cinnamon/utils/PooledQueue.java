@@ -78,6 +78,7 @@ public class PooledQueue<E>
         if (isEmpty()) {
             mHead = node;
             mTail = node;
+            mHead.mNext = mTail;
 
         } else {
             // Append new node to end

@@ -76,8 +76,10 @@ public abstract class Game<E extends GObject>
     // Tickrate sample size if not set (5 samples == 5 second measurement intervals)
     private static final int DEFAULT_TICKRATE_SAMPLES = 5;
 
-    // Frame rate and frame duration
+    // Frame rate
     private int mTickRate;
+
+    // Number of nanoseconds per frame
     private long mTickSize;
 
     /**
@@ -180,7 +182,7 @@ public abstract class Game<E extends GObject>
         }
 
         // Init physics and collision
-        mSolver = new Solver(getBodyFactory(), mTickRate);
+        mSolver = new IterativeSolver(getBodyFactory(), 1f / (float) mTickRate, 30);
 
         // Use given EventHub or use default if none provided
         final boolean noService = services == null;
@@ -590,7 +592,7 @@ public abstract class Game<E extends GObject>
         mControlMap.fire();
 
         // Perform AABB collision tests
-        mSolver.update(getGObjectFactory());
+        mSolver.update(getGObjectFactory(), getBodyFactory());
 
         // Process View's operations over time (focusing, interpolation)
         mView.update();
