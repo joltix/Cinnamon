@@ -3,7 +3,7 @@ package com.cinnamon.object;
 import com.cinnamon.gfx.ImageComponent;
 import com.cinnamon.gfx.Texture;
 import com.cinnamon.system.ComponentFactory;
-import com.cinnamon.system.IndexedFactory;
+import com.cinnamon.utils.IndexedFactory;
 import com.cinnamon.system.MouseEvent;
 import com.cinnamon.utils.OnClickListener;
 import com.cinnamon.utils.Point3F;
@@ -29,6 +29,12 @@ public class GObject extends IndexedFactory.Identifiable implements Positional, 
 {
     // Callback for on click events
     private OnClickListener mOnClickListener;
+
+    // Parent GObject's id
+    private int mParentId;
+
+    // Parent GObject's version
+    private int mParentVer;
 
     // Collision
     private BodyComponent mBodyComp;
@@ -134,11 +140,6 @@ public class GObject extends IndexedFactory.Identifiable implements Positional, 
     {
         // Move BodyComponent to match pos
         if (mBodyComp != null) {
-            // Bail out if not allowed to move
-            if (mBodyComp.isStatic()) {
-                return;
-            }
-
             mBodyComp.moveTo(x, y);
         }
 
@@ -163,11 +164,6 @@ public class GObject extends IndexedFactory.Identifiable implements Positional, 
     {
         // Move BodyComponent to match pos
         if (mBodyComp != null) {
-            // Bail out if not allowed to move
-            if (mBodyComp.isStatic()) {
-                return;
-            }
-
             mBodyComp.moveTo(x, y, z);
         }
 
@@ -207,11 +203,6 @@ public class GObject extends IndexedFactory.Identifiable implements Positional, 
     {
         // Move BodyComponent to match pos
         if (mBodyComp != null) {
-            // Bail out if not allowed to move
-            if (mBodyComp.isStatic()) {
-                return;
-            }
-
             mBodyComp.moveBy(x, y, z);
         }
 
@@ -342,6 +333,37 @@ public class GObject extends IndexedFactory.Identifiable implements Positional, 
         } else {
             return 0f;
         }
+    }
+
+    /**
+     * <p>Gets the parent's id.</p>
+     *
+     * @return parent id.
+     */
+    public final int getParentId()
+    {
+        return mParentId;
+    }
+
+    /**
+     * <p>Gets the parent's version.</p>
+     *
+     * @return parent version.
+     */
+    public final int getParentVersion()
+    {
+        return mParentVer;
+    }
+
+    /**
+     * <p>Sets the parent.</p>
+     *
+     * @param object parent.
+     */
+    public final void setParent(GObject object)
+    {
+        mParentId = object.getId();
+        mParentVer = object.getVersion();
     }
 
     @Override
