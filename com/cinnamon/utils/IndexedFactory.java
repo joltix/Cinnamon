@@ -1,9 +1,10 @@
-package com.cinnamon.system;
+package com.cinnamon.utils;
 
-import com.cinnamon.utils.IndexList;
-import com.cinnamon.utils.PooledQueue;
+import com.cinnamon.system.Config;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -38,6 +39,9 @@ public abstract class IndexedFactory<E extends IndexedFactory.Identifiable, R>
 
     // Configurations lookup
     private final HashMap<String, Config<E, R>> mConfigs = new HashMap<String, Config<E, R>>();
+
+    // List of remove listeners to notify
+    private final List<OnRemoveListener<E>> mOnRemoveListeners = new ArrayList<OnRemoveListener<E>>();
 
     // Object pool for recycling
     private final PooledQueue<E> mCompPool = new PooledQueue<E>();
@@ -253,6 +257,11 @@ public abstract class IndexedFactory<E extends IndexedFactory.Identifiable, R>
             return null;
         }
 
+        // Notify all attached listeners
+        for (int i = 0, sz = mOnRemoveListeners.size(); i < sz; i++) {
+            mOnRemoveListeners.get(i).onRemove(obj);
+        }
+
         // Notify subclasses of removal
         onRemove(obj);
 
@@ -263,11 +272,38 @@ public abstract class IndexedFactory<E extends IndexedFactory.Identifiable, R>
     }
 
     /**
-     * <p>Notifies the factory of an object's removal. The object's state is as it was when removal was requested.</p>
+     * <p>Notifies the factory of an object's removal.</p>
+     *
+     * <p>The object's state may have been changed by an {@link OnRemoveListener} prior to reaching this method.</p>
      *
      * @param object object.
      */
     protected abstract void onRemove(E object);
+
+    /**
+     * <p>Adds an {@link OnRemoveListener} to be notified when {@link #remove(int)} or {@link #remove(int, int)} has
+     * been called on an {@link Identifiable}.</p>
+     *
+     * <p>When the listener is notified, the state of the Identifiable will not yet have changed since the removal
+     * method was called. However, any modification done to the Identifiable by a listener will be visible to
+     * subclasses overriding {@link #onRemove(Identifiable)}.</p>
+     *
+     * @param listener listener.
+     */
+    public final void addOnRemoveListener(OnRemoveListener<E> listener)
+    {
+        mOnRemoveListeners.add(listener);
+    }
+
+    /**
+     * <p>Removes an {@link OnRemoveListener} from the factory.</p>
+     *
+     * @param listener listener to remove.
+     */
+    public final void removeOnRemoveListener(OnRemoveListener<E> listener)
+    {
+        mOnRemoveListeners.remove(listener);
+    }
 
     /**
      * <p>Removes all objects. Associated ids may be reused though the id version pairs will not be.</p>
@@ -280,7 +316,7 @@ public abstract class IndexedFactory<E extends IndexedFactory.Identifiable, R>
     }
 
     /**
-     * <p>Removes all objects.</p>
+     * <p>Removes all {@link Identifiable}s.</p>
      */
     public final void clear()
     {
@@ -288,7 +324,7 @@ public abstract class IndexedFactory<E extends IndexedFactory.Identifiable, R>
     }
 
     /**
-     * <p>Gets the number of objects.</p>
+     * <p>Gets the number of {@link Identifiable}s.</p>
      *
      * @return object count.
      */
