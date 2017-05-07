@@ -100,6 +100,9 @@ public class ExampleGame extends Game
 }
 ```
 
+## Attribution
+Cinnamon uses LWJGL for low level access to Window creation, OpenGL, and the like. Some of Box2D's source code has been slightly modified and is in use within [IterativeSolver](com/cinnamon/object/IterativeSolver.java) and is documented as such in IterativeSolver's source. Both LWJGL and Box2D's licenses can be found in separate aptly named folders at the root of this project.
+
 ## License
 MIT License
 
