@@ -1,32 +1,38 @@
 # Cinnamon
-Cinnamon is a Java framework for building 2D games intended as an educational hands-on exploration of engineering a large system.
+Cinnamon is a Java-based framework for building 2D games. This project is intended as an educational experience in engineering a system designed for extension as well as an exploration of the nuts and bolts that can drive together the various systems of a video game.
 
-## Sounds like reinventing the wheel
-The purpose of this project is to gain exposure to and a better understanding of different algorithms, data structures, and problems that arise in their interaction through application. Plus, who doesn't want to know how video games work?
+Due to this project's experimental nature, *Cinnamon is not intended for production use.* That said, hopefully things in this engine can help others in their own projects.
 
-## Can I use this for my own game?
-For now, it's not recommended. The Cinnamon engine is currently very much incomplete, buggy, and prone to frequent changes.
+**Current status:** Major changes focusing on breaking up bloated classes and improving documentation
 
-## The Structure
-A game made with Cinnamon is drawn with OpenGL and centers around an instance of [Game](com/cinnamon/system/Game.java) and [Canvas2D](com/cinnamon/gfx/Canvas2D.java) working across two threads. In each game update (also known as a "tick"), a snapshot of the current visible scene is pushed to be drawn in the second thread. In turn, the snapshot is drawn as soon as possible, with the canvas redrawing the same scene if no new data is available.
+#### Available systems
+* Partial physics from Box2D *
+* Zoomable camera with interpolated motion
+* Support for OpenGL on secondary thread
+* Key and mouse mapping with press/release specification
 
-It should be noted that this project (and therefore the [demo](#demo)) has only been tested on Windows 10 64-bit, though more systems are planned to officially be supported.
+#### Upcoming
+* Multiple viewports and cameras
+* Asynchronous resource loading
+* Unit tests with JUnit 4
+* UML class overview
 
-#### Game
-The main thread belongs to Game and performing game world related tasks such as processing input, collision detection, stepping objects through their physics, and the like.
-
-#### Canvas
-The second thread belongs to Canvas2D and the bulk of OpenGL calls. This helps ease the time it takes to process a game update since updating the game's state occurs in parallel to drawing (the previous state).
+###### * see [attribution](#attribution)
 
 ## Demo
-A demo with a batch file for run configurations and a readme for controls is available in [artifacts](artifacts). The demo must be run through the batch file and not the jar. Currently, this demo is only available to be run on Windows.
+A test room setup as a platformer with a batch file for run configurations and a readme for controls is available in [artifacts](artifacts). The demo must be run through the batch file and not the jar. Currently, this demo is only available on Windows * .
 
-A console is provided to see exceptions as well as submit commands to examine the game world. These commands range from spawning a game object to reading an object's rotation; a full list is shown by typing "help". This demo consists of a simple room with simplistic physics displayed in fullscreen and using the ESC key to exit.
+A console is provided to see exceptions as well as submit commands to examine the game world. These commands range from spawning a game object to reading its angle of rotation; the full list of commands are available by typing "help".
 
-Note that unlike the [Hello World](#hello-world) example, the initialization code for a Game instance is separated to the [DemoDriver](com/cinnamon/demo/DemoDriver.java) class in the demo.
+This demo can be run in fullscreen mode by changing the batch file's run resolution to "0x0". Since fullscreen obscures window controls, the ESC key has been set to exit the program.
+
+Note that unlike the [Hello World](#hello-world) below, the initialization code for an instance of Game is separated to the [DemoDriver](com/cinnamon/demo/DemoDriver.java) class in the [demo](com/cinnamon/demo) package.
+
+###### * this project (and therefore the demo) uses native code from LWJGL and has only been tested on Windows 10 64-bit.
+
 
 ## Hello World
-In order to run, Cinnamon requires a subclass of each of the following (aside from [Game](com/cinnamon/system/Game.java)): [GObjectFactory](com/cinnamon/object/GObjectFactory.java), [BodyFactory](com/cinnamon/object/BodyFactory.java), [ImageFactory](com/cinnamon/gfx/ImageFactory.java), [ShaderFactory](com/cinnamon/gfx/ShaderFactory.java), and [Canvas2D](com/cinnamon/gfx/Canvas2D.java). Each of these factory classes provide game specific object configurations while the Canvas implementation facilitates drawing.
+In order to run, Cinnamon requires a subclass of each of the following (aside from [Game](com/cinnamon/system/Game.java)): [GObjectFactory](com/cinnamon/object/GObjectFactory.java), [BodyFactory](com/cinnamon/object/BodyFactory.java), [ImageFactory](com/cinnamon/gfx/ImageFactory.java), [ShaderFactory](com/cinnamon/gfx/ShaderFactory.java), and [Canvas2D](com/cinnamon/gfx/Canvas2D.java). While GObjectFactory constructs game objects, BodyFactory, ImageFactory, and ShaderFactory provide resources that define a game object's behavioral and visual configuration. The Canvas, on the other hand, is the end of the rendering pipeline responsible for OpenGL calls.
 
 In the example below, implementations prefixed with "Example" are assumed to exist. Required method overrides for subclasses of Game have been omitted for clarity.
 
@@ -36,7 +42,7 @@ For an even more involved setup, see the [demo package](com/cinnamon/demo) where
 public class ExampleGame extends Game
 {
     public static void main(String[] args)
-    {    
+    {
         // Create game info: title, name, version
         final Map<String, String> properties = createBasicProperties();
 
@@ -67,9 +73,7 @@ public class ExampleGame extends Game
     }
 
     /**
-     *  <p>
-     *      Directory responsible for providing factories that assemble game objects.
-     *  </p>
+     *  <p>Directory responsible for providing factories that assemble game objects.</p>
      */
     private static class Resources<ExampleGObject> extends Game.Resources
     {
@@ -100,8 +104,19 @@ public class ExampleGame extends Game
 }
 ```
 
+
+## The Structure
+A game made with Cinnamon is drawn with OpenGL and centers around an instance of [Game](com/cinnamon/system/Game.java) and [Canvas2D](com/cinnamon/gfx/Canvas2D.java) working across two threads with the main thread responsible for the game state. In each game update (also known as a "tick"), a snapshot of the current state is pushed to be drawn in the second thread. In turn, the snapshot is drawn repeatedly until new data is received from the main thread.
+
+#### Game
+The main thread belongs to the Game class and performing world related tasks such as processing input, collision detection, stepping objects through their physics, and the like. The Game class should be extended and available methods overridden to access services such as keybindings as well as provide hooks into specific points of a game tick.
+
+#### Canvas
+The second thread belongs to Canvas2D and the bulk of OpenGL calls. This decouples the tickrate from framerate, allowing for 30hz in game logic with 60fps.
+
+
 ## Attribution
-Cinnamon uses LWJGL for low level access to Window creation, OpenGL, and the like. Some of Box2D's source code has been slightly modified and is in use within [IterativeSolver](com/cinnamon/object/IterativeSolver.java) and is documented as such in IterativeSolver's source. Both LWJGL and Box2D's licenses can be found in separate aptly named folders at the root of this project.
+Cinnamon uses LWJGL for low level access to window creation, OpenGL, and the like. In addition, some of Box2D's source code has been ported and slightly modified for use in [IterativeSolver](com/cinnamon/object/IterativeSolver.java) and is documented as such in the class. Both LWJGL and Box2D's licenses can be found in separate aptly named folders at the root of this project.
 
 ## License
 MIT License
