@@ -8,6 +8,7 @@ package cinnamon.engine.utils;
  *
  * <pre>
  *     <code>
+ *
  *     final Vector vector = new Vector(2f, 2f, 0f);
  *
  *     // Final vector = (1f, 1f, -0f)
@@ -15,14 +16,14 @@ package cinnamon.engine.utils;
  *     </code>
  * </pre>
  */
-public final class Vector implements Repositionable, Copier<Vector>
+public final class Vector implements Positionable, Copier<Vector>
 {
     private float mX;
     private float mY;
     private float mZ;
 
     /**
-     * <p>Constructs a <tt>Vector</tt> whose components are all zero.</p>
+     * <p>Constructs a {@code Vector} whose components are all zero.</p>
      */
     public Vector()
     {
@@ -30,7 +31,7 @@ public final class Vector implements Repositionable, Copier<Vector>
     }
 
     /**
-     * <p>Constructs a <tt>Vector</tt> with the given components.</p>
+     * <p>Constructs a {@code Vector} with the given components.</p>
      *
      * @param x x.
      * @param y y.
@@ -44,7 +45,7 @@ public final class Vector implements Repositionable, Copier<Vector>
     }
 
     /**
-     * <p>Constructs a <tt>Vector</tt> with the same components as another.</p>
+     * <p>Constructs a {@code Vector} with the same components as another.</p>
      *
      * @param vector to copy.
      * @throws NullPointerException if the given vector is null.
@@ -62,7 +63,7 @@ public final class Vector implements Repositionable, Copier<Vector>
     @Override
     public void copy(Vector vector)
     {
-        checkNull( vector, "copy");
+        checkNull( vector);
 
         mX =  vector.mX;
         mY =  vector.mY;
@@ -78,7 +79,7 @@ public final class Vector implements Repositionable, Copier<Vector>
      */
     public float dot(Vector vector)
     {
-        checkNull(vector, "dot");
+        checkNull(vector);
 
         return (mX * vector.mX) + (mY * vector.mY) + (mZ * vector.mZ);
     }
@@ -92,7 +93,7 @@ public final class Vector implements Repositionable, Copier<Vector>
      */
     public Vector cross(Vector vector)
     {
-        checkNull(vector, "cross");
+        checkNull(vector);
 
         final float x = (mY * vector.mZ) - (mZ * vector.mY);
         final float y = (mZ * vector.mX) - (mX * vector.mZ);
@@ -114,7 +115,7 @@ public final class Vector implements Repositionable, Copier<Vector>
      */
     public Vector add(Vector vector)
     {
-        checkNull(vector, "add");
+        checkNull(vector);
 
         mX += vector.mX;
         mY += vector.mY;
@@ -131,7 +132,7 @@ public final class Vector implements Repositionable, Copier<Vector>
      */
     public Vector subtract(Vector vector)
     {
-        checkNull(vector, "subtract");
+        checkNull(vector);
 
         mX -= vector.mX;
         mY -= vector.mY;
@@ -322,17 +323,15 @@ public final class Vector implements Repositionable, Copier<Vector>
     }
 
     /**
-     * <p>Throws a <tt>NullPointerException</tt> if the given vector is null. The Exception's message follows the format
-     * 'Cannot &lt;action&gt; null vector' where <i>&lt;action&gt;</i> is replaced by the corresponding argument.</p>
+     * <p>Throws a {@code NullPointerException} if the given vector is null.</p>
      *
      * @param vector to check.
-     * @param action attempted operation.
      * @throws NullPointerException if the given vector is null.
      */
-    private void checkNull(Vector vector, String action)
+    private void checkNull(Vector vector)
     {
         if (vector == null) {
-            throw new NullPointerException("Cannot " + action + " null vector");
+            throw new NullPointerException();
         }
     }
 }

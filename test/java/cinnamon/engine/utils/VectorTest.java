@@ -5,7 +5,7 @@ import org.junit.*;
 import java.util.Random;
 
 /**
- * <p><tt>Vector</tt>'s getters and setters are not explicitly tested and are presumed correct.</p>
+ * <p>{@code Vector}'s getters and setters are not explicitly tested and are presumed correct.</p>
  *
  * <p>Each test performs its testing on vectors with components of all combinations of the following value types
  * (positive and negative zeros are not differentiated).</p>
@@ -55,10 +55,10 @@ public class VectorTest
     @Test
     public void testCopy()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
             mVectorCopyA.copy(mVectorA);
 
-            RepositionableTestSuite.assertEquals(mVectorA, mVectorCopyA);
+            PositionableTestSuite.assertEquals(mVectorA, mVectorCopyA);
         }, mRNG);
     }
 
@@ -71,11 +71,11 @@ public class VectorTest
     @Test
     public void testDot()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
-            RepositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
+            PositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
 
-            RepositionableTestSuite.generatePermutations(mVectorB, () -> {
-                RepositionableTestSuite.copyPositionFromTo(mVectorB, mVectorCopyB);
+            PositionableTestSuite.generatePermutations(mVectorB, () -> {
+                PositionableTestSuite.copyPositionFromTo(mVectorB, mVectorCopyB);
 
                 final float dotA2B = mVectorA.dot(mVectorB);
                 final float dotB2A = mVectorB.dot(mVectorA);
@@ -95,8 +95,8 @@ public class VectorTest
                 Assert.assertEquals(expectedDot, dotB2A, DELTA);
 
                 // Test vector's components remain changed
-                RepositionableTestSuite.assertEquals(mVectorCopyA, mVectorA);
-                RepositionableTestSuite.assertEquals(mVectorCopyB, mVectorB);
+                PositionableTestSuite.assertEquals(mVectorCopyA, mVectorA);
+                PositionableTestSuite.assertEquals(mVectorCopyB, mVectorB);
             }, mRNG);
         }, mRNG);
     }
@@ -110,10 +110,10 @@ public class VectorTest
     @Test
     public void testCross()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
-            RepositionableTestSuite.generatePermutations(mVectorB, () -> {
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
+            PositionableTestSuite.generatePermutations(mVectorB, () -> {
 
-                RepositionableTestSuite.copyPositionFromTo(mVectorB, mVectorCopyB);
+                PositionableTestSuite.copyPositionFromTo(mVectorB, mVectorCopyB);
 
                 final float xA = mVectorA.getX();
                 final float yA = mVectorA.getY();
@@ -134,7 +134,7 @@ public class VectorTest
                 Assert.assertEquals(expCrossZ, mVectorA.getZ(), DELTA);
 
                 // Test second vector for unchanged components
-                RepositionableTestSuite.assertEquals(mVectorCopyB, mVectorB);
+                PositionableTestSuite.assertEquals(mVectorCopyB, mVectorB);
 
                 // Test returned is caller
                 Assert.assertTrue(returnedVector == mVectorA);
@@ -151,15 +151,15 @@ public class VectorTest
     @Test
     public void testMultiply()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
-            RepositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
+            PositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
 
-            for (int i = 0; i < RepositionableTestSuite.VALUE_TYPE_COUNT; i++) {
+            for (int i = 0; i < PositionableTestSuite.VALUE_TYPE_COUNT; i++) {
                 // Reset components back to permutation
-                RepositionableTestSuite.copyPositionFromTo(mVectorCopyA, mVectorA);
+                PositionableTestSuite.copyPositionFromTo(mVectorCopyA, mVectorA);
 
                 // Compute expected and actual
-                final float factor = RepositionableTestSuite.getValueOfType(i, mRNG);
+                final float factor = PositionableTestSuite.getValueOfType(i, mRNG);
                 final float expX = mVectorA.getX() * factor;
                 final float expY = mVectorA.getY() * factor;
                 final float expZ = mVectorA.getZ() * factor;
@@ -176,15 +176,15 @@ public class VectorTest
     @Test
     public void testDivide()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
-            RepositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
+            PositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
 
-            for (int i = 0; i < RepositionableTestSuite.VALUE_TYPE_COUNT; i++) {
+            for (int i = 0; i < PositionableTestSuite.VALUE_TYPE_COUNT; i++) {
                 // Reset components back to permutation
-                RepositionableTestSuite.copyPositionFromTo(mVectorCopyA, mVectorA);
+                PositionableTestSuite.copyPositionFromTo(mVectorCopyA, mVectorA);
 
                 // Compute expected and actual
-                final float factor = RepositionableTestSuite.getValueOfType(i, mRNG);
+                final float factor = PositionableTestSuite.getValueOfType(i, mRNG);
                 final float expX = mVectorA.getX() / factor;
                 final float expY = mVectorA.getY() / factor;
                 final float expZ = mVectorA.getZ() / factor;
@@ -201,11 +201,11 @@ public class VectorTest
     @Test
     public void testAdd()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
-            RepositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
+            PositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
 
-            RepositionableTestSuite.generatePermutations(mVectorB, () -> {
-                RepositionableTestSuite.copyPositionFromTo(mVectorB, mVectorCopyB);
+            PositionableTestSuite.generatePermutations(mVectorB, () -> {
+                PositionableTestSuite.copyPositionFromTo(mVectorB, mVectorCopyB);
 
                 final float vecAX = mVectorA.getX();
                 final float vecAY = mVectorA.getY();
@@ -227,7 +227,7 @@ public class VectorTest
                 Assert.assertTrue(returnedVector == mVectorA);
 
                 // Vector B should remain unchanged
-                RepositionableTestSuite.assertEquals(mVectorCopyB, mVectorB);
+                PositionableTestSuite.assertEquals(mVectorCopyB, mVectorB);
             }, mRNG);
         }, mRNG);
     }
@@ -241,11 +241,11 @@ public class VectorTest
     @Test
     public void testSubtract()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
-            RepositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
+            PositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
 
-            RepositionableTestSuite.generatePermutations(mVectorB, () -> {
-                RepositionableTestSuite.copyPositionFromTo(mVectorB, mVectorCopyB);
+            PositionableTestSuite.generatePermutations(mVectorB, () -> {
+                PositionableTestSuite.copyPositionFromTo(mVectorB, mVectorCopyB);
 
                 final float vecAX = mVectorA.getX();
                 final float vecAY = mVectorA.getY();
@@ -267,7 +267,7 @@ public class VectorTest
                 Assert.assertTrue(returnedVector == mVectorA);
 
                 // Vector B should remain unchanged
-                RepositionableTestSuite.assertEquals(mVectorCopyB, mVectorB);
+                PositionableTestSuite.assertEquals(mVectorCopyB, mVectorB);
             }, mRNG);
         }, mRNG);
     }
@@ -281,7 +281,7 @@ public class VectorTest
     @Test
     public void testNormalize()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
 
             final float x = mVectorA.getX();
             final float y = mVectorA.getY();
@@ -310,7 +310,7 @@ public class VectorTest
     @Test
     public void testNegate()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
 
             final float expX = -mVectorA.getX();
             final float expY = -mVectorA.getY();
@@ -331,7 +331,7 @@ public class VectorTest
     @Test
     public void testMagnitude()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
 
             final float expMag = computeDistanceTo(mVectorA.getX(), mVectorA.getY(), mVectorA.getZ());
             final float actualMag = mVectorA.magnitude();
@@ -343,7 +343,7 @@ public class VectorTest
     @Test
     public void testIsZero()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
 
             final float x = mVectorA.getX();
             final float y = mVectorA.getY();
@@ -356,9 +356,9 @@ public class VectorTest
     @Test
     public void testHashCode()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
 
-            RepositionableTestSuite.copyPositionFromTo(mVectorA, mVectorB);
+            PositionableTestSuite.copyPositionFromTo(mVectorA, mVectorB);
 
             // Test affirmative
             Assert.assertEquals(mVectorA.hashCode(), mVectorB.hashCode());
@@ -378,10 +378,10 @@ public class VectorTest
     @Test
     public void testEquals()
     {
-        RepositionableTestSuite.generatePermutations(mVectorA, () -> {
+        PositionableTestSuite.generatePermutations(mVectorA, () -> {
 
-            RepositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
-            RepositionableTestSuite.copyPositionFromTo(mVectorA, mVectorB);
+            PositionableTestSuite.copyPositionFromTo(mVectorA, mVectorCopyA);
+            PositionableTestSuite.copyPositionFromTo(mVectorA, mVectorB);
 
             // Symmetric
             Assert.assertTrue(mVectorA.equals(mVectorB));

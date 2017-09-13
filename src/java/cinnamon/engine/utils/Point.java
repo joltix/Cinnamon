@@ -3,14 +3,14 @@ package cinnamon.engine.utils;
 /**
  * <p>A movable point in three dimensions.</p>
  */
-public final class Point implements Repositionable, Copier<Point>
+public final class Point implements Positionable, Copier<Point>
 {
     private float mX;
     private float mY;
     private float mZ;
 
     /**
-     * <p>Constructs a <tt>Point</tt> whose coordinates are (0,0,0).</p>
+     * <p>Constructs a {@code Point} whose coordinates are (0,0,0).</p>
      */
     public Point()
     {
@@ -18,7 +18,7 @@ public final class Point implements Repositionable, Copier<Point>
     }
 
     /**
-     * <p>Constructs a <tt>Point</tt> from the given coordinates.</p>
+     * <p>Constructs a {@code Point} from the given coordinates.</p>
      *
      * @param x x.
      * @param y y.
@@ -32,7 +32,7 @@ public final class Point implements Repositionable, Copier<Point>
     }
 
     /**
-     * <p>Constructs a <tt>Point</tt> with the same coordinates as another.</p>
+     * <p>Constructs a {@code Point} with the same coordinates as another.</p>
      *
      * @param point to copy.
      * @throws NullPointerException if the given point is null.
@@ -43,7 +43,7 @@ public final class Point implements Repositionable, Copier<Point>
     }
 
     /**
-     * <p>Copies all coordinates from the given <tt>Point</tt>.</p>
+     * <p>Copies all coordinates from the given {@code Point}.</p>
      *
      * @param point to copy.
      * @throws NullPointerException if the given point is null.
@@ -55,9 +55,9 @@ public final class Point implements Repositionable, Copier<Point>
             throw new NullPointerException("Cannot copy null point");
         }
 
-        mX = point.mX;
-        mY = point.mY;
-        mZ = point.mZ;
+        mX = point.getX();
+        mY = point.getY();
+        mZ = point.getZ();
     }
 
     @Override

@@ -1,9 +1,9 @@
 package cinnamon.engine.utils;
 
 /**
- * <p>Describes a movable <tt>Position</tt>.</p>
+ * <p>Describes a movable {@code Position}.</p>
  */
-public interface Repositionable extends Position
+public interface Positionable extends Position
 {
     /**
      * <p>Sets the x position.</p>

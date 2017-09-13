@@ -14,16 +14,17 @@ import java.util.Random;
  * NaN, and finite non-zero positive and negative numbers. Unlike the other types of values, when a finite non-zero
  * positive or negative number is needed in a permutation, the number is randomly chosen.</p>
  *
- * <p>Tests wanting to cover these values should call {@link #generatePermutations(Repositionable, Runnable, Random)}
- * and pass the actual test's operations in as a <tt>Runnable</tt>.</p>
+ * <p>Tests wanting to cover these values should call {@link #generatePermutations(Positionable, Runnable, Random)}
+ * and pass the actual test's operations in as a {@code Runnable}.</p>
  */
 @RunWith(Suite.class)
 @SuiteClasses({PointTest.class, VectorTest.class})
-public class RepositionableTestSuite
+public class PositionableTestSuite
 {
     // Number of different kinds of input values (-inf, NaN, etc)
     public static final int VALUE_TYPE_COUNT = 5;
 
+    // Type of value to randomly generate
     private static final int TYPE_ZERO = 0;
     private static final int TYPE_POSITIVE_INFINITY = 1;
     private static final int TYPE_NEGATIVE_INFINITY = 2;
@@ -38,8 +39,8 @@ public class RepositionableTestSuite
 
     /**
      * <p>Executes the Runnable multiple times with each execution having a different combination of different
-     * kinds of x, y, and z values (+0, infinity, etc) for the given Repositionable. The test method should be
-     * called in {@link Runnable#run()} and expect that the given Repositionable's values are changed between
+     * kinds of x, y, and z values (+0, infinity, etc) for the given Positionable. The test method should be
+     * called in {@link Runnable#run()} and expect that the given Positionable's values are changed between
      * executions of the Runnable.</p>
      *
      *  @param container to test.
@@ -47,7 +48,7 @@ public class RepositionableTestSuite
      * @param rng random number generator.
      * @throws NullPointerException if either container, runnable, or rng is null.
      */
-    public static void generatePermutations(Repositionable container, Runnable runnable, Random rng)
+    public static void generatePermutations(Positionable container, Runnable runnable, Random rng)
     {
         if (container == null) {
             throw new NullPointerException("Permutations cannot be stored when container is null");
@@ -125,13 +126,13 @@ public class RepositionableTestSuite
     }
 
     /**
-     * <p>Copies the position values from one <tt>Repositionable</tt> to another.</p>
+     * <p>Copies the position values from one {@code Positionable} to another.</p>
      *
      * @param from source.
      * @param to target.
      * @throws NullPointerException if either from or to is null.
      */
-    public static void copyPositionFromTo(Repositionable from, Repositionable to)
+    public static void copyPositionFromTo(Positionable from, Positionable to)
     {
         if (from == null) {
             throw new NullPointerException("Position copy source cannot be null");
@@ -146,14 +147,14 @@ public class RepositionableTestSuite
     }
 
     /**
-     * <p>Asserts that the given actual <tt>Repositionable</tt> has the exact same values (floating point delta of 0)
+     * <p>Asserts that the given actual {@code Positionable} has the exact same values (floating point delta of 0)
      * as the expected one. This method cannot be used to assert that two Repositionals are both null.</p>
      *
      * @param expected expected.
      * @param actual actual.
      * @throws NullPointerException if either expected or actual is null.
      */
-    public static void assertEquals(Repositionable expected, Repositionable actual)
+    public static void assertEquals(Positionable expected, Positionable actual)
     {
         if (expected == null) {
             throw new NullPointerException("Expected cannot be null");

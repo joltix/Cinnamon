@@ -5,7 +5,7 @@ import org.junit.*;
 import java.util.Random;
 
 /**
- * <p><tt>Point</tt>'s getters and setters are not explicitly tested and are presumed correct.</p>
+ * <p>{@code Point}'s getters and setters are not explicitly tested and are presumed correct.</p>
  *
  * <p>Each test performs its operations on points of all combinations of the following value types
  * (positive and negative zeros are not differentiated).</p>
@@ -51,10 +51,10 @@ public class PointTest
     @Test
     public void testCopy()
     {
-        RepositionableTestSuite.generatePermutations(mPointA, () -> {
+        PositionableTestSuite.generatePermutations(mPointA, () -> {
             mPointCopyA.copy(mPointA);
 
-            RepositionableTestSuite.assertEquals(mPointA, mPointCopyA);
+            PositionableTestSuite.assertEquals(mPointA, mPointCopyA);
         }, mRNG);
     }
 
@@ -67,9 +67,9 @@ public class PointTest
     @Test
     public void testHashCode()
     {
-        RepositionableTestSuite.generatePermutations(mPointA, () -> {
+        PositionableTestSuite.generatePermutations(mPointA, () -> {
 
-            RepositionableTestSuite.copyPositionFromTo(mPointA, mPointB);
+            PositionableTestSuite.copyPositionFromTo(mPointA, mPointB);
 
             // Test affirmative
             Assert.assertEquals(mPointA.hashCode(), mPointB.hashCode());
@@ -89,10 +89,10 @@ public class PointTest
     @Test
     public void testEquals()
     {
-        RepositionableTestSuite.generatePermutations(mPointA, () -> {
+        PositionableTestSuite.generatePermutations(mPointA, () -> {
 
-            RepositionableTestSuite.copyPositionFromTo(mPointA, mPointCopyA);
-            RepositionableTestSuite.copyPositionFromTo(mPointA, mPointB);
+            PositionableTestSuite.copyPositionFromTo(mPointA, mPointCopyA);
+            PositionableTestSuite.copyPositionFromTo(mPointA, mPointB);
 
             // Symmetric
             Assert.assertTrue(mPointA.equals(mPointB));
@@ -123,8 +123,8 @@ public class PointTest
         final Point pA = mPointA;
         final Point pB = mPointB;
 
-        RepositionableTestSuite.generatePermutations(mPointA, () -> {
-            RepositionableTestSuite.generatePermutations(mPointB, () -> {
+        PositionableTestSuite.generatePermutations(mPointA, () -> {
+            PositionableTestSuite.generatePermutations(mPointB, () -> {
 
                 final float expDist = distance(pA.getX(), pA.getY(), pA.getZ(), pB.getX(), pB.getY(), pB.getZ());
                 final float actualDist = Point.distanceBetween(pA, pB);
@@ -151,8 +151,8 @@ public class PointTest
     public void testStaticIsEqual()
     {
         // Test special case values
-        RepositionableTestSuite.generatePermutations(mPointA, () -> {
-            RepositionableTestSuite.generatePermutations(mPointB, () -> {
+        PositionableTestSuite.generatePermutations(mPointA, () -> {
+            PositionableTestSuite.generatePermutations(mPointB, () -> {
 
                 Assert.assertEquals(coordinatesEqual(mPointA, mPointB), Point.isEqual(mPointA, mPointB, DELTA));
 
