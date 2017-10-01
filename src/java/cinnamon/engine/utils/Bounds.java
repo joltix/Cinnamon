@@ -46,7 +46,7 @@ package cinnamon.engine.utils;
 public abstract class Bounds implements Position, Size
 {
     /**
-     * <p>Index when not being used by an exclusive locking {@code SpatialPartition}.</p>
+     * <p>Index when not being used by an exclusive locking {@code SpacePartitioningTree}.</p>
      */
     static final int UNPARTITIONED = -1;
 
@@ -66,7 +66,7 @@ public abstract class Bounds implements Position, Size
     public boolean contains(Bounds bounds)
     {
         checkNull(bounds);
-        return isBoxContainedInBox(this, bounds);
+        return isBoxContainedInBox(bounds, this);
     }
 
     /**
@@ -479,31 +479,31 @@ public abstract class Bounds implements Position, Size
     /**
      * <p>Tests if a box defined by a {@code Bounds} is contained within another.</p>
      *
-     * @param outer containing box.
      * @param inner box to test.
+     * @param outer containing box.
      * @return true if inner is contained within outer.
      */
-    private static boolean isBoxContainedInBox(Bounds outer, Bounds inner)
+    private static boolean isBoxContainedInBox(Bounds inner, Bounds outer)
     {
         // Compute inner box
-        final float targetMinX = inner.getX();
-        final float targetMinY = inner.getY();
-        final float targetMinZ = inner.getZ();
-        final float targetMaxX = targetMinX + inner.getWidth();
-        final float targetMaxY = targetMinY + inner.getHeight();
-        final float targetMaxZ = targetMinZ + inner.getDepth();
+        final float innerMinX = inner.getX();
+        final float innerMinY = inner.getY();
+        final float innerMinZ = inner.getZ();
+        final float innerMaxX = inner.getMaximumX();
+        final float innerMaxY = inner.getMaximumY();
+        final float innerMaxZ = inner.getMaximumZ();
 
         // Compute outer box
-        final float minX = outer.getX();
-        final float minY = outer.getY();
-        final float minZ = outer.getZ();
-        final float maxX = minX + outer.getWidth();
-        final float maxY = minY + outer.getHeight();
-        final float maxZ = minZ + outer.getDepth();
+        final float outerMinX = outer.getX();
+        final float outerMinY = outer.getY();
+        final float outerMinZ = outer.getZ();
+        final float outerMaxX = outer.getMaximumX();
+        final float outerMaxY = outer.getMaximumY();
+        final float outerMaxZ = outer.getMaximumZ();
 
         // Check target box's min/max points if in this box's min/max
-        return isBoxContainedInBox(targetMinX, targetMinY, targetMinZ, targetMaxX, targetMaxY, targetMaxZ,
-                minX, minY, minZ, maxX, maxY, maxZ);
+        return isBoxContainedInBox(innerMinX, innerMinY, innerMinZ, innerMaxX, innerMaxY, innerMaxZ,
+                outerMinX, outerMinY, outerMinZ, outerMaxX, outerMaxY, outerMaxZ);
 
     }
 
