@@ -74,6 +74,8 @@ public final class MutableBounds extends Bounds implements DefinableBounds, Copi
     @Override
     public void encompass(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
     {
+        assert(minX <= maxX && minY <= maxY && minZ <= maxZ);
+
         mMinPt.setPosition(minX, minY, minZ);
         mMaxPt.setPosition(maxX, maxY, maxZ);
     }
@@ -123,6 +125,24 @@ public final class MutableBounds extends Bounds implements DefinableBounds, Copi
     public float getZ()
     {
         return mMinPt.getZ();
+    }
+
+    @Override
+    public float getMaximumX()
+    {
+        return mMaxPt.getX();
+    }
+
+    @Override
+    public float getMaximumY()
+    {
+        return mMaxPt.getY();
+    }
+
+    @Override
+    public float getMaximumZ()
+    {
+        return mMaxPt.getZ();
     }
 
     @Override
