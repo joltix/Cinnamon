@@ -1,26 +1,42 @@
+**NOTICE:** Major changes are currently occurring across all packages on the revamp-1 branch. Admittedly, the build on the master branch is not yet suitable for public use and so many classes are being rewritten or removed in anticipation of the first *usable* build. This includes the addition of tests and bug fixes as well as API redesigns and more comprehensive documentation.
+
 # Cinnamon
-Cinnamon is a Java-based framework for building 2D games. This project is intended as an educational experience in engineering a system designed for extension as well as an exploration of the nuts and bolts that can drive together the various systems of a video game.
+Cinnamon is a Java framework for building 2D games and graphics-related applications in general, built on top of LWJGL. In addition to low-level APIs from LWJGL, Cinnamon provides higher-level wrappers for accelerated development and a multi-threaded application skeleton.
 
-Due to this project's experimental nature, *Cinnamon is not intended for production use.* That said, hopefully things in this engine can help others in their own projects.
+This project started as an educational experience in engineering interoperable systems, building a framework for others' development, and exploring the architectures and methodologies behind video games. Due to Cinnamon's experimental nature, *the project is not intended for products releasing to market.*
 
-**Current status:** Major changes focusing on breaking up bloated classes and improving documentation
+## Current state
+Rewriting for usability and stability. All revisions are being introduced on the revamp-1 branch.
 
-#### Available systems
+#### Available on master
 * Partial physics from Box2D *
 * Zoomable camera with interpolated motion
-* Support for OpenGL on secondary thread
+* Background thread rendering
 * Key and mouse mapping with press/release specification
 
-#### Upcoming
-* Multiple viewports and cameras
-* Asynchronous resource loading
-* Unit tests with JUnit 4
-* UML class overview
+#### Upcoming on revamp-1
+* Asynchronous file and resource loading
+* Input filters for button combinations
+* Multiple windows
+* Support for Xbox controllers
+* 3D space partitioning tree and related shapes
+* JUnit 4, Mockito, and PowerMock tests
 
 ###### * see [attribution](#attribution)
 
+## Structure
+A Cinnamon game runs, at minimum, on two threads with the secondary thread devoted to rendering operations. These two threads follow a producer-consumer relationship where the main thread buffers the game state's drawable information for the secondary to poll and draw.
+
+Both threads are tied to two classes in particular; the **Game** class belongs to the main thread while **Canvas** belongs to the secondary. Both must be extended - the Game class for game logic and Canvas for drawing the game's state.
+
+#### The loop
+One moment in game time is called a *tick*. Operations occur per tick to determine the game's state prior to rendering. These operations typically execute from the Game class as the game loops and constantly runs the simulation.
+
 ## Demo
-A test room setup as a platformer with a batch file for run configurations and a readme for controls is available in [artifacts](artifacts). The demo must be run through the batch file and not the jar. Currently, this demo is only available on Windows * .
+**Note:**
+These demo game rooms use an older version of Cinnamon. Updated rooms will be available shortly after revamp-1 is merged with master.
+
+A test room setup as a platformer with a batch file for run configurations and a readme for controls is available in [artifacts](artifacts). The demo must be run through the batch file and not the jar. Currently, this demo has only been tested on Windows * .
 
 A console is provided to see exceptions as well as submit commands to examine the game world. These commands range from spawning a game object to reading its angle of rotation; the full list of commands are available by typing "help".
 
@@ -29,90 +45,6 @@ This demo can be run in fullscreen mode by changing the batch file's run resolut
 Note that unlike the [Hello World](#hello-world) below, the initialization code for an instance of Game is separated to the [DemoDriver](com/cinnamon/demo/DemoDriver.java) class in the [demo](com/cinnamon/demo) package.
 
 ###### * this project (and therefore the demo) uses native code from LWJGL and has only been tested on Windows 10 64-bit.
-
-
-## Hello World
-In order to run, Cinnamon requires a subclass of each of the following (aside from [Game](com/cinnamon/system/Game.java)): [GObjectFactory](com/cinnamon/object/GObjectFactory.java), [BodyFactory](com/cinnamon/object/BodyFactory.java), [ImageFactory](com/cinnamon/gfx/ImageFactory.java), [ShaderFactory](com/cinnamon/gfx/ShaderFactory.java), and [Canvas2D](com/cinnamon/gfx/Canvas2D.java). While GObjectFactory constructs game objects, BodyFactory, ImageFactory, and ShaderFactory provide resources that define a game object's behavioral and visual configuration. The Canvas, on the other hand, is the end of the rendering pipeline responsible for OpenGL calls.
-
-In the example below, implementations prefixed with "Example" are assumed to exist. Required method overrides for subclasses of Game have been omitted for clarity.
-
-For an even more involved setup, see the [demo package](com/cinnamon/demo) where initialization is separated to a driver class.
-
-```java
-public class ExampleGame extends Game
-{
-    public static void main(String[] args)
-    {
-        // Create game info: title, name, version
-        final Map<String, String> properties = createBasicProperties();
-
-        // Create directory of factories for assembling game objects
-        final Game.Resources res = new Resources();
-
-        // Instantiate a window and Canvas to draw on
-        final Window window = new Window(1920, 1080, properties.get(Game.TITLE), false);
-        final Canvas canvas = new ExampleCanvas(window, new ConcurrentSceneBuffer(), res.getShaderFactory());
-
-        // Begin the game
-        new ExampleGame(res, null, canvas, properties).start();
-    }
-
-    /**
-     *  <p>Creates a Map containing the game's title, author, and version.</p>
-     */
-    private static Map<String, String> createBasicProperties()
-    {
-        final Map<String, String> properties = new HashMap<String, String>();
-
-        // Fill with basic game info
-        properties.put(Game.TITLE, "Hello World");
-        properties.put(Game.DEVELOPER, "John Smith");
-        properties.put(Game.VERSION, "0.001a");
-
-        return properties;
-    }
-
-    /**
-     *  <p>Directory responsible for providing factories that assemble game objects.</p>
-     */
-    private static class Resources<ExampleGObject> extends Game.Resources
-    {
-        @Override
-        public GObjectFactory<ExampleGObject> getGObjectFactory()
-        {
-            return new ExampleGObjectFactory<ExampleGObject>();
-        }
-
-        @Override
-        public BodyFactory getBodyFactory()
-        {
-            return new ExampleBodyFactory();
-        }
-
-        @Override
-        public ImageFactory getImageFactory()
-        {
-            return new ExampleImageFactory();
-        }
-
-        @Override
-        public ShaderFactory getShaderFactory()
-        {
-            return new ExampleShaderFactory();
-        }
-    }
-}
-```
-
-
-## The Structure
-A game made with Cinnamon is drawn with OpenGL and centers around an instance of [Game](com/cinnamon/system/Game.java) and [Canvas2D](com/cinnamon/gfx/Canvas2D.java) working across two threads with the main thread responsible for the game state. In each game update (also known as a "tick"), a snapshot of the current state is pushed to be drawn in the second thread. In turn, the snapshot is drawn repeatedly until new data is received from the main thread.
-
-#### Game
-The main thread belongs to the Game class and performing world related tasks such as processing input, collision detection, stepping objects through their physics, and the like. The Game class should be extended and available methods overridden to access services such as keybindings as well as provide hooks into specific points of a game tick.
-
-#### Canvas
-The second thread belongs to Canvas2D and the bulk of OpenGL calls. This decouples the tickrate from framerate, allowing for 30hz in game logic with 60fps.
 
 
 ## Attribution
