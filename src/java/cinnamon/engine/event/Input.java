@@ -1,0 +1,210 @@
+package cinnamon.engine.event;
+
+import cinnamon.engine.event.Gamepad.AxisWrapper;
+import cinnamon.engine.event.Gamepad.ButtonWrapper;
+import cinnamon.engine.event.Gamepad.Connection;
+import cinnamon.engine.utils.Table;
+
+import java.util.Map;
+
+/**
+ * <p>This interface serves as an entry-point for {@link InputEvent}s into the input pipeline and provides access to
+ * the device states for the keyboard, mouse, and gamepad(s).</p>
+ *
+ * <p>While it is up to implementations to decide how to harvest input, implementations are presumed to consume input
+ * internally and on their own. External sources, such as for artificial input, can explicitly provide events through
+ * {@code submit(KeyEvent)} and its variations.</p><br>
+ *
+ * <b>Gamepad availability</b>
+ * <p>While the {@link Keyboard} and {@link Mouse} instances are always available through {@code getKeyboard()} and
+ * {@code getMouse()}, gamepads can be unavailable. Aside from an unconnected controller, the following conditions
+ * affect availability:</p>
+ * <ul>
+ *     <li>the number of available {@link Gamepad} instances cannot be more than the size of the set of values from
+ *     {@link Connection}</li>
+ *     <li>each connecting gamepad must have a matching {@link PadProfile} prior to connection</li>
+ * </ul>
+ *
+ * <p>When a gamepad is disconnected, its corresponding {@code Gamepad} instance reflects this connection change and
+ * is then discarded. The instance's state is no longer updated and a new instance must be retrieved through {@code
+ * getGamepad(Connection)} (assuming a gamepad has connected to take its place).</p><br>
+ *
+ * <b>Gamepad configuration</b>
+ * <p>A {@code PadProfile} must have already been added through {@code addGamepadProfile(PadProfile)} for a
+ * {@code Gamepad} instance to be created and configured. If a gamepad connects to the machine with a device name
+ * that does not match that of an added {@code PadProfile}, the connection is ignored.</p><br>
+ */
+public interface Input
+{
+    /**
+     * <p>Submits a {@code KeyEvent} to the input pipeline.</p>
+     *
+     * <p>This method is meant to allow the introduction of artificial input, i.e. input not actually coming from the
+     * keyboard.</p>
+     *
+     * @param event event.
+     * @throws NullPointerException if event is null.
+     */
+    void submit(KeyEvent event);
+
+    /**
+     * <p>Submits a {@code MouseEvent} to the input pipeline.</p>
+     *
+     * <p>This method is meant to allow the introduction of artificial input, i.e. input not actually coming from the
+     * mouse.</p>
+     *
+     * @param event event.
+     * @throws NullPointerException if event is null.
+     */
+    void submit(MouseEvent event);
+
+    /**
+     * <p>Submits a {@code PadEvent} to the input pipeline.</p>
+     *
+     * <p>This method is meant to allow the introduction of artificial input, i.e. input not actually coming from a
+     * gamepad.</p>
+     *
+     * <p>{@code PadEvent} type parameter must have either {@code ButtonWrapper} or {@code AxisWrapper} as the type
+     * argument, whichever is appropriate for the event. If the corresponding source {@code Gamepad} is not
+     * available, this method does nothing.</p>
+     *
+     * @param event event.
+     * @throws NullPointerException if event is null.
+     */
+    void submit(PadEvent event);
+
+    /**
+     * <p>Gets the keyboard.</p>
+     *
+     * @return keyboard.
+     */
+    Keyboard getKeyboard();
+
+    /**
+     * <p>Gets the mouse.</p>
+     *
+     * @return mouse.
+     */
+    Mouse getMouse();
+
+    /**
+     * <p>Gets a gamepad.</p>
+     *
+     * @param connection connection.
+     * @return gamepad, or null if none is available through the specified connection.
+     * @throws NullPointerException if connection is null.
+     */
+    Gamepad getGamepad(Connection connection);
+
+    /**
+     * <p>Gets a {@code Map} of all available {@code Gamepad}s.</p>
+     *
+     * @return available gamepads.
+     */
+    Map<Connection, Gamepad> getGamepads();
+
+    /**
+     * <p>Adds a {@code PadProfile} for configuring connecting gamepads.</p>
+     *
+     * <p>Changes made to a profile after being added are not reflected in gamepad configurations. If a change must
+     * be made, a new profile should be created.</p>
+     *
+     * @param name profile name.
+     * @param profile profile.
+     * @throws NullPointerException if name or profile is null.
+     * @throws IllegalArgumentException if name is already in use by an existing profile.
+     */
+    void addGamepadProfile(String name, PadProfile profile);
+
+    /**
+     * <p>Checks if a {@code PadProfile} has been added with the given name.</p>
+     *
+     * @param name name.
+     * @return true if name is already in use.
+     * @throws NullPointerException if name is null.
+     */
+    boolean containsGamepadProfile(String name);
+
+    /**
+     * <p>Adds an {@code OnConnectionChangeListener} to be notified of gamepad connections and disconnections. The
+     * listener will be called once the {@code Gamepad}'s connection state has been updated.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    void addGamepadOnConnectionChangeListener(OnConnectionChangeListener listener);
+
+    /**
+     * <p>Removes an {@code OnConnectionChangeListener}.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    void removeGamepadOnConnectionChangeListener(OnConnectionChangeListener listener);
+
+    /**
+     * <p>Listener for changes to a gamepad's connection state.</p>
+     */
+    interface OnConnectionChangeListener
+    {
+        /**
+         * <p>Called when a gamepad's connection state has changed.</p>
+         *
+         * @param gamepad gamepad.
+         * @param connected true if just connected, false if disconnected.
+         */
+        void onChange(Gamepad gamepad, boolean connected);
+    }
+
+    /**
+     * <p>An {@code Input} allowing read-only access to the event histories of its input devices as well as an ordered
+     * consumption of events.</p>
+     *
+     * <p>This interface is meant for systems that need to read further back into a device's event histories.</p>
+     *
+     * <p>If an event needs to be injected into both a history and the buffer, it must be provided through either
+     * {@link #submit(KeyEvent)}, {@link #submit(MouseEvent)}, or {@link #submit(PadEvent)}.</p>
+     */
+    interface BufferedInput extends Input
+    {
+        /**
+         * <p>Removes the next event from the buffer. The returned event can be either a {@code KeyEvent},
+         * {@code MouseEvent}, or {@code PadEvent}.</p>
+         *
+         * @return next event, or null if none are available.
+         */
+        InputEvent poll();
+
+        /**
+         * <p>Gets the keyboard's event history.</p>
+         *
+         * @return history.
+         */
+        Table<KeyEvent>[] getKeyboardHistory();
+
+        /**
+         * <p>Gets the mouse's event history.</p>
+         *
+         * @return history.
+         */
+        Table<MouseEvent>[] getMouseHistory();
+
+        /**
+         * <p>Gets each gamepad's button-type event history.</p>
+         *
+         * @param connection connection.
+         * @return button history, or null if there is no available gamepad for the connection.
+         * @throws NullPointerException if connection is null.
+         */
+        Table<PadEvent<ButtonWrapper>>[] getGamepadButtonHistory(Connection connection);
+
+        /**
+         * <p>Gets each gamepad's axis-type event history.</p>
+         *
+         * @return axis history, or null if there is no available gamepad for the connection.
+         * @param connection connection.
+         * @throws NullPointerException if connection is null.
+         */
+        Table<PadEvent<AxisWrapper>> getGamepadAxisHistory(Connection connection);
+    }
+}
