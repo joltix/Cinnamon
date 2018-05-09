@@ -1,7 +1,5 @@
 package cinnamon.engine.event;
 
-import cinnamon.engine.event.Gamepad.AxisWrapper;
-import cinnamon.engine.event.Gamepad.ButtonWrapper;
 import cinnamon.engine.event.Gamepad.Connection;
 import cinnamon.engine.utils.Table;
 
@@ -26,8 +24,8 @@ import java.util.Map;
  * </ul>
  *
  * <p>When a gamepad is disconnected, its corresponding {@code Gamepad} instance reflects this connection change and
- * is then discarded. The instance's state is no longer updated and a new instance must be retrieved through {@code
- * getGamepad(Connection)} (assuming a gamepad has connected to take its place).</p><br>
+ * is then discarded. The instance's state is no longer updated and a new instance must be retrieved through
+ * {@code getGamepad(Connection)} (assuming a gamepad has connected to take its place).</p><br>
  *
  * <b>Gamepad configuration</b>
  * <p>A {@code PadProfile} must have already been added through {@code addGamepadProfile(PadProfile)} for a
@@ -151,30 +149,16 @@ public interface Input
          * <p>Called when a gamepad's connection state has changed.</p>
          *
          * @param gamepad gamepad.
-         * @param connected true if just connected, false if disconnected.
          */
-        void onChange(Gamepad gamepad, boolean connected);
+        void onChange(Gamepad gamepad);
     }
 
     /**
-     * <p>An {@code Input} allowing read-only access to the event histories of its input devices as well as an ordered
-     * consumption of events.</p>
-     *
-     * <p>This interface is meant for systems that need to read further back into a device's event histories.</p>
-     *
-     * <p>If an event needs to be injected into both a history and the buffer, it must be provided through either
-     * {@link #submit(KeyEvent)}, {@link #submit(MouseEvent)}, or {@link #submit(PadEvent)}.</p>
+     * <p>This interface allows read-only access to the event histories of input devices and is meant for systems
+     * that need to read events older than the latest.</p>
      */
-    interface BufferedInput extends Input
+    interface InputHistories
     {
-        /**
-         * <p>Removes the next event from the buffer. The returned event can be either a {@code KeyEvent},
-         * {@code MouseEvent}, or {@code PadEvent}.</p>
-         *
-         * @return next event, or null if none are available.
-         */
-        InputEvent poll();
-
         /**
          * <p>Gets the keyboard's event history.</p>
          *
@@ -183,28 +167,35 @@ public interface Input
         Table<KeyEvent>[] getKeyboardHistory();
 
         /**
-         * <p>Gets the mouse's event history.</p>
+         * <p>Gets the mouse's button event history.</p>
          *
-         * @return history.
+         * @return button history.
          */
-        Table<MouseEvent>[] getMouseHistory();
+        Table<MouseEvent>[] getMouseButtonHistory();
 
         /**
-         * <p>Gets each gamepad's button-type event history.</p>
+         * <p>Gets the mouse's scroll event history.</p>
+         *
+         * @return scroll history.
+         */
+        Table<MouseEvent> getMouseScrollHistory();
+
+        /**
+         * <p>Gets a gamepad's button-type event history.</p>
          *
          * @param connection connection.
          * @return button history, or null if there is no available gamepad for the connection.
          * @throws NullPointerException if connection is null.
          */
-        Table<PadEvent<ButtonWrapper>>[] getGamepadButtonHistory(Connection connection);
+        Table<PadEvent>[] getGamepadButtonHistory(Connection connection);
 
         /**
-         * <p>Gets each gamepad's axis-type event history.</p>
+         * <p>Gets a gamepad's axis-type event history.</p>
          *
          * @return axis history, or null if there is no available gamepad for the connection.
          * @param connection connection.
          * @throws NullPointerException if connection is null.
          */
-        Table<PadEvent<AxisWrapper>> getGamepadAxisHistory(Connection connection);
+        Table<PadEvent> getGamepadAxisHistory(Connection connection);
     }
 }
