@@ -1,10 +1,9 @@
 package cinnamon.engine.event;
 
 import cinnamon.engine.event.Gamepad.*;
-import cinnamon.engine.event.XboxPadProfile.Button;
-import cinnamon.engine.event.XboxPadProfile.Stick;
+import cinnamon.engine.event.XB1.Stick;
 import cinnamon.engine.utils.FixedQueueArray;
-import cinnamon.engine.utils.Table;
+import cinnamon.engine.utils.Point;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -14,58 +13,62 @@ import static org.mockito.Mockito.mock;
 
 public class GamepadTest
 {
-    private static final ButtonWrapper WRONG_BUTTON = new ButtonWrapper()
+    /**
+     * <p>This enum is passed to {@code Gamepad}'s methods in order to trigger an {@code IllegalArgumentException}.</p>
+     */
+    private enum WRONG_BUTTON implements ButtonWrapper
     {
-        @Override
-        public Gamepad.Button toButton()
-        {
-            return Gamepad.Button.BUTTON_0;
-        }
-    };
-
-    private static final AxisWrapper WRONG_AXIS = new AxisWrapper()
-    {
-        @Override
-        public Axis getVertical()
-        {
-            return Axis.AXIS_0;
-        }
+        BUTTON_0;
 
         @Override
-        public Axis getHorizontal()
+        public Button button()
+        {
+            return Button.BUTTON_0;
+        }
+    }
+
+    /**
+     * <p>This enum is passed to {@code Gamepad}'s methods in order to trigger an {@code IllegalArgumentException}.</p>
+     */
+    private enum WRONG_AXIS implements AxisWrapper
+    {
+        AXIS_0;
+
+        @Override
+        public Axis horizontal()
         {
             return null;
         }
-    };
 
+        @Override
+        public Axis vertical()
+        {
+            return Axis.AXIS_0;
+        }
+    }
+
+    // Number of events to track
     private static final int HISTORY_LENGTH = 2;
 
+    // Gamepad identifier
     private static final Connection CONNECTION = Connection.PAD_1;
 
-    private FixedQueueArray<PadEvent<ButtonWrapper>>[] mButtonHistory;
-    private FixedQueueArray<PadEvent<AxisWrapper>> mAxisHistory;
-    private FixedQueueArray<Boolean> mDeadZoneHistory;
+    // Write access to gamepad's event histories
+    private Gamepad.State mState;
 
     private Gamepad mGamepad;
-    private State mState;
 
     @Before
     public void setUp()
     {
-        mButtonHistory = createButtonHistory();
-        mAxisHistory = createAxisHistory();
-        mDeadZoneHistory = createDeadZoneHistory();
-
-        mGamepad = fakeXboxControllerConnected(mButtonHistory[0], mButtonHistory[1], mAxisHistory, mDeadZoneHistory);
+        mState = createGamepadState();
+        mGamepad = fakeXboxControllerConnected();
     }
 
     @After
     public void tearDown()
     {
-        mButtonHistory = null;
-        mAxisHistory = null;
-        mDeadZoneHistory = null;
-
+        mState = null;
         mGamepad = null;
     }
 
@@ -73,7 +76,7 @@ public class GamepadTest
     public void testConstructorNPEConnection()
     {
         final State state = mock(State.class);
-        new Gamepad(null, new XboxPadProfile(), state);
+        new Gamepad(null, XB1.GAMEPAD_PROFILE, state);
     }
 
     @Test (expected = NullPointerException.class)
@@ -86,23 +89,29 @@ public class GamepadTest
     @Test (expected = NullPointerException.class)
     public void testConstructorNPEState()
     {
-        new Gamepad(Connection.PAD_1, new XboxPadProfile(), null);
+        new Gamepad(Connection.PAD_1, XB1.GAMEPAD_PROFILE, null);
     }
 
     @Test
     public void testIsPressed()
     {
-        mockButtonEvent(Button.X, true);
+        fakeButtonEvent(XB1.Button.X, true);
 
-        Assert.assertTrue(mGamepad.isPressed(XboxPadProfile.Button.X));
+        Assert.assertTrue(mGamepad.isPressed(XB1.Button.X));
     }
 
     @Test
     public void testIsPressedReturnsFalse()
     {
-        mockButtonEvent(Button.X, false);
+        fakeButtonEvent(XB1.Button.X, false);
 
-        Assert.assertFalse(mGamepad.isPressed(XboxPadProfile.Button.Y));
+        Assert.assertFalse(mGamepad.isPressed(XB1.Button.Y));
+    }
+
+    @Test
+    public void testIsPressedReturnsFalseWithEmptyHistory()
+    {
+        Assert.assertFalse(mGamepad.isPressed(XB1.Button.Y));
     }
 
     @Test (expected = NullPointerException.class)
@@ -112,59 +121,63 @@ public class GamepadTest
     }
 
     @Test (expected = IllegalArgumentException.class)
-    public void testIsPressedIAE()
+    public void testIsPressedIAEWrongClass()
     {
-        mGamepad.isPressed(WRONG_BUTTON);
+        mGamepad.isPressed(WRONG_BUTTON.BUTTON_0);
     }
 
     @Test
-    public void testGetAxisPosition()
+    public void testGetMotion()
     {
-        final Axis vertical = Stick.RIGHT_TRIGGER.getVertical();
-        final float v = new XboxPadProfile().getRestingAxisValues().get(vertical);
+        final float falseMotion = 0.5f;
+        fakeAxisEvent(Stick.RIGHT_TRIGGER, 0f, falseMotion);
 
-        Assert.assertEquals(v, mGamepad.getAxisPosition(Stick.RIGHT_TRIGGER).getY(), 0f);
+        final float motion = mGamepad.getMotion(Stick.RIGHT_TRIGGER).getY();
+        Assert.assertEquals(falseMotion, motion, 0f);
     }
 
     @Test
-    public void testGetAxisPositionReturnsRestingPosition()
+    public void testGetMotionReturnsRestingPosition()
     {
-        final Axis vertical = Stick.RIGHT_TRIGGER.getVertical();
+        final Axis trigger = XB1.Stick.RIGHT_TRIGGER.vertical();
+        final float resting = XB1.GAMEPAD_PROFILE.getRestingAxisValues().get(trigger);
 
-        // Remove all events for the right trigger
-        mAxisHistory.clear(vertical.ordinal());
-
-        final float v = new XboxPadProfile().getRestingAxisValues().get(vertical);
-
-        Assert.assertEquals(v, mGamepad.getAxisPosition(Stick.RIGHT_TRIGGER).getY(), 0f);
+        final float motion = mGamepad.getMotion(Stick.RIGHT_TRIGGER).getY();
+        Assert.assertEquals(resting, motion, 0f);
     }
 
     @Test (expected = NullPointerException.class)
-    public void testGetAxisPositionNPE()
+    public void testGetMotionNPE()
     {
-        mGamepad.getAxisPosition(null);
+        mGamepad.getMotion(null);
     }
 
     @Test (expected = IllegalArgumentException.class)
-    public void testGetAxisPositionIAE()
+    public void testGetMotionIAEWrongClass()
     {
-        mGamepad.getAxisPosition(WRONG_AXIS);
+        mGamepad.getMotion(WRONG_AXIS.AXIS_0);
     }
 
     @Test
     public void testIsInsideDeadZoneCached()
     {
-        mockAxisEvent(Stick.LEFT_STICK, 0f, 0f);
+        fakeAxisEvent(XB1.Stick.LEFT_STICK, 0f, 0f);
 
-        Assert.assertTrue(mGamepad.isInsideDeadZone(Stick.LEFT_STICK));
+        Assert.assertTrue(mGamepad.isInsideDeadZone(XB1.Stick.LEFT_STICK));
     }
 
     @Test
     public void testIsInsideDeadZoneCachedReturnsFalse()
     {
-        mockAxisEvent(Stick.LEFT_STICK, 30f, 48f);
+        fakeAxisEvent(XB1.Stick.LEFT_STICK, 30f, 48f);
 
-        Assert.assertFalse(mGamepad.isInsideDeadZone(Stick.LEFT_STICK));
+        Assert.assertFalse(mGamepad.isInsideDeadZone(XB1.Stick.LEFT_STICK));
+    }
+
+    @Test
+    public void testIsInsideDeadZoneCachedReturnsFalseWithEmptyHistory()
+    {
+        Assert.assertFalse(mGamepad.isInsideDeadZone(XB1.Stick.LEFT_STICK));
     }
 
     @Test (expected = NullPointerException.class)
@@ -174,21 +187,21 @@ public class GamepadTest
     }
 
     @Test (expected = IllegalArgumentException.class)
-    public void testIsInsideDeadZoneCachedIAE()
+    public void testIsInsideDeadZoneCachedIAEWrongClass()
     {
-        mGamepad.isInsideDeadZone(WRONG_AXIS);
+        mGamepad.isInsideDeadZone(WRONG_AXIS.AXIS_0);
     }
 
     @Test
     public void testIsInsideDeadZone()
     {
-        Assert.assertTrue(mGamepad.isInsideDeadZone(Stick.LEFT_STICK, 0f, 0f));
+        Assert.assertTrue(mGamepad.isInsideDeadZone(XB1.Stick.LEFT_STICK, 0f, 0f));
     }
 
     @Test
     public void testIsInsideDeadZoneReturnsFalse()
     {
-        Assert.assertFalse(mGamepad.isInsideDeadZone(Stick.LEFT_STICK, 50f, 80f));
+        Assert.assertFalse(mGamepad.isInsideDeadZone(XB1.Stick.LEFT_STICK, 50f, 80f));
     }
 
     @Test (expected = NullPointerException.class)
@@ -198,15 +211,34 @@ public class GamepadTest
     }
 
     @Test (expected = IllegalArgumentException.class)
-    public void testIsInsideDeadZoneIAE()
+    public void testIsInsideDeadZoneIAEWrongClass()
     {
-        mGamepad.isInsideDeadZone(WRONG_AXIS, 0f, 0f);
+        mGamepad.isInsideDeadZone(WRONG_AXIS.AXIS_0, 0f, 0f);
+    }
+
+    @Test
+    public void testGetDeadZone()
+    {
+        final double zoneRadius = mGamepad.getDeadZone(Stick.RIGHT_TRIGGER);
+        Assert.assertEquals(0d, zoneRadius, 0d);
+    }
+
+    @Test (expected = NullPointerException.class)
+    public void testGetDeadZoneNPE()
+    {
+        mGamepad.getDeadZone(null);
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testGetDeadZoneIAEWrongClass()
+    {
+        mGamepad.getDeadZone(WRONG_AXIS.AXIS_0);
     }
 
     @Test
     public void testSetDeadZone()
     {
-        mGamepad.setDeadZone(Stick.LEFT_STICK, 0.15d);
+        mGamepad.setDeadZone(XB1.Stick.LEFT_STICK, 0.15d);
     }
 
     @Test (expected = NullPointerException.class)
@@ -218,28 +250,41 @@ public class GamepadTest
     @Test (expected = IllegalArgumentException.class)
     public void testSetDeadZoneIAERadiusTooSmall()
     {
-        mGamepad.setDeadZone(Stick.LEFT_STICK, -0.15d);
+        mGamepad.setDeadZone(XB1.Stick.LEFT_STICK, -0.15d);
     }
 
     @Test (expected = IllegalArgumentException.class)
     public void testSetDeadZoneIAERadiusTooLarge()
     {
-        mGamepad.setDeadZone(Stick.LEFT_STICK, -1.5d);
+        mGamepad.setDeadZone(XB1.Stick.LEFT_STICK, -1.5d);
     }
 
     @Test (expected = IllegalArgumentException.class)
     public void testSetDeadZoneIAEWrongClass()
     {
-        mGamepad.setDeadZone(WRONG_AXIS, 0.15d);
+        mGamepad.setDeadZone(WRONG_AXIS.AXIS_0, 0.15d);
     }
 
     @Test
-    public void testStateSetConnected()
+    public void testIsMutedReturnsFalse()
     {
-        mState.setConnected(false);
+        Assert.assertFalse(mGamepad.isMuted());
+    }
 
-        Assert.assertFalse(mState.isConnected());
-        Assert.assertFalse(mGamepad.isConnected());
+    @Test
+    public void testIsMutedReturnsTrueAfterMute()
+    {
+        mGamepad.mute();
+
+        Assert.assertTrue(mGamepad.isMuted());
+    }
+
+    @Test
+    public void testIsMutedReturnsFalseAfterUnmute()
+    {
+        mGamepad.unmute();
+
+        Assert.assertFalse(mGamepad.isMuted());
     }
 
     /**
@@ -249,71 +294,71 @@ public class GamepadTest
      * @param press true if pressed.
      * @param <T> type of button.
      */
-    private <T extends Enum<T> & ButtonWrapper> void mockButtonEvent(T button, boolean press)
+    private <T extends Enum<T> & ButtonWrapper> void fakeButtonEvent(T button, boolean press)
     {
-        final PadEvent<ButtonWrapper> event = PadEvent.createForButton(CONNECTION, button, press);
+        final PadEvent event = new PadEvent(0L, CONNECTION, button, press);
 
-        mButtonHistory[(press) ? 0 : 1].add(button.toButton().ordinal(), event);
+        final FixedQueueArray<PadEvent> history;
+        history = (press) ? mState.getPressHistory() : mState.getReleaseHistory();
+        history.add(button.button().ordinal(), event);
     }
 
     /**
-     * <p>Inserts an axis-type event into the gamepad's axis history.</p>
+     * <p>Attempts to insert a motion event into the gamepad's histories. If the motion is within the dead zone
+     * assigned to the given axis, the event is not written to the motion history. Whether or not the motion is
+     * ignored, it will be written to the dead zone history as appropriate.</p>
      *
      * @param axis source of event.
-     * @param horizontal horizontal position.
-     * @param vertical vertical position.
+     * @param horizontal horizontal offset.
+     * @param vertical vertical offset.
      * @param <T> type of axis.
      */
-    private <T extends Enum<T> & AxisWrapper> void mockAxisEvent(T axis, float horizontal, float vertical)
+    private <T extends Enum<T> & AxisWrapper> void fakeAxisEvent(T axis, float horizontal, float vertical)
     {
-        final PadEvent<AxisWrapper> event = PadEvent.createForAxis(CONNECTION, axis, horizontal, vertical);
-        final int ord = axis.getVertical().ordinal();
 
-        mAxisHistory.add(ord, event);
-        mDeadZoneHistory.add(ord, (horizontal == 0f && vertical == 0f));
+        final double radius = mGamepad.getDeadZone(axis);
+        final boolean suppressed = isInsideRadius(horizontal, vertical, radius);
+        final int ord = axis.vertical().ordinal();
+
+        if (!suppressed) {
+            final Point position = new Point(horizontal, vertical, 0f);
+            mState.getMotionHistory().add(ord, new PadEvent(0L, CONNECTION, axis, position));
+        }
+
+        mState.getDeadZoneHistory().add(ord, suppressed);
     }
 
-
-    private Gamepad fakeXboxControllerConnected(Table<PadEvent<ButtonWrapper>> presses,
-                                                Table<PadEvent<ButtonWrapper>> releases,
-                                                Table<PadEvent<AxisWrapper>> axes, Table<Boolean> zones)
+    private boolean isInsideRadius(float h, float v, double r)
     {
-        mState = State.builder()
-                .pressHistory(presses)
-                .releaseHistory(releases)
-                .axisHistory(axes)
-                .deadZoneHistory(zones)
-                .build();
+        return (h * h) + (v * v) <= r * r;
+    }
 
+    private Gamepad fakeXboxControllerConnected()
+    {
         mState.setConnected(true);
-        return new Gamepad(Connection.PAD_1, new XboxPadProfile(), mState);
+        return new Gamepad(CONNECTION, XB1.GAMEPAD_PROFILE, mState);
     }
 
     /**
-     * <p>Press history is returned in the 0th index with release history in the second.</p>
+     * <p>Creates a {@code Gamepad.State} with empty event histories.</p>
      *
-     * @return event histories.
+     * @return state.
      */
-    @SuppressWarnings("unchecked")
-    private FixedQueueArray<PadEvent<ButtonWrapper>>[] createButtonHistory()
+    private Gamepad.State createGamepadState()
     {
-        final int buttonCount = Gamepad.Button.values().length;
-        final FixedQueueArray<PadEvent<ButtonWrapper>>[] histories =
-                (FixedQueueArray<PadEvent<ButtonWrapper>>[]) new FixedQueueArray[2];
+        final int c = XB1.Button.COUNT;
+        final int l = HISTORY_LENGTH;
 
-        histories[0] = new FixedQueueArray<>(buttonCount, HISTORY_LENGTH);
-        histories[1] = new FixedQueueArray<>(buttonCount, HISTORY_LENGTH);
+        final FixedQueueArray<PadEvent> presses = new FixedQueueArray<>(c, l);
+        final FixedQueueArray<PadEvent> releases = new FixedQueueArray<>(c, l);
+        final FixedQueueArray<PadEvent> motions = new FixedQueueArray<>(c, l);
+        final FixedQueueArray<Boolean> zones = new FixedQueueArray<>(c, l);
 
-        return histories;
-    }
-
-    private FixedQueueArray<PadEvent<AxisWrapper>> createAxisHistory()
-    {
-        return new FixedQueueArray<>(Axis.COUNT, HISTORY_LENGTH);
-    }
-
-    private FixedQueueArray<Boolean> createDeadZoneHistory()
-    {
-        return new FixedQueueArray<>(Axis.COUNT, HISTORY_LENGTH);
+        return Gamepad.State.builder()
+                .pressHistory(presses)
+                .releaseHistory(releases)
+                .motionHistory(motions)
+                .deadZoneHistory(zones)
+                .build();
     }
 }
