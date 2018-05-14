@@ -5,8 +5,9 @@ import cinnamon.engine.utils.IntMap.IntWrapper;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * <p>{@code Mouse} represents the mouse input device, providing a view of the cursor's position, scroll offsets, and
- * button states. Updates must be set through the {@code Mouse.State} passed to the {@code Mouse}'s constructor.</p>
+ * <p>An event-based representation of the user's mouse. Updating the mouse's state requires updating the table of
+ * events provided by the {@code Mouse}'s {@link Mouse.State}. Each {@code Mouse} instance's state is controlled by
+ * the {@code Mouse.State} provided during instantiation.</p>
  */
 public final class Mouse implements EventSilenceable
 {
@@ -29,41 +30,43 @@ public final class Mouse implements EventSilenceable
         MIDDLE(GLFW.GLFW_MOUSE_BUTTON_MIDDLE);
 
         /**
-         * <p>Button count.</p>
+         * <p>Number of buttons.</p>
          */
         public static final int COUNT = Button.values().length;
 
+        // Mapping between buttons and lower level constants
         private static final IntMap<Button> MAPPING = new SparseEnumIntMap<>(Button.class);
 
-        // GLFW button
-        private final int mButton;
+        // Lower level constants
+        private final int mConstant;
 
-        Button(int glfw)
+        Button(int constant)
         {
-            mButton = glfw;
+            mConstant = constant;
         }
 
         @Override
         public int toInt()
         {
-            return mButton;
+            return mConstant;
         }
 
         /**
-         * <p>Gets the {@code Button} equivalent of a GLFW mouse button constant.</p>
+         * <p>Gets the {@code Button} equivalent of a lower level constant.</p>
          *
-         * @param glfw GLFW button.
-         * @return button, or null if unrecognized.
+         * @param constant lower level constant.
+         * @return button or null if unrecognized.
          */
-        public static Button from(int glfw)
+        public static Button from(int constant)
         {
-            return MAPPING.get(glfw);
+            return MAPPING.get(constant);
         }
     }
 
-    private static final PressCondition<MouseEvent> mPressCondition = new PressCondition<>();
-
+    // Event histories and position on screen
     private final State mState;
+
+    // True if events should be ignored
     private boolean mMute;
 
     /**
@@ -80,7 +83,7 @@ public final class Mouse implements EventSilenceable
     }
 
     /**
-     * <p>Checks if the most recent event for the given button is a press.</p>
+     * <p>Checks if the most recent event for a button is a press.</p>
      *
      * @param button button.
      * @return true if pressed.
@@ -90,19 +93,19 @@ public final class Mouse implements EventSilenceable
     {
         checkNull(button);
 
-        return mPressCondition.isPressed(button, mState.mPresses, mState.mReleases);
+        return PressChecker.isPressed(button, mState.getPressHistory(), mState.getReleaseHistory());
     }
 
     /**
      * <p>Gets the mouse' position.</p>
      *
-     * <p>Changes to the returned {@code Point} does not affect the current position.</p>
+     * <p>Changes to the returned {@code Point} do not affect the actual position.</p>
      *
      * @return position.
      */
     public Point getPosition()
     {
-        return new Point(mState.mPt);
+        return new Point(mState.getPosition());
     }
 
     /**
@@ -112,7 +115,8 @@ public final class Mouse implements EventSilenceable
      */
     public float getHorizontalScroll()
     {
-        return mState.getHorizontalScrollOffset();
+        final MouseEvent event = mState.getScrollHistory().get(0, 0);
+        return (event == null) ? 0f : event.getHorizontal();
     }
 
     /**
@@ -122,7 +126,8 @@ public final class Mouse implements EventSilenceable
      */
     public float getVerticalScroll()
     {
-        return mState.getVerticalScrollOffset();
+        final MouseEvent event = mState.getScrollHistory().get(0, 0);
+        return (event == null) ? 0f : event.getVertical();
     }
 
     @Override
@@ -143,6 +148,22 @@ public final class Mouse implements EventSilenceable
         mMute = false;
     }
 
+    @Override
+    public String toString()
+    {
+        final String format = "%s(@(%.2f,%.2f))";
+        final String name = getClass().getSimpleName();
+        final Point pos = getPosition();
+
+        return String.format(format, name, pos.getX(), pos.getY());
+    }
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException
+    {
+        throw new CloneNotSupportedException();
+    }
+
     private static void checkNull(Object object)
     {
         if (object == null) {
@@ -151,100 +172,207 @@ public final class Mouse implements EventSilenceable
     }
 
     /**
-     * <p>{@code Mouse.State} allows changing the {@code Mouse}'s position, scroll offsets, and event histories.</p>
+     * <p>{@code Mouse.State} allows changing the {@code Mouse}'s position and updating its press, release, and
+     * scroll events.</p>
+     *
+     * <p>{@code Mouse.State}s are constructed with a guided builder.</p>
+     * <pre>
+     *     <code>
+     *         Mouse.State state = Mouse.State.builder()
+     *             .pressHistory(presses)
+     *             .releaseHistory(releases)
+     *             .scrollHistory(scrolls)
+     *             .position(position)
+     *             .build();
+     *     </code>
+     * </pre>
      */
     public static class State
     {
-        private final Table<MouseEvent> mPresses;
-        private final Table<MouseEvent> mReleases;
+        // Press event history
+        private final FixedQueueArray<MouseEvent> mPresses;
 
-        private final Point mPt = new Point();
+        // Release event history
+        private final FixedQueueArray<MouseEvent> mReleases;
 
-        private float mScrollH = 0f;
-        private float mScrollV = 0f;
+        // Scroll event history
+        private final FixedQueueArray<MouseEvent> mScrolls;
 
-        /**
-         * <p>Constructs a {@code Mouse.State}.</p>
-         *
-         * @param pressHistory press event history.
-         * @param releaseHistory release event history.
-         * @throws NullPointerException if pressHistory or releaseHistory is null.
-         */
-        public State(Table<MouseEvent> pressHistory, Table<MouseEvent> releaseHistory)
+        // Mouse position
+        private final Point mPosition;
+
+        private State(FixedQueueArray<MouseEvent> pressHistory, FixedQueueArray<MouseEvent> releaseHistory,
+                      FixedQueueArray<MouseEvent> scrollHistory, Point position)
         {
-            checkNull(pressHistory);
-            checkNull(releaseHistory);
-
             mPresses = pressHistory;
             mReleases = releaseHistory;
+            mScrolls = scrollHistory;
+            mPosition = position;
         }
 
         /**
-         * <p>Gets the position.</p>
+         * <p>Gets the editable history for press events.</p>
          *
-         * @return position.
+         * @return editable press history.
+         */
+        public FixedQueueArray<MouseEvent> getPressHistory()
+        {
+            return mPresses;
+        }
+
+        /**
+         * <p>Gets the editable history for release events.</p>
+         *
+         * @return editable release history.
+         */
+        public FixedQueueArray<MouseEvent> getReleaseHistory()
+        {
+            return mReleases;
+        }
+
+        /**
+         * <p>Gets the editable history for scroll events.</p>
+         *
+         * @return editable scroll history.
+         */
+        public FixedQueueArray<MouseEvent> getScrollHistory()
+        {
+            return mScrolls;
+        }
+
+        /**
+         * <p>Gets the editable position.</p>
+         *
+         * @return editable position.
          */
         public Point getPosition()
         {
-            return mPt;
-        }
-
-        /**
-         * <p>Sets the position.</p>
-         *
-         * @param x x.
-         * @param y y.
-         */
-        public void setPosition(float x, float y)
-        {
-            mPt.setX(x);
-            mPt.setY(y);
-        }
-
-        /**
-         * <p>Gets the horizontal scroll offset.</p>
-         *
-         * @return horizontal scroll offset.
-         */
-        public float getHorizontalScrollOffset()
-        {
-            return mScrollH;
-        }
-
-        /**
-         * <p>Sets the horizontal scroll offset.</p>
-         *
-         * @param offset horizontal scroll offset.
-         */
-        public void setHorizontalScrollOffset(float offset)
-        {
-            mScrollH = offset;
-        }
-
-        /**
-         * <p>Gets the vertical scroll offset.</p>
-         *
-         * @return vertical scroll offset.
-         */
-        public float getVerticalScrollOffset()
-        {
-            return mScrollV;
-        }
-
-        /**
-         * <p>Sets the vertical scroll offset.</p>
-         *
-         * @param offset vertical scroll offset.
-         */
-        public void setVerticalScrollOffset(float offset)
-        {
-            mScrollV = offset;
+            return mPosition;
         }
 
         @Override
         protected final Object clone() throws CloneNotSupportedException
         {
             throw new CloneNotSupportedException();
+        }
+
+        /**
+         * <p>Begins the process to build a {@code Mouse.State}.</p>
+         *
+         * @return first build step.
+         */
+        public static PressHistoryStep builder()
+        {
+            return new StepBuilder();
+        }
+
+        private static class StepBuilder implements PressHistoryStep, ReleaseHistoryStep, ScrollHistoryStep,
+                PositionStep, BuildStep
+        {
+            private FixedQueueArray<MouseEvent> mPressHistory;
+            private FixedQueueArray<MouseEvent> mReleaseHistory;
+            private FixedQueueArray<MouseEvent> mScrollHistory;
+            private Point mPosition;
+
+            @Override
+            public ReleaseHistoryStep pressHistory(FixedQueueArray<MouseEvent> history)
+            {
+                checkNull(history);
+
+                mPressHistory = history;
+                return this;
+            }
+
+            @Override
+            public ScrollHistoryStep releaseHistory(FixedQueueArray<MouseEvent> history)
+            {
+                checkNull(history);
+
+                mReleaseHistory = history;
+                return this;
+            }
+
+            @Override
+            public PositionStep scrollHistory(FixedQueueArray<MouseEvent> history)
+            {
+                checkNull(history);
+
+                mScrollHistory = history;
+                return this;
+            }
+
+            @Override
+            public BuildStep position(Point position)
+            {
+                checkNull(position);
+
+                mPosition = position;
+                return this;
+            }
+
+            @Override
+            public State build()
+            {
+                return new State(mPressHistory, mReleaseHistory, mScrollHistory, mPosition);
+            }
+        }
+
+        public interface PressHistoryStep
+        {
+            /**
+             * <p>Sets the mouse's button press event history.</p>
+             *
+             * @param history press history.
+             * @return next step.
+             * @throws NullPointerException if history is null.
+             */
+            ReleaseHistoryStep pressHistory(FixedQueueArray<MouseEvent> history);
+        }
+
+        public interface ReleaseHistoryStep
+        {
+            /**
+             * <p>Sets the mouse's button release event history.</p>
+             *
+             * @param history release history.
+             * @return next step.
+             * @throws NullPointerException if history is null.
+             */
+            ScrollHistoryStep releaseHistory(FixedQueueArray<MouseEvent> history);
+        }
+
+        public interface ScrollHistoryStep
+        {
+            /**
+             * <p>Sets the mouse's scroll event history.</p>
+             *
+             * @param history scroll history.
+             * @return next step.
+             * @throws NullPointerException if history is null.
+             */
+            PositionStep scrollHistory(FixedQueueArray<MouseEvent> history);
+        }
+
+        public interface PositionStep
+        {
+            /**
+             * <p>Sets the mouse's position.</p>
+             *
+             * @param position position.
+             * @return next step.
+             * @throws NullPointerException if position is null.
+             */
+            BuildStep position(Point position);
+        }
+
+        public interface BuildStep
+        {
+            /**
+             * <p>Creates the {@code Mouse.State}.</p>
+             *
+             * @return mouse state.
+             */
+            State build();
         }
     }
 }
