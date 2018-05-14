@@ -6,17 +6,16 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.system.MemoryUtil;
-
 
 public class KeyboardTest
 {
+    // Number of events to track per key
     private static final int HISTORY_LENGTH = 2;
 
     private Keyboard mKeyboard;
 
     private FixedQueueArray<KeyEvent> mPressHistory;
+
     private FixedQueueArray<KeyEvent> mReleaseHistory;
 
     @Before
@@ -52,13 +51,23 @@ public class KeyboardTest
     @Test
     public void testIsPressed()
     {
-        mPressHistory.add(Key.KEY_SPACE.ordinal(), KeyEvent.createForKey(Key.KEY_SPACE, true));
+        final KeyEvent event = new KeyEvent(0L, Key.KEY_SPACE, true);
+        mPressHistory.add(Key.KEY_SPACE.ordinal(), event);
 
         Assert.assertTrue(mKeyboard.isPressed(Key.KEY_SPACE));
     }
 
     @Test
     public void testIsPressedReturnsFalse()
+    {
+        final KeyEvent event = new KeyEvent(0L, Key.KEY_SPACE, false);
+        mReleaseHistory.add(Key.KEY_SPACE.ordinal(), event);
+
+        Assert.assertFalse(mKeyboard.isPressed(Key.KEY_SPACE));
+    }
+
+    @Test
+    public void testIsPressedReturnsFalseWithEmptyHistory()
     {
         Assert.assertFalse(mKeyboard.isPressed(Key.KEY_SPACE));
     }
@@ -67,5 +76,27 @@ public class KeyboardTest
     public void testIsPressedNPE()
     {
         mKeyboard.isPressed(null);
+    }
+
+    @Test
+    public void testIsMutedReturnsFalse()
+    {
+        Assert.assertFalse(mKeyboard.isMuted());
+    }
+
+    @Test
+    public void testIsMutedReturnsTrueAfterMute()
+    {
+        mKeyboard.mute();
+
+        Assert.assertTrue(mKeyboard.isMuted());
+    }
+
+    @Test
+    public void testIsMutedReturnsFalseAfterUnmute()
+    {
+        mKeyboard.unmute();
+
+        Assert.assertFalse(mKeyboard.isMuted());
     }
 }
