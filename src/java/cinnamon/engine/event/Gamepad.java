@@ -1,24 +1,35 @@
 package cinnamon.engine.event;
 
-import cinnamon.engine.utils.IntMap;
+import cinnamon.engine.utils.*;
 import cinnamon.engine.utils.IntMap.IntWrapper;
-import cinnamon.engine.utils.Point;
-import cinnamon.engine.utils.SparseEnumIntMap;
-import cinnamon.engine.utils.Table;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.EnumMap;
 import java.util.Map;
 
 /**
- * <p>{@code Gamepad} represents the gamepad (or joystick) input device, providing a view of connection status and
- * button and axis states. With the exception of dead zone radii, updates must be set through the
- * {@code Gamepad.State} passed to the constructor.</p>
+ * <p>An event-based representation of the user's gamepad. Updating the gamepad's press-release and motion states
+ * requires updating the table of events passed to the {@code Gamepad}'s {@link Gamepad.State} during instantiation.</p>
+ *
+ * <p>Methods in this class that take either a {@link ButtonWrapper} or {@link AxisWrapper} are expected to be given
+ * the appropriate {@code Enum} expected by the {@link PadProfile} that configured the {@code Gamepad} instance.
+ * Providing these methods with a different wrapper implementation will cause an {@code Exception}.</p>
+ *
+ * <h3>Connection</h3>
+ * <p>{@code Gamepad}s are given an unchangeable {@link Connection} upon creation which identify the owning
+ * {@literal "player"}. There may be many {@code Gamepad} instances with the same {@code Connection}.</p>
+ *
+ * <h3>Dead Zones</h3>
+ * <p>Each {@link AxisWrapper} constant is allowed a circular area which suppresses motion. This value is
+ * defined as a radius radiating from the constant's resting offset and is referred to as the sensor's
+ * {@literal "dead zone"}. Although these dead zones can be set for each axis-based constant, this class does not
+ * enforce the motion suppression and is at the mercy of classes working directly with produced motion. By default,
+ * all axes have a dead zone radius of 0.</p>
  */
 public final class Gamepad implements EventSilenceable
 {
     /**
-     * <p>Each {@code Connection} represents a specific {@code Gamepad} instance.</p>
+     * <p>Gamepad identifying constants.</p>
      */
     public enum Connection implements IntWrapper
     {
@@ -43,34 +54,36 @@ public final class Gamepad implements EventSilenceable
         PAD_4(GLFW.GLFW_JOYSTICK_4);
 
         /**
-         * <p>Gamepad count.</p>
+         * <p>Number of possible gamepads.</p>
          */
         public static final int COUNT = Connection.values().length;
 
+        // Mapping between Connections and lower level constants
         private static final IntMap<Connection> MAPPING = new SparseEnumIntMap<>(Connection.class);
 
-        private int mJoystick;
+        // Lower level constant
+        private int mConstant;
 
-        Connection(int glfw)
+        Connection(int constant)
         {
-            mJoystick = glfw;
+            mConstant = constant;
         }
 
         @Override
         public int toInt()
         {
-            return mJoystick;
+            return mConstant;
         }
 
         /**
-         * <p>Gets the {@code Connection} equivalent of a GLFW joystick constant.</p>
+         * <p>Gets the {@code Connection} equivalent of a lower level constant.</p>
          *
-         * @param glfw GLFW joystick.
-         * @return connection, or null if unrecognized.
+         * @param constant lower level constant.
+         * @return connection or null if unrecognized.
          */
-        public static Connection from(int glfw)
+        public static Connection from(int constant)
         {
-            return MAPPING.get(glfw);
+            return MAPPING.get(constant);
         }
     }
 
@@ -79,6 +92,10 @@ public final class Gamepad implements EventSilenceable
      */
     public enum Button implements IntWrapper
     {
+        /*
+        Although current constants are merely indices, they are explicitly
+        provided in case the lower level input source is changed
+         */
         BUTTON_0(0),
         BUTTON_1(1),
         BUTTON_2(2),
@@ -92,41 +109,47 @@ public final class Gamepad implements EventSilenceable
         BUTTON_10(10),
         BUTTON_11(11),
         BUTTON_12(12),
-        BUTTON_13(13);
+        BUTTON_13(13),
+        BUTTON_14(14),
+        BUTTON_15(15),
+        BUTTON_16(16),
+        BUTTON_17(17);
 
         /**
-         * <p>Button count.</p>
+         * <p>Number of buttons.</p>
          */
         public static final int COUNT = Button.values().length;
 
+        // Mapping between buttons and lower level constants
         private static final Button[] MAPPING = Button.values();
 
-        private final int mIndex;
+        // Lower level constant
+        private final int mConstant;
 
-        Button(int index)
+        Button(int constant)
         {
-            mIndex = index;
+            mConstant = constant;
         }
 
         @Override
         public int toInt()
         {
-            return mIndex;
+            return mConstant;
         }
 
         /**
-         * <p>Gets the {@code Button} equivalent of a GLFW joystick button constant.</p>
+         * <p>Gets the {@code Button} equivalent of a lower level constant.</p>
          *
-         * @param glfw GLFW button.
-         * @return button, or null if unrecognized.
+         * @param constant lower level constant.
+         * @return button or null if unrecognized.
          */
-        public static Button from(int glfw)
+        public static Button from(int constant)
         {
-            if (glfw < 0 || glfw >= MAPPING.length) {
+            if (constant < 0 || constant >= MAPPING.length) {
                 return null;
             }
 
-            return MAPPING[glfw];
+            return MAPPING[constant];
         }
     }
 
@@ -135,6 +158,10 @@ public final class Gamepad implements EventSilenceable
      */
     public enum Axis implements IntWrapper
     {
+        /*
+        Although current constants are merely indices, they are explicitly
+        provided in case the lower level input source is changed
+        */
         AXIS_0(0),
         AXIS_1(1),
         AXIS_2(2),
@@ -143,55 +170,62 @@ public final class Gamepad implements EventSilenceable
         AXIS_5(5);
 
         /**
-         * <p>Axis count.</p>
+         * <p>Number of axes.</p>
          */
         public static final int COUNT = Axis.values().length;
 
+        // Mapping between axes and lower level constants
         private static final Axis[] MAPPING = Axis.values();
 
-        private int mIndex;
+        // Lower level constant
+        private int mConstant;
 
-        Axis(int glfw)
+        Axis(int constant)
         {
-            mIndex = glfw;
+            mConstant = constant;
         }
 
         @Override
         public int toInt()
         {
-            return mIndex;
+            return mConstant;
         }
 
         /**
-         * <p>Gets the {@code Axis} equivalent of a GLFW joystick axis constant.</p>
+         * <p>Gets the {@code Axis} equivalent of a lower level constant.</p>
          *
-         * @param glfw GLFW axis.
-         * @return axis, or null if unrecognized.
+         * @param constant lower level constant.
+         * @return axis or null if unrecognized.
          */
-        public static Axis from(int glfw)
+        public static Axis from(int constant)
         {
-            if (glfw < 0 || glfw >= MAPPING.length) {
+            if (constant < 0 || constant >= MAPPING.length) {
                 return null;
             }
 
-            return MAPPING[glfw];
+            return MAPPING[constant];
         }
     }
 
+    // Initial dead zone
     private static final double DEFAULT_DEAD_ZONE_RADIUS = 0d;
 
-    private static final PressCondition<PadEvent<ButtonWrapper>> mPressCondition = new PressCondition<>();
-
+    // Event histories and connection status
     private final State mState;
 
+    // Expected configuration
     private final PadProfile mProfile;
+
+    // Gamepad identifier
     private final Connection mConnection;
 
+    // Resting values per axis
     private final Map<Axis, Float> mResting;
 
     // Dead zone radius is stored only with each wrapper's vertical Axis
     private final Map<Axis, Double> mDeadZones;
 
+    // True if events should be ignored
     private boolean mMuted = false;
 
     /**
@@ -208,10 +242,11 @@ public final class Gamepad implements EventSilenceable
         checkNull(profile);
         checkNull(state);
 
-        mResting = profile.getRestingAxisValues();
         mConnection = connection;
         mProfile = profile;
         mState = state;
+
+        mResting = mProfile.getRestingAxisValues();
 
         // Initialize dead zones
         mDeadZones = new EnumMap<>(Axis.class);
@@ -232,49 +267,52 @@ public final class Gamepad implements EventSilenceable
     {
         checkNull(button);
 
+        // Check if button is expected
         if (button.getClass() != mProfile.getButtonClass()) {
-            throw new IllegalArgumentException("Constant class does not match profile's button class, " +
-                    "expected: " + mProfile.getButtonClass().getSimpleName() + ", actual: " +
-                    button.getClass().getSimpleName());
+
+            final String format = "Constant class does not match profile's button class, expected: %s, actual: %s";
+            final String expected = mProfile.getButtonClass().getSimpleName();
+            final String actual = button.getClass().getSimpleName();
+
+            throw new IllegalArgumentException(String.format(format, expected, actual));
         }
 
-        return mPressCondition.isPressed(button.toButton(), mState.mPresses, mState.mReleases);
+        return PressChecker.isPressed(button.button(), mState.getPressHistory(), mState.getReleaseHistory());
     }
 
     /**
-     * <p>Gets an axis' position.</p>
+     * <p>Gets the horizontal and vertical motion offsets.</p>
      *
      * @param axis axis.
-     * @return position.
+     * @return motion offsets.
      * @throws NullPointerException if axis is null.
      * @throws IllegalArgumentException if axis' class is not the same as that used by the profile.
      */
-    public Point getAxisPosition(AxisWrapper axis)
+    public Point getMotion(AxisWrapper axis)
     {
         checkNull(axis);
         checkAxisClass(axis);
 
-        final Axis vertical = axis.getVertical();
-        final int ord = vertical.ordinal();
-        final PadEvent<AxisWrapper> event = mState.mAxes.get(0, ord);
-        final Point pt = new Point();
+        final Axis vertical = axis.vertical();
+        final PadEvent event = mState.mMotions.get(0, vertical.ordinal());
+        final Point motion = new Point();
 
-        // Use resting values when no event
         if (event != null) {
-            pt.setX(event.getHorizontal());
-            pt.setY(event.getVertical());
+            motion.setX(event.getHorizontal());
+            motion.setY(event.getVertical());
 
         } else {
-            final Axis horizontal = axis.getHorizontal();
-            pt.setX((horizontal == null) ? 0f : mResting.get(horizontal));
-            pt.setY(mResting.get(vertical));
+            // Use resting values when no event
+            final Axis horizontal = axis.horizontal();
+            motion.setX((horizontal == null) ? 0f : mResting.get(horizontal));
+            motion.setY(mResting.get(vertical));
         }
 
-        return pt;
+        return motion;
     }
 
     /**
-     * <p>Checks if the axis' position is within its dead zone.</p>
+     * <p>Checks if the axis' offset position is within its dead zone.</p>
      *
      * @param axis axis.
      * @return true if within dead zone.
@@ -286,11 +324,15 @@ public final class Gamepad implements EventSilenceable
         checkNull(axis);
         checkAxisClass(axis);
 
-        return mState.mZones.get(0, axis.getVertical().ordinal());
+        final int vertical = axis.vertical().ordinal();
+        final Boolean inside = mState.getDeadZoneHistory().get(0, vertical);
+
+        // Explicit unboxing necessary to avoid NPE
+        return inside != null && inside.booleanValue();
     }
 
     /**
-     * <p>Checks if the given position is inside the specified axis' dead zone.</p>
+     * <p>Checks if the given offset position is inside an axis' dead zone.</p>
      *
      * @param axis axis.
      * @param x x.
@@ -304,12 +346,25 @@ public final class Gamepad implements EventSilenceable
         checkNull(axis);
         checkAxisClass(axis);
 
-        final float xSqr = x * x;
-        final float ySqr = y * y;
-        final double radius = mDeadZones.get(axis.getVertical());
+        final double radius = mDeadZones.get(axis.vertical());
 
-        // Dead zone does not apply to triggers
-        return axis.getHorizontal() != null && xSqr + ySqr <= radius * radius;
+        return (x * x) + (y * y) <= radius * radius;
+    }
+
+    /**
+     * <p>Gets an axis' dead zone radius.</p>
+     *
+     * @param axis axis.
+     * @return dead zone radius.
+     * @throws NullPointerException if axis is null.
+     * @throws IllegalArgumentException if axis' class is not the same as that used by the profile.
+     */
+    public double getDeadZone(AxisWrapper axis)
+    {
+        checkNull(axis);
+        checkAxisClass(axis);
+
+        return mDeadZones.get(axis.vertical());
     }
 
     /**
@@ -326,18 +381,16 @@ public final class Gamepad implements EventSilenceable
         checkNull(axis);
         checkAxisClass(axis);
 
-        if (axis.getClass() != mProfile.getAxisClass()) {
-            throw new IllegalArgumentException("Constant class doesn't match profile's expected axis class");
-        }
         if (radius < 0d) {
-            throw new IllegalArgumentException("Dead zone must be >= 0 and <= 1, actual: " + radius);
+            final String format = "Dead zone radius must be >= 0 and <= 1, actual: %f";
+            throw new IllegalArgumentException(String.format(format, radius));
         }
 
-        mDeadZones.put(axis.getVertical(), radius);
+        mDeadZones.put(axis.vertical(), radius);
     }
 
     /**
-     * <p>Gets the {@code PadProfile}.</p>
+     * <p>Gets the profile describing the the gamepad's configuration.</p>
      *
      * @return profile.
      */
@@ -347,7 +400,7 @@ public final class Gamepad implements EventSilenceable
     }
 
     /**
-     * <p>Gets the {@code Connection}.</p>
+     * <p>Gets the gamepad's identifier.</p>
      *
      * @return connection.
      */
@@ -357,7 +410,7 @@ public final class Gamepad implements EventSilenceable
     }
 
     /**
-     * <p>Checks if the {@code Gamepad} is connected.</p>
+     * <p>Checks if the gamepad is connected.</p>
      *
      * @return true if connected.
      */
@@ -390,11 +443,23 @@ public final class Gamepad implements EventSilenceable
         throw new CloneNotSupportedException();
     }
 
+    /**
+     * <p>Throws an {@code IllegalArgumentException} if the given wrapper's class name does not match that which the
+     * profile expects.</p>
+     *
+     * @param axis axis.
+     * @throws NullPointerException if axis is null.
+     * @throws IllegalArgumentException if axis class does not match the profile.
+     */
     private void checkAxisClass(AxisWrapper axis)
     {
         if (axis.getClass() != mProfile.getAxisClass()) {
-            throw new IllegalArgumentException("Constant class does not match profile's axis class, expected: " +
-                    mProfile.getAxisClass().getSimpleName() + ", actual: " + axis.getClass().getSimpleName());
+
+            final String format = "Constant class does not match profile's axis class, expected: %s, actual: %s";
+            final String expected = mProfile.getAxisClass().getSimpleName();
+            final String actual = axis.getClass().getSimpleName();
+
+            throw new IllegalArgumentException(String.format(format, expected, actual));
         }
     }
 
@@ -406,58 +471,91 @@ public final class Gamepad implements EventSilenceable
     }
 
     /**
-     * <p>Controls the {@code Gamepad}'s event histories and connection state. Along with the press/release event
-     * histories for buttons, the {@code State} also wraps an axis event history and accompanying history for each
-     * axis' dead zone (if applicable).</p>
+     * <p>{@code Gamepad.State} allows changing the {@code Gamepad}'s connection status and updating its press,
+     * release, and motion events.</p>
      *
-     * <p>{@code Gamepad.State}s are constructed through a guided builder process as follows.</p>
+     * <p>{@code Gamepad.State}s are constructed with a guided builder.</p>
      * <pre>
      *     <code>
-     *         State state = State.builder()
-     *           .pressHistory(presses)
-     *           .releaseHistory(releases)
-     *           .axisHistory(axes)
-     *           .deadZoneHistory(zones)
-     *           .build();
+     *         Gamepad.State state = Gamepad.State.builder()
+     *             .pressHistory(presses)
+     *             .releaseHistory(releases)
+     *             .motionHistory(motions)
+     *             .deadZoneHistory(zones)
+     *             .build();
      *     </code>
      * </pre>
      */
     public static class State
     {
-        private final Table<PadEvent<ButtonWrapper>> mPresses;
-        private final Table<PadEvent<ButtonWrapper>> mReleases;
-        private final Table<PadEvent<AxisWrapper>> mAxes;
-        private final Table<Boolean> mZones;
+        // Press event history
+        private final FixedQueueArray<PadEvent> mPresses;
 
+        // Release event history
+        private final FixedQueueArray<PadEvent> mReleases;
+
+        // Axis motion event history
+        private final FixedQueueArray<PadEvent> mMotions;
+
+        // Dead zone presence history
+        private final FixedQueueArray<Boolean> mZones;
+
+        // True if gamepad state is still valid
         private boolean mConnected = false;
 
-        /**
-         * <p>Constructs a {@code State}.</p>
-         *
-         * @param pressHistory press event history.
-         * @param releaseHistory release event history.
-         * @param axisHistory axis event history.
-         * @param zoneHistory dead zone history.
-         * @throws NullPointerException if either pressHistory, releaseHistory, axisHistory, or zoneHistory is null.
-         */
-        private State(Table<PadEvent<ButtonWrapper>> pressHistory, Table<PadEvent<ButtonWrapper>> releaseHistory,
-                Table<PadEvent<AxisWrapper>> axisHistory, Table<Boolean> zoneHistory)
+        private State(FixedQueueArray<PadEvent> pressHistory, FixedQueueArray<PadEvent> releaseHistory,
+                      FixedQueueArray<PadEvent> axisHistory, FixedQueueArray<Boolean> zoneHistory)
         {
-            checkNull(pressHistory);
-            checkNull(releaseHistory);
-            checkNull(axisHistory);
-            checkNull(zoneHistory);
-
             mPresses = pressHistory;
             mReleases = releaseHistory;
-            mAxes = axisHistory;
+            mMotions = axisHistory;
             mZones = zoneHistory;
+        }
+
+        /**
+         * <p>Gets the editable history for press events.</p>
+         *
+         * @return editable press history.
+         */
+        public FixedQueueArray<PadEvent> getPressHistory()
+        {
+            return mPresses;
+        }
+
+        /**
+         * <p>Gets the editable history for release events.</p>
+         *
+         * @return editable release history.
+         */
+        public FixedQueueArray<PadEvent> getReleaseHistory()
+        {
+            return mReleases;
+        }
+
+        /**
+         * <p>Gets the editable history for motion events.</p>
+         *
+         * @return editable motion history.
+         */
+        public FixedQueueArray<PadEvent> getMotionHistory()
+        {
+            return mMotions;
+        }
+
+        /**
+         * <p>Gets the editable history for dead zone presence.</p>
+         *
+         * @return editable dead zone history.
+         */
+        public FixedQueueArray<Boolean> getDeadZoneHistory()
+        {
+            return mZones;
         }
 
         /**
          * <p>Checks if the {@code Gamepad} is connected.</p>
          *
-         * @return connection status.
+         * @return true if connected.
          */
         public boolean isConnected()
         {
@@ -465,7 +563,7 @@ public final class Gamepad implements EventSilenceable
         }
 
         /**
-         * <p>Sets the connection status as connected.</p>
+         * <p>Sets the connection status.</p>
          *
          * @param connected true if connected.
          */
@@ -475,28 +573,28 @@ public final class Gamepad implements EventSilenceable
         }
 
         /**
-         * <p>Begins the first step for constructing a {@code Gamepad.State}.</p>
+         * <p>Begins the process to build a {@code Gamepad.State}.</p>
          *
          * @return first build step.
          */
         public static PressHistoryStep builder()
         {
-            return new Builder();
+            return new StepBuilder();
         }
 
         /**
          * <p>Guides the creation of a {@code Gamepad.State}.</p>
          */
-        private static class Builder implements PressHistoryStep, ReleaseHistoryStep, AxisHistoryStep,
+        private static class StepBuilder implements PressHistoryStep, ReleaseHistoryStep, MotionHistoryStep,
                 DeadZoneHistoryStep, BuildStep
         {
-            private Table<PadEvent<ButtonWrapper>> mPressHistory;
-            private Table<PadEvent<ButtonWrapper>> mReleaseHistory;
-            private Table<PadEvent<AxisWrapper>> mAxisHistory;
-            private Table<Boolean> mDeadZoneHistory;
+            private FixedQueueArray<PadEvent> mPressHistory;
+            private FixedQueueArray<PadEvent> mReleaseHistory;
+            private FixedQueueArray<PadEvent> mAxisHistory;
+            private FixedQueueArray<Boolean> mDeadZoneHistory;
 
             @Override
-            public ReleaseHistoryStep pressHistory(Table<PadEvent<ButtonWrapper>> history)
+            public ReleaseHistoryStep pressHistory(FixedQueueArray<PadEvent> history)
             {
                 checkNull(history);
 
@@ -505,7 +603,7 @@ public final class Gamepad implements EventSilenceable
             }
 
             @Override
-            public AxisHistoryStep releaseHistory(Table<PadEvent<ButtonWrapper>> history)
+            public MotionHistoryStep releaseHistory(FixedQueueArray<PadEvent> history)
             {
                 checkNull(history);
 
@@ -514,7 +612,7 @@ public final class Gamepad implements EventSilenceable
             }
 
             @Override
-            public DeadZoneHistoryStep axisHistory(Table<PadEvent<AxisWrapper>> history)
+            public DeadZoneHistoryStep motionHistory(FixedQueueArray<PadEvent> history)
             {
                 checkNull(history);
 
@@ -523,7 +621,7 @@ public final class Gamepad implements EventSilenceable
             }
 
             @Override
-            public BuildStep deadZoneHistory(Table<Boolean> history)
+            public BuildStep deadZoneHistory(FixedQueueArray<Boolean> history)
             {
                 checkNull(history);
 
@@ -540,26 +638,59 @@ public final class Gamepad implements EventSilenceable
 
         public interface PressHistoryStep
         {
-            ReleaseHistoryStep pressHistory(Table<PadEvent<ButtonWrapper>> history);
+            /**
+             * <p>Sets the gamepad's button press event history.</p>
+             *
+             * @param history press history.
+             * @return next step.
+             * @throws NullPointerException if history is null.
+             */
+            ReleaseHistoryStep pressHistory(FixedQueueArray<PadEvent> history);
         }
 
         public interface ReleaseHistoryStep
         {
-            AxisHistoryStep releaseHistory(Table<PadEvent<ButtonWrapper>> history);
+            /**
+             * <p>Sets the gamepad's button release event history.</p>
+             *
+             * @param history release history.
+             * @return next step.
+             * @throws NullPointerException if history is null.
+             */
+            MotionHistoryStep releaseHistory(FixedQueueArray<PadEvent> history);
         }
 
-        public interface AxisHistoryStep
+        public interface MotionHistoryStep
         {
-            DeadZoneHistoryStep axisHistory(Table<PadEvent<AxisWrapper>> axisHistory);
+            /**
+             * <p>Sets the gamepad's axis motion history.</p>
+             *
+             * @param history motion history.
+             * @return next step.
+             * @throws NullPointerException if history is null.
+             */
+            DeadZoneHistoryStep motionHistory(FixedQueueArray<PadEvent> history);
         }
 
         public interface DeadZoneHistoryStep
         {
-            BuildStep deadZoneHistory(Table<Boolean> deadZoneHistory);
+            /**
+             * <p>Sets the gamepad's dead zone history.</p>
+             *
+             * @param history dead zone history.
+             * @return next step.
+             * @throws NullPointerException if history is null.
+             */
+            BuildStep deadZoneHistory(FixedQueueArray<Boolean> history);
         }
 
         public interface BuildStep
         {
+            /**
+             * <p>Creates the {@code Gamepad.State}. The state will not be connected.</p>
+             *
+             * @return gamepad state.
+             */
             State build();
         }
     }
@@ -571,26 +702,39 @@ public final class Gamepad implements EventSilenceable
     public interface ButtonWrapper
     {
         /**
-         * <p>Gets the raw button.</p>
+         * <p>Gets the underlying {@code Gamepad.Button}.</p>
          *
-         * @return raw button.
+         * @return button.
          */
-        Button toButton();
+        Button button();
+
+        /**
+         * <p>Checks if the {@code ButtonWrapper} returns the expected kind of values.</p>
+         *
+         * @param wrapper wrapper.
+         * @throws NullPointerException if wrapper is null.
+         * @throws IllegalArgumentException if {@code wrapper.button()} is null.
+         */
+        static void checkWrapper(ButtonWrapper wrapper)
+        {
+            if (wrapper.button() == null) {
+
+                final String format = "%s \"%s\" should return a non-null %s";
+                final String wrapperName = ButtonWrapper.class.getSimpleName();
+                final String actualName = wrapper.getClass().getSimpleName();
+                final String button = Button.class.getSimpleName();
+
+                throw new IllegalArgumentException(String.format(format, wrapperName, actualName, button));
+            }
+        }
     }
 
     /**
      * <p>This interface should be implemented by custom axis enumerations to refer to {@code Gamepad}-specific axes
-     * . {@code getVertical()} should never be null.</p>
+     * . {@code vertical()} should never be null.</p>
      */
     public interface AxisWrapper
     {
-        /**
-         * <p>Gets the vertical axis.</p>
-         *
-         * @return vertical axis.
-         */
-        Axis getVertical();
-
         /**
          * <p>Gets the horizontal axis.</p>
          *
@@ -598,6 +742,33 @@ public final class Gamepad implements EventSilenceable
          *
          * @return horizontal axis, or null if unavailable.
          */
-        Axis getHorizontal();
+        Axis horizontal();
+
+        /**
+         * <p>Gets the vertical axis.</p>
+         *
+         * @return vertical axis.
+         */
+        Axis vertical();
+
+        /**
+         * <p>Checks if the {@code AxisWrapper} returns the expected kind of values.</p>
+         *
+         * @param wrapper wrapper.
+         * @throws NullPointerException if wrapper is null.
+         * @throws IllegalArgumentException if {@code wrapper.vertical()} is null.
+         */
+        static void checkWrapper(AxisWrapper wrapper)
+        {
+            if (wrapper.vertical() == null) {
+
+                final String format = "%s \"%s\" should return a non-null vertical %s";
+                final String wrapperName = AxisWrapper.class.getSimpleName();
+                final String actualName = wrapper.getClass().getSimpleName();
+                final String axis = Axis.class.getSimpleName();
+
+                throw new IllegalArgumentException(String.format(format, wrapperName, actualName, axis));
+            }
+        }
     }
 }
