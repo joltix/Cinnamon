@@ -7,8 +7,8 @@ import cinnamon.engine.utils.Table;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * <p>{@code Keyboard} represents the keyboard input device, providing a view of key states. Updates must be set
- * through the press and release event histories passed to the {@code Keyboard}'s constructor.</p>
+ * <p>An event-based representation of the user's keyboard. Updating the keyboard's state requires updating the
+ * table of events provided during instantiation.</p>
  */
 public final class Keyboard implements EventSilenceable
 {
@@ -17,7 +17,7 @@ public final class Keyboard implements EventSilenceable
      */
     public enum Key implements IntWrapper
     {
-        // Numerical constants (10)
+        // Numerical (10)
         KEY_0 (GLFW.GLFW_KEY_0, "0"),
         KEY_1 (GLFW.GLFW_KEY_1, "1"),
         KEY_2 (GLFW.GLFW_KEY_2, "2"),
@@ -29,7 +29,7 @@ public final class Keyboard implements EventSilenceable
         KEY_8 (GLFW.GLFW_KEY_8, "8"),
         KEY_9 (GLFW.GLFW_KEY_9, "9"),
 
-        // Punctuation constants (11)
+        // Punctuation (11)
         KEY_GRAVE (GLFW.GLFW_KEY_GRAVE_ACCENT, "`"),
         KEY_MINUS (GLFW.GLFW_KEY_MINUS, "-"),
         KEY_EQUAL (GLFW.GLFW_KEY_EQUAL, "="),
@@ -42,90 +42,94 @@ public final class Keyboard implements EventSilenceable
         KEY_PERIOD (GLFW.GLFW_KEY_PERIOD, "."),
         KEY_FORWARD_SLASH (GLFW.GLFW_KEY_SLASH, "/"),
 
-        // Auxiliary constants (20)
-        KEY_ESCAPE (GLFW.GLFW_KEY_ESCAPE, "escape"),
-        KEY_ENTER (GLFW.GLFW_KEY_ENTER, "enter"),
-        KEY_SPACE (GLFW.GLFW_KEY_SPACE, "space"),
-        KEY_BACKSPACE (GLFW.GLFW_KEY_BACKSPACE, "backspace"),
-        KEY_TAB (GLFW.GLFW_KEY_TAB, "tab"),
-        KEY_CAPS_LOCK (GLFW.GLFW_KEY_CAPS_LOCK, "caps lock"),
-        KEY_LEFT_CTRL (GLFW.GLFW_KEY_LEFT_CONTROL, "left_control"),
-        KEY_LEFT_SHIFT (GLFW.GLFW_KEY_LEFT_SHIFT, "left_shift"),
-        KEY_LEFT_ALT (GLFW.GLFW_KEY_LEFT_ALT, "left_alt"),
-        KEY_RIGHT_CTRL (GLFW.GLFW_KEY_RIGHT_CONTROL, "right_control"),
-        KEY_RIGHT_SHIFT (GLFW.GLFW_KEY_RIGHT_SHIFT, "right_shift"),
-        KEY_RIGHT_ALT (GLFW.GLFW_KEY_RIGHT_ALT, "right_alt"),
-        KEY_RIGHT (GLFW.GLFW_KEY_RIGHT, "right"),
-        KEY_DOWN (GLFW.GLFW_KEY_DOWN, "down"),
-        KEY_LEFT (GLFW.GLFW_KEY_LEFT, "left"),
-        KEY_UP (GLFW.GLFW_KEY_UP, "up"),
-        KEY_LEFT_SUPER (GLFW.GLFW_KEY_LEFT_SUPER, "left_super"),
-        KEY_RIGHT_SUPER (GLFW.GLFW_KEY_RIGHT_SUPER, "right_super"),
-        KEY_PAGE_UP (GLFW.GLFW_KEY_PAGE_UP, "page up"),
-        KEY_PAGE_DOWN (GLFW.GLFW_KEY_PAGE_DOWN, "page down"),
+        // Auxiliary (20)
+        KEY_ESCAPE (GLFW.GLFW_KEY_ESCAPE, "ESCAPE"),
+        KEY_ENTER (GLFW.GLFW_KEY_ENTER, "ENTER"),
+        KEY_SPACE (GLFW.GLFW_KEY_SPACE, "SPACE"),
+        KEY_BACKSPACE (GLFW.GLFW_KEY_BACKSPACE, "BACKSPACE"),
+        KEY_TAB (GLFW.GLFW_KEY_TAB, "TAB"),
+        KEY_CAPS_LOCK (GLFW.GLFW_KEY_CAPS_LOCK, "CAPS_LOCK"),
+        KEY_LEFT_CTRL (GLFW.GLFW_KEY_LEFT_CONTROL, "LEFT_CONTROL"),
+        KEY_LEFT_SHIFT (GLFW.GLFW_KEY_LEFT_SHIFT, "LEFT_SHIFT"),
+        KEY_LEFT_ALT (GLFW.GLFW_KEY_LEFT_ALT, "LEFT_ALT"),
+        KEY_RIGHT_CTRL (GLFW.GLFW_KEY_RIGHT_CONTROL, "RIGHT_CONTROL"),
+        KEY_RIGHT_SHIFT (GLFW.GLFW_KEY_RIGHT_SHIFT, "RIGHT_SHIFT"),
+        KEY_RIGHT_ALT (GLFW.GLFW_KEY_RIGHT_ALT, "RIGHT_ALT"),
+        KEY_RIGHT (GLFW.GLFW_KEY_RIGHT, "RIGHT"),
+        KEY_DOWN (GLFW.GLFW_KEY_DOWN, "DOWN"),
+        KEY_LEFT (GLFW.GLFW_KEY_LEFT, "LEFT"),
+        KEY_UP (GLFW.GLFW_KEY_UP, "UP"),
+        KEY_LEFT_SUPER (GLFW.GLFW_KEY_LEFT_SUPER, "LEFT_SUPER"),
+        KEY_RIGHT_SUPER (GLFW.GLFW_KEY_RIGHT_SUPER, "RIGHT_SUPER"),
+        KEY_PAGE_UP (GLFW.GLFW_KEY_PAGE_UP, "PAGE_UP"),
+        KEY_PAGE_DOWN (GLFW.GLFW_KEY_PAGE_DOWN, "PAGE_DOWN"),
 
-        // Function constants (12)
-        KEY_F1 (GLFW.GLFW_KEY_F1, "f1"),
-        KEY_F2 (GLFW.GLFW_KEY_F2, "f2"),
-        KEY_F3 (GLFW.GLFW_KEY_F3, "f3"),
-        KEY_F4 (GLFW.GLFW_KEY_F4, "f4"),
-        KEY_F5 (GLFW.GLFW_KEY_F5, "f5"),
-        KEY_F6 (GLFW.GLFW_KEY_F6, "f6"),
-        KEY_F7 (GLFW.GLFW_KEY_F7, "f7"),
-        KEY_F8 (GLFW.GLFW_KEY_F8, "f8"),
-        KEY_F9 (GLFW.GLFW_KEY_F9, "f9"),
-        KEY_F10 (GLFW.GLFW_KEY_F10, "f10"),
-        KEY_F11 (GLFW.GLFW_KEY_F11, "f11"),
-        KEY_F12 (GLFW.GLFW_KEY_F12, "f12"),
+        // Function (12)
+        KEY_F1 (GLFW.GLFW_KEY_F1, "F1"),
+        KEY_F2 (GLFW.GLFW_KEY_F2, "F2"),
+        KEY_F3 (GLFW.GLFW_KEY_F3, "F3"),
+        KEY_F4 (GLFW.GLFW_KEY_F4, "F4"),
+        KEY_F5 (GLFW.GLFW_KEY_F5, "F5"),
+        KEY_F6 (GLFW.GLFW_KEY_F6, "F6"),
+        KEY_F7 (GLFW.GLFW_KEY_F7, "F7"),
+        KEY_F8 (GLFW.GLFW_KEY_F8, "F8"),
+        KEY_F9 (GLFW.GLFW_KEY_F9, "F9"),
+        KEY_F10 (GLFW.GLFW_KEY_F10, "F10"),
+        KEY_F11 (GLFW.GLFW_KEY_F11, "F11"),
+        KEY_F12 (GLFW.GLFW_KEY_F12, "F12"),
 
-        // English alphabet constants (26)
-        KEY_A (GLFW.GLFW_KEY_A, "a"),
-        KEY_B (GLFW.GLFW_KEY_B, "b"),
-        KEY_C (GLFW.GLFW_KEY_C, "c"),
-        KEY_D (GLFW.GLFW_KEY_D, "d"),
-        KEY_E (GLFW.GLFW_KEY_E, "e"),
-        KEY_F (GLFW.GLFW_KEY_F, "f"),
-        KEY_G (GLFW.GLFW_KEY_G, "g"),
-        KEY_H (GLFW.GLFW_KEY_H, "h"),
-        KEY_I (GLFW.GLFW_KEY_I, "i"),
-        KEY_J (GLFW.GLFW_KEY_J, "j"),
-        KEY_K (GLFW.GLFW_KEY_K, "k"),
-        KEY_L (GLFW.GLFW_KEY_L, "l"),
-        KEY_M (GLFW.GLFW_KEY_M, "m"),
-        KEY_N (GLFW.GLFW_KEY_N, "n"),
-        KEY_O (GLFW.GLFW_KEY_O, "o"),
-        KEY_P (GLFW.GLFW_KEY_P, "p"),
-        KEY_Q (GLFW.GLFW_KEY_Q, "q"),
-        KEY_R (GLFW.GLFW_KEY_R, "r"),
-        KEY_S (GLFW.GLFW_KEY_S, "s"),
-        KEY_T (GLFW.GLFW_KEY_T, "t"),
-        KEY_U (GLFW.GLFW_KEY_U, "u"),
-        KEY_V (GLFW.GLFW_KEY_V, "v"),
-        KEY_W (GLFW.GLFW_KEY_W, "w"),
-        KEY_X (GLFW.GLFW_KEY_X, "x"),
-        KEY_Y (GLFW.GLFW_KEY_Y, "y"),
-        KEY_Z (GLFW.GLFW_KEY_Z, "z");
+        // English alphabet (26)
+        KEY_A (GLFW.GLFW_KEY_A, "A"),
+        KEY_B (GLFW.GLFW_KEY_B, "B"),
+        KEY_C (GLFW.GLFW_KEY_C, "C"),
+        KEY_D (GLFW.GLFW_KEY_D, "D"),
+        KEY_E (GLFW.GLFW_KEY_E, "E"),
+        KEY_F (GLFW.GLFW_KEY_F, "F"),
+        KEY_G (GLFW.GLFW_KEY_G, "G"),
+        KEY_H (GLFW.GLFW_KEY_H, "H"),
+        KEY_I (GLFW.GLFW_KEY_I, "I"),
+        KEY_J (GLFW.GLFW_KEY_J, "J"),
+        KEY_K (GLFW.GLFW_KEY_K, "K"),
+        KEY_L (GLFW.GLFW_KEY_L, "L"),
+        KEY_M (GLFW.GLFW_KEY_M, "M"),
+        KEY_N (GLFW.GLFW_KEY_N, "N"),
+        KEY_O (GLFW.GLFW_KEY_O, "O"),
+        KEY_P (GLFW.GLFW_KEY_P, "P"),
+        KEY_Q (GLFW.GLFW_KEY_Q, "Q"),
+        KEY_R (GLFW.GLFW_KEY_R, "R"),
+        KEY_S (GLFW.GLFW_KEY_S, "S"),
+        KEY_T (GLFW.GLFW_KEY_T, "T"),
+        KEY_U (GLFW.GLFW_KEY_U, "U"),
+        KEY_V (GLFW.GLFW_KEY_V, "V"),
+        KEY_W (GLFW.GLFW_KEY_W, "W"),
+        KEY_X (GLFW.GLFW_KEY_X, "X"),
+        KEY_Y (GLFW.GLFW_KEY_Y, "Y"),
+        KEY_Z (GLFW.GLFW_KEY_Z, "Z");
 
         /**
-         * <p>Key count.</p>
+         * <p>Number of keys.</p>
          */
         public static final int COUNT = Key.values().length;
 
+        // Mapping between keys and lower level constants
         private static final IntMap<Key> MAPPING = new PackedEnumIntMap<>(Key.class);
 
-        private final int mGLFW;
+        // Lower level constant
+        private final int mConstant;
+
+        // Text representation
         private final String mString;
 
-        Key(int glfw, String string)
+        Key(int constant, String string)
         {
-            mGLFW = glfw;
+            mConstant = constant;
             mString = string;
         }
 
         @Override
         public int toInt()
         {
-            return mGLFW;
+            return mConstant;
         }
 
         @Override
@@ -135,58 +139,54 @@ public final class Keyboard implements EventSilenceable
         }
 
         /**
-         * <p>Gets the {@code Key} equivalent of a GLFW keyboard key constant.</p>
+         * <p>Gets the {@code Key} equivalent of a lower level constant.</p>
          *
-         * @param glfw GLFW key.
-         * @return key, or null if unrecognized.
+         * @param constant lower level constant.
+         * @return key or null if unrecognized.
          */
-        public static Key from(int glfw)
+        public static Key from(int constant)
         {
-            return MAPPING.get(glfw);
+            return MAPPING.get(constant);
         }
     }
 
-    private static final PressCondition<KeyEvent> mPressCondition = new PressCondition<>();
-
+    // Press event history
     private final Table<KeyEvent> mPresses;
+
+    // Release event history
     private final Table<KeyEvent> mReleases;
 
+    // True if events should be ignored
     private boolean mMuted;
 
     /**
-     * <p>Constructs a {@code Keyboard} with a {@code ButtonHistory} as its state.</p>
+     * <p>Constructs a {@code Keyboard} around event histories for press and releases.</p>
      *
-     * @param pressHistory press events.
-     * @param releaseHistory release events
-     * @throws NullPointerException if history is null.
+     * @param pressHistory press event history.
+     * @param releaseHistory release event history.
+     * @throws NullPointerException if pressHistory or releaseHistory is null.
      */
     public Keyboard(Table<KeyEvent> pressHistory, Table<KeyEvent> releaseHistory)
     {
-        if (pressHistory == null) {
-            throw new NullPointerException();
-        }
-        if (releaseHistory == null) {
-            throw new NullPointerException();
-        }
+        checkNull(pressHistory);
+        checkNull(releaseHistory);
 
         mPresses = pressHistory;
         mReleases = releaseHistory;
     }
 
     /**
-     * <p>Checks if the last event for the given key is a press.</p>
+     * <p>Checks if the most recent event for a key is a press.</p>
      *
      * @param key key.
-     * @return {@inheritDoc}
+     * @return true if pressed.
      * @throws NullPointerException if key is null.
      */
     public boolean isPressed(Key key)
     {
-        if (key == null) {
-            throw new NullPointerException();
-        }
+        checkNull(key);
 
-        return mPressCondition.isPressed(key, mPresses, mReleases);
+        return PressChecker.isPressed(key, mPresses, mReleases);
     }
 
     @Override
@@ -205,5 +205,18 @@ public final class Keyboard implements EventSilenceable
     public void unmute()
     {
         mMuted = false;
+    }
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException
+    {
+        throw new CloneNotSupportedException();
+    }
+
+    private void checkNull(Object object)
+    {
+        if (object == null) {
+            throw new NullPointerException();
+        }
     }
 }
