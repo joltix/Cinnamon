@@ -2,9 +2,8 @@ package cinnamon.engine.event;
 
 import cinnamon.engine.event.Keyboard.Key;
 import cinnamon.engine.event.Mouse.Button;
-import cinnamon.engine.event.Mouse.State;
 import cinnamon.engine.utils.FixedQueueArray;
-import cinnamon.engine.utils.Position;
+import cinnamon.engine.utils.Point;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -12,34 +11,24 @@ import org.junit.Test;
 
 public class MouseTest
 {
+    // Number of events to track per button
     private static final int HISTORY_LENGTH = 2;
 
-    // Misc location for position testing
-    private static final float POSITION_X = 4f;
-    private static final float POSITION_Y = 2f;
-
-    private Mouse mMouse;
+    // Write access to mouse' position and event histories
     private Mouse.State mState;
 
-    private FixedQueueArray<MouseEvent> mPressHistory;
-    private FixedQueueArray<MouseEvent> mReleaseHistory;
+    private Mouse mMouse;
 
     @Before
     public void setUp()
     {
-        mPressHistory = new FixedQueueArray<>(Key.COUNT, HISTORY_LENGTH);
-        mReleaseHistory = new FixedQueueArray<>(Key.COUNT, HISTORY_LENGTH);
-
-        mState = new State(mPressHistory, mReleaseHistory);
+        mState = createMouseState();
         mMouse = new Mouse(mState);
     }
 
     @After
     public void tearDown()
     {
-        mPressHistory = null;
-        mReleaseHistory = null;
-
         mState = null;
         mMouse = null;
     }
@@ -53,34 +42,52 @@ public class MouseTest
     @Test
     public void testGetPosition()
     {
-        mState.getPosition().setPosition(POSITION_X, POSITION_Y, 0f);
+        final Point position = new Point(4f, 2f, 0f);
+        mState.getPosition().copy(position);
 
-        final Position pos = mMouse.getPosition();
-        Assert.assertEquals(POSITION_X, pos.getX(), 0f);
-        Assert.assertEquals(POSITION_Y, pos.getY(), 0f);
+        Assert.assertEquals(position, mMouse.getPosition());
+    }
+
+    @Test
+    public void testGetPositionChangesDoNotAffectPosition()
+    {
+        mMouse.getPosition().setPosition(3f, 4f, 3f);
+
+        Assert.assertEquals(new Point(0f, 0f, 0f), mState.getPosition());
     }
 
     @Test
     public void testGetHorizontalScroll()
     {
-        mState.setHorizontalScrollOffset(5f);
+        fakeScroll(1f, 0f);
 
-        Assert.assertEquals(5f, mMouse.getHorizontalScroll(), 0f);
+        Assert.assertEquals(1f, mMouse.getHorizontalScroll(), 0f);
+    }
+
+    @Test
+    public void testGetHorizontalScrollReturnsZeroWithEmptyHistory()
+    {
+        Assert.assertEquals(0f, mMouse.getHorizontalScroll(), 0f);
     }
 
     @Test
     public void testGetVerticalScroll()
     {
-        mState.setVerticalScrollOffset(3f);
+        fakeScroll(0f, 1f);
 
-        Assert.assertEquals(3f, mMouse.getVerticalScroll(), 0f);
+        Assert.assertEquals(1f, mMouse.getVerticalScroll(), 0f);
+    }
+
+    @Test
+    public void testGetVerticalScrollReturnsZeroWithEmptyHistory()
+    {
+        Assert.assertEquals(0f, mMouse.getVerticalScroll(), 0f);
     }
 
     @Test
     public void testIsPressed()
     {
-        final MouseEvent event = MouseEvent.createForButton(Button.MIDDLE, true, POSITION_X, POSITION_Y);
-        mPressHistory.add(Button.MIDDLE.ordinal(), event);
+        fakeButtonAction(Button.MIDDLE, true);
 
         Assert.assertTrue(mMouse.isPressed(Button.MIDDLE));
     }
@@ -88,9 +95,14 @@ public class MouseTest
     @Test
     public void testIsPressedReturnsFalse()
     {
-        final MouseEvent event = MouseEvent.createForButton(Button.MIDDLE, false, POSITION_X, POSITION_Y);
-        mReleaseHistory.add(Button.MIDDLE.ordinal(), event);
+        fakeButtonAction(Button.MIDDLE, false);
 
+        Assert.assertFalse(mMouse.isPressed(Button.MIDDLE));
+    }
+
+    @Test
+    public void testIsPressedReturnsFalseWithEmptyHistory()
+    {
         Assert.assertFalse(mMouse.isPressed(Button.MIDDLE));
     }
 
@@ -98,5 +110,77 @@ public class MouseTest
     public void testIsPressedNPE()
     {
         mMouse.isPressed(null);
+    }
+
+    @Test
+    public void testIsMutedReturnsFalse()
+    {
+        Assert.assertFalse(mMouse.isMuted());
+    }
+
+    @Test
+    public void testIsMutedReturnsTrueAfterMute()
+    {
+        mMouse.mute();
+
+        Assert.assertTrue(mMouse.isMuted());
+    }
+
+    @Test
+    public void testIsMutedReturnsFalseAfterUnmute()
+    {
+        mMouse.unmute();
+
+        Assert.assertFalse(mMouse.isMuted());
+    }
+
+    /**
+     * <p>Creates a {@code Mouse.State} with empty event histories. The position will be (0,0).</p>
+     *
+     * @return mouse's state.
+     */
+    private Mouse.State createMouseState()
+    {
+        final int count = Key.COUNT;
+        final int length = HISTORY_LENGTH;
+        final FixedQueueArray<MouseEvent> presses = new FixedQueueArray<>(count, length);
+        final FixedQueueArray<MouseEvent> releases = new FixedQueueArray<>(count, length);
+        final FixedQueueArray<MouseEvent> scrolls = new FixedQueueArray<>(count, length);
+
+        return Mouse.State.builder()
+                .pressHistory(presses)
+                .releaseHistory(releases)
+                .scrollHistory(scrolls)
+                .position(new Point())
+                .build();
+    }
+
+    /**
+     * <p>Writes a button event to the mouse' history. The event will have a timestamp of 0.</p>
+     *
+     * @param button button.
+     * @param press true if pressed.
+     */
+    private void fakeButtonAction(Button button, boolean press)
+    {
+        final MouseEvent action = new MouseEvent(0L, new Point(), button, press);
+
+        final FixedQueueArray<MouseEvent> history;
+        history = (press) ? mState.getPressHistory() : mState.getReleaseHistory();
+        history.add(button.ordinal(), action);
+    }
+
+    /**
+     * <p>Writes a scroll event to the mouse' history. The event's button will be {@code Mouse.Button.MIDDLE} and the
+     * timestamp will be 0.</p>
+     *
+     * @param horizontal horizontal scroll offset.
+     * @param vertical vertical scroll offset.
+     */
+    private void fakeScroll(float horizontal, float vertical)
+    {
+        final Point offsets = new Point(horizontal, vertical, 0f);
+
+        mState.getScrollHistory().add(0, new MouseEvent(0L, new Point(), offsets));
     }
 }
