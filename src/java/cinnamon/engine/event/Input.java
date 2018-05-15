@@ -6,14 +6,14 @@ import cinnamon.engine.utils.Table;
 import java.util.Map;
 
 /**
- * <p>This interface serves as an entry-point for {@link InputEvent}s into the input pipeline and provides access to
- * the device states for the keyboard, mouse, and gamepad(s).</p>
+ * <p>This interface serves as an entry-point for {@link InputEvent}s into the input pipeline and provides
+ * read-only access to the device states for the keyboard, mouse, and gamepad(s).</p>
  *
- * <p>While it is up to implementations to decide how to harvest input, implementations are presumed to consume input
- * internally and on their own. External sources, such as for artificial input, can explicitly provide events through
- * {@code submit(KeyEvent)} and its variations.</p><br>
+ * <p>It is up to implementations to decide how to harvest input. However, for user intervention, artificial input
+ * can be explicitly provided through {@code submit(KeyEvent)} and its variations. Introducing events in this manner
+ * ignore device mute status as this action is essentially an override.</p>
  *
- * <b>Gamepad availability</b>
+ * <h3>Gamepad availability</h3>
  * <p>While the {@link Keyboard} and {@link Mouse} instances are always available through {@code getKeyboard()} and
  * {@code getMouse()}, gamepads can be unavailable. Aside from an unconnected controller, the following conditions
  * affect availability:</p>
@@ -27,10 +27,10 @@ import java.util.Map;
  * is then discarded. The instance's state is no longer updated and a new instance must be retrieved through
  * {@code getGamepad(Connection)} (assuming a gamepad has connected to take its place).</p><br>
  *
- * <b>Gamepad configuration</b>
+ * <h3>Gamepad configuration</h3>
  * <p>A {@code PadProfile} must have already been added through {@code addGamepadProfile(PadProfile)} for a
  * {@code Gamepad} instance to be created and configured. If a gamepad connects to the machine with a device name
- * that does not match that of an added {@code PadProfile}, the connection is ignored.</p><br>
+ * that does not match that of an added profile, the connection is ignored.</p><br>
  */
 public interface Input
 {
@@ -38,7 +38,7 @@ public interface Input
      * <p>Submits a {@code KeyEvent} to the input pipeline.</p>
      *
      * <p>This method is meant to allow the introduction of artificial input, i.e. input not actually coming from the
-     * keyboard.</p>
+     * keyboard. The event will be processed even if {@link Keyboard#isMuted()} returns {@code true}.</p>
      *
      * @param event event.
      * @throws NullPointerException if event is null.
@@ -49,7 +49,7 @@ public interface Input
      * <p>Submits a {@code MouseEvent} to the input pipeline.</p>
      *
      * <p>This method is meant to allow the introduction of artificial input, i.e. input not actually coming from the
-     * mouse.</p>
+     * mouse. The event will be processed even if {@link Mouse#isMuted()} returns {@code true}</p>
      *
      * @param event event.
      * @throws NullPointerException if event is null.
@@ -60,11 +60,8 @@ public interface Input
      * <p>Submits a {@code PadEvent} to the input pipeline.</p>
      *
      * <p>This method is meant to allow the introduction of artificial input, i.e. input not actually coming from a
-     * gamepad.</p>
-     *
-     * <p>{@code PadEvent} type parameter must have either {@code ButtonWrapper} or {@code AxisWrapper} as the type
-     * argument, whichever is appropriate for the event. If the corresponding source {@code Gamepad} is not
-     * available, this method does nothing.</p>
+     * gamepad. The event will be processed even if {@link Gamepad#isMuted()} returns {@code true}. If the
+     * corresponding source {@code Gamepad} is not available, this method does nothing.</p>
      *
      * @param event event.
      * @throws NullPointerException if event is null.
@@ -102,7 +99,7 @@ public interface Input
     Map<Connection, Gamepad> getGamepads();
 
     /**
-     * <p>Adds a {@code PadProfile} for configuring connecting gamepads.</p>
+     * <p>Adds a profile for configuring connecting gamepads.</p>
      *
      * <p>Changes made to a profile after being added are not reflected in gamepad configurations. If a change must
      * be made, a new profile should be created.</p>
@@ -192,10 +189,10 @@ public interface Input
         /**
          * <p>Gets a gamepad's axis-type event history.</p>
          *
-         * @return axis history, or null if there is no available gamepad for the connection.
+         * @return motion history, or null if there is no available gamepad for the connection.
          * @param connection connection.
          * @throws NullPointerException if connection is null.
          */
-        Table<PadEvent> getGamepadAxisHistory(Connection connection);
+        Table<PadEvent> getGamepadMotionHistory(Connection connection);
     }
 }
