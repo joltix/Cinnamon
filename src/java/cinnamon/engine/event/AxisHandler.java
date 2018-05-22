@@ -41,7 +41,7 @@ abstract class AxisHandler<
                                        Enum constant,
                                        Executable<EventType, AxisPreferences, AxisCondition> exe)
     {
-        return condition.validate(mHistory, constant, exe.getPreferences());
+        return condition.validate(this, constant, exe.getPreferences());
     }
 
     @Override
