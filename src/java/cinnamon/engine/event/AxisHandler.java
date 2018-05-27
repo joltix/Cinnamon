@@ -15,7 +15,7 @@ abstract class AxisHandler<
         ExternalType extends Enum<ExternalType>,
         InternalType extends Enum<InternalType>,
         EventType extends InputEvent & AxisEvent
-        > extends MappingsHandler<ExternalType, InternalType, EventType, AxisPreferences, AxisCondition>
+        > extends MappingsHandler<ExternalType, InternalType, EventType, MotionPreferences, AxisCondition>
 {
     private final Table<EventType> mHistory;
 
@@ -39,13 +39,13 @@ abstract class AxisHandler<
     @Override
     protected final boolean isReadyToExecute(AxisCondition condition,
                                        Enum constant,
-                                       Executable<EventType, AxisPreferences, AxisCondition> exe)
+                                       Executable<EventType, MotionPreferences, AxisCondition> exe)
     {
         return condition.validate(this, constant, exe.getPreferences());
     }
 
     @Override
-    protected final AxisCondition selectConditionFrom(AxisPreferences preferences)
+    protected final AxisCondition selectConditionFrom(MotionPreferences preferences)
     {
         assert (preferences != null);
 

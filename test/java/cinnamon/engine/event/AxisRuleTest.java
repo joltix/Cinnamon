@@ -8,7 +8,7 @@ public class AxisRuleTest
 {
     private static final EventListener<PadEvent> LISTENER = (event) -> {};
 
-    private static final AxisPreferences PREFS = AxisPreferences.forMotion(0);
+    private static final MotionPreferences PREFS = MotionPreferences.forTranslation(0);
 
     private static final Stick AXIS_A = XB1.Stick.RIGHT_TRIGGER;
     private static final Stick AXIS_B = XB1.Stick.LEFT_TRIGGER;

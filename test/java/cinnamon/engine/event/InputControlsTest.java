@@ -174,7 +174,7 @@ public class InputControlsTest
     public void testGetMouseScrollsReturnsPreviouslySet()
     {
         final HashMap<String, AxisRule<Button, MouseEvent>> b = new HashMap<>();
-        b.put(RULE_NAME, new AxisRule<>(Button.MIDDLE, (event) -> {}, AxisPreferences.forMotion(0)));
+        b.put(RULE_NAME, new AxisRule<>(Button.MIDDLE, (event) -> {}, MotionPreferences.forTranslation(0)));
 
         mCtrl.setMouseScrolls(b);
 
@@ -197,7 +197,7 @@ public class InputControlsTest
     public void testSetMouseScrollsIAERuleDoesNotUseMiddleButton()
     {
         final HashMap<String, AxisRule<Button, MouseEvent>> b = new HashMap<>();
-        b.put(RULE_NAME, new AxisRule<>(Button.LEFT, (event) -> {}, AxisPreferences.forMotion(0)));
+        b.put(RULE_NAME, new AxisRule<>(Button.LEFT, (event) -> {}, MotionPreferences.forTranslation(0)));
 
         mCtrl.setMouseScrolls(b);
     }
@@ -323,7 +323,7 @@ public class InputControlsTest
         mockGamepadConnected(CONNECTION);
 
         final Map<String, AxisRule<Stick, PadEvent>> b = new HashMap<>();
-        b.put(RULE_NAME, new AxisRule<>(Stick.RIGHT_TRIGGER, (event) -> {}, AxisPreferences.forMotion(100)));
+        b.put(RULE_NAME, new AxisRule<>(Stick.RIGHT_TRIGGER, (event) -> {}, MotionPreferences.forTranslation(100)));
 
         mCtrl.setGamepadAxes(CONNECTION, b);
 
@@ -475,7 +475,7 @@ public class InputControlsTest
     private Map<String, AxisRule<Stick, PadEvent>> createXboxAxisMap()
     {
         final Map<String, AxisRule<Stick, PadEvent>> b = new HashMap<>();
-        b.put(RULE_NAME, new AxisRule<>(Stick.RIGHT_TRIGGER, (event) -> {}, AxisPreferences.forMotion(100)));
+        b.put(RULE_NAME, new AxisRule<>(Stick.RIGHT_TRIGGER, (event) -> {}, MotionPreferences.forTranslation(100)));
         return b;
     }
 

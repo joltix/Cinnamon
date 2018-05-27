@@ -6,19 +6,19 @@ import java.util.List;
 
 /**
  * <p>Set of instructions to be executed in reaction to an axis. Each {@code AxisRule} consists of an
- * {@link EventListener} to execute, {@link AxisPreferences} to specify its requirements and details, and the
+ * {@link EventListener} to execute, {@link MotionPreferences} to specify its requirements and details, and the
  * constants for which the reaction belongs. A {@code AxisRule}'s components cannot be changed.</p>
  *
  * @param <K> constant type owning the reaction.
  * @param <T> event type to react to.
  */
-public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements InputRule<K, T, AxisPreferences>
+public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements InputRule<K, T, MotionPreferences>
 {
     // Actual reaction
     private final EventListener<T> mListener;
 
     // Requirements
-    private final AxisPreferences mPrefs;
+    private final MotionPreferences mPrefs;
 
     // Constant
     private final K mAxis;
@@ -33,7 +33,7 @@ public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements 
      * @param preferences preferences.
      * @throws NullPointerException if axis, listener, or preferences is null.
      */
-    public AxisRule(K axis, EventListener<T> listener, AxisPreferences preferences)
+    public AxisRule(K axis, EventListener<T> listener, MotionPreferences preferences)
     {
         checkNull(axis);
         checkNull(listener);
@@ -61,7 +61,7 @@ public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements 
     }
 
     @Override
-    public AxisPreferences getPreferences()
+    public MotionPreferences getPreferences()
     {
         return mPrefs;
     }

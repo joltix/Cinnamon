@@ -190,7 +190,7 @@ abstract class MappingsHandler<
      * <p>Container for a set of instructions' mapping to an event and set of required constants.</p>
      *
      * @param <EventType> triggering event.
-     * @param <PreferencesType>  either {@link ButtonPreferences} or {@link AxisPreferences}.
+     * @param <PreferencesType>  either {@link ButtonPreferences} or {@link MotionPreferences}.
      * @param <ConditionType> either {@link ButtonCondition} or {@link AxisCondition}.
      */
     static class Executable<EventType extends InputEvent, PreferencesType extends Preferences, ConditionType>
