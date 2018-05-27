@@ -1,5 +1,6 @@
 package cinnamon.engine.event;
 
+import cinnamon.engine.event.MotionPreferences.Axis;
 import cinnamon.engine.event.Mouse.Button;
 import cinnamon.engine.utils.FixedQueueArray;
 import cinnamon.engine.utils.Point;
@@ -14,15 +15,21 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * <p>Mouse scrolling is front-and-center in this class' tests but gamepad axes are also handled in the same manner.
- * The following kinds of {@link AxisPreferences} are tested.</p>
+ * The following kinds of {@link MotionPreferences} are tested.</p>
  * <ul>
- *     <li>Any motion</li>
- *     <li>Horizontal only</li>
- *     <li>Vertical only</li>
- *     <li>Positive horizontal</li>
- *     <li>Negative horizontal</li>
- *     <li>Positive vertical</li>
- *     <li>Negative vertical</li>
+ *     <li>any motion</li>
+ *     <li>motion on x only</li>
+ *     <li>motion on y only</li>
+ *     <li>positive x axis</li>
+ *     <li>negative x axis</li>
+ *     <li>positive y axis</li>
+ *     <li>negative y axis</li>
+ *     <li>towards resting position</li>
+ *     <li>away from resting position</li>
+ *     <li>towards resting position on x only</li>
+ *     <li>away from resting position on x only</li>
+ *     <li>towards resting position on y only</li>
+ *     <li>away from resting position on y only</li>
  * </ul>
  */
 public class AxisHandlerTest
@@ -65,22 +72,22 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollFree()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forMotion(0));
+        setTraceMapping(trace, MotionPreferences.forTranslation(0));
 
         // Scroll left
-        fakeHistory(false, false);
+        fakeHistory(false, -1f, false);
         execute();
 
         // Scroll up
-        fakeHistory(true, true);
+        fakeHistory(true, 1f, false);
         execute();
 
         // Scroll right
-        fakeHistory(false, true);
+        fakeHistory(false, 1f, false);
         execute();
 
         // Scroll down
-        fakeHistory(true, false);
+        fakeHistory(true, -1f, false);
         execute();
 
         Assert.assertEquals(new Integer(4), trace.get());
@@ -90,14 +97,14 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollHorizontal()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forHorizontal(0));
+        setTraceMapping(trace, MotionPreferences.forTranslation(0, Axis.X));
 
         // Scroll left
-        fakeHistory(false, false);
+        fakeHistory(false, -1f, false);
         execute();
 
         // Scroll right
-        fakeHistory(false, true);
+        fakeHistory(false, 1f, false);
         execute();
 
         Assert.assertEquals(new Integer(2), trace.get());
@@ -107,14 +114,14 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollHorizontalDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forHorizontal(0));
+        setTraceMapping(trace, MotionPreferences.forTranslation(0, Axis.X));
 
         // Scroll down
-        fakeHistory(true, false);
+        fakeHistory(true, -1f, false);
         execute();
 
         // Scroll up
-        fakeHistory(true, true);
+        fakeHistory(true, 1f, false);
         execute();
 
         Assert.assertEquals(new Integer(0), trace.get());
@@ -124,14 +131,14 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollVertical()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forVertical(0));
+        setTraceMapping(trace, MotionPreferences.forTranslation(0, Axis.Y));
 
         // Scroll down
-        fakeHistory(true, false);
+        fakeHistory(true, -1f, false);
         execute();
 
         // Scroll up
-        fakeHistory(true, true);
+        fakeHistory(true, 1f, false);
         execute();
 
         Assert.assertEquals(new Integer(2), trace.get());
@@ -141,14 +148,14 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollVerticalDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forVertical(0));
+        setTraceMapping(trace, MotionPreferences.forTranslation(0, Axis.Y));
 
         // Scroll left
-        fakeHistory(false, false);
+        fakeHistory(false, -1f, false);
         execute();
 
         // Scroll right
-        fakeHistory(false, true);
+        fakeHistory(false, 1f, false);
         execute();
 
         Assert.assertEquals(new Integer(0), trace.get());
@@ -158,9 +165,9 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollLeft()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forHorizontal(0, false));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.X, false));
 
-        fakeHistory(false, false);
+        fakeHistory(false, -1f, false);
         execute();
 
         Assert.assertEquals(new Integer(1), trace.get());
@@ -170,9 +177,9 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollLeftDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forHorizontal(0, false));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.X, false));
 
-        fakeHistory(false, true);
+        fakeHistory(false, 1f, false);
         execute();
 
         Assert.assertEquals(new Integer(0), trace.get());
@@ -182,9 +189,9 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollUp()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forVertical(0, true));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.Y, true));
 
-        fakeHistory(true, true);
+        fakeHistory(true, 1f, false);
         execute();
 
         Assert.assertEquals(new Integer(1), trace.get());
@@ -194,9 +201,9 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollUpDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forVertical(0, true));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.Y, true));
 
-        fakeHistory(true, false);
+        fakeHistory(true, -1f, false);
         execute();
 
         Assert.assertEquals(new Integer(0), trace.get());
@@ -206,9 +213,9 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollRight()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forHorizontal(0, true));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.X, true));
 
-        fakeHistory(false, true);
+        fakeHistory(false, 1f, false);
         execute();
 
         Assert.assertEquals(new Integer(1), trace.get());
@@ -218,9 +225,9 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollRightDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forHorizontal(0, true));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.X, true));
 
-        fakeHistory(false, false);
+        fakeHistory(false, -1f, false);
         execute();
 
         Assert.assertEquals(new Integer(0), trace.get());
@@ -230,9 +237,9 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollDown()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forVertical(0, false));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.Y, false));
 
-        fakeHistory(true, false);
+        fakeHistory(true, -1f, false);
         execute();
 
         Assert.assertEquals(new Integer(1), trace.get());
@@ -242,9 +249,210 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollDownDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, AxisPreferences.forVertical(0, false));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.Y, false));
 
-        fakeHistory(true, true);
+        fakeHistory(true, 1f, false);
+        execute();
+
+        Assert.assertEquals(new Integer(0), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollAway()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, true));
+
+        fakeHistory(true, -1f, false);
+        execute();
+
+        Assert.assertEquals(new Integer(1), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollAwayDoesNothing()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, true));
+
+        fakeHistory(true, 0f, true);
+        fakeHistory(true, 0f, true);
+        execute();
+
+        Assert.assertEquals(new Integer(0), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollAwayOnX()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.X, true));
+
+        fakeHistory(false, -1f, false);
+        execute();
+
+        Assert.assertEquals(new Integer(1), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollAwayOnXDoesNothing()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.X, true));
+
+        fakeHistory(false, 0f, true);
+        fakeHistory(false, 0f, true);
+        execute();
+
+        Assert.assertEquals(new Integer(0), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollAwayOnY()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.Y, true));
+
+        fakeHistory(true, -1f, false);
+        execute();
+
+        Assert.assertEquals(new Integer(1), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollAwayOnYDoesNothing()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.Y, true));
+
+        fakeHistory(true, 0f, true);
+        fakeHistory(true, 0f, true);
+        execute();
+
+        Assert.assertEquals(new Integer(0), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollTowards()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, false));
+
+        fakeHistory(true, -1f, true);
+        fakeHistory(true, 0f, true);
+        execute();
+
+        Assert.assertEquals(new Integer(1), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollTowardsDoesNothing()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, false));
+
+        fakeHistory(true, 0f, true);
+        fakeHistory(true, 0f, true);
+        execute();
+
+        Assert.assertEquals(new Integer(0), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollTowardsOnX()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.X, false));
+
+        fakeHistory(false, -1f, true);
+        fakeHistory(false, 0f, true);
+        execute();
+
+        Assert.assertEquals(new Integer(1), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollTowardsOnXDoesNothing()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.X, false));
+
+        fakeHistory(true, -1f, true);
+        fakeHistory(true, 0f, true);
+        execute();
+
+        Assert.assertEquals(new Integer(0), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollTowardsOnY()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.Y, false));
+
+        fakeHistory(true, -1f, true);
+        fakeHistory(true, 0f, true);
+        execute();
+
+        Assert.assertEquals(new Integer(1), trace.get());
+    }
+
+    /**
+     * <p>This case does not test events with NO_SCROLL_EVENT prefixed in order to test how {@code PadEvent}s are
+     * handled. Mouse scrolls are a special case where there is typically no scrolling toward a starting position.</p>
+     */
+    @Test
+    public void testExecuteOnEventScrollTowardsOnYDoesNothing()
+    {
+        final AtomicReference<Integer> trace = new AtomicReference<>(0);
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.Y, false));
+
+        fakeHistory(false, 0f, true);
+        fakeHistory(false, -1f, true);
         execute();
 
         Assert.assertEquals(new Integer(0), trace.get());
@@ -265,7 +473,7 @@ public class AxisHandlerTest
      * @param trace trace.
      * @param preferences preferences.
      */
-    private void setTraceMapping(AtomicReference<Integer> trace, AxisPreferences preferences)
+    private void setTraceMapping(AtomicReference<Integer> trace, MotionPreferences preferences)
     {
         final Map<String, AxisRule<Button, MouseEvent>> mapping = new HashMap<>(1);
 
@@ -283,25 +491,28 @@ public class AxisHandlerTest
     /**
      * <p>Inserts scrolling {@code MouseEvent}s into the history.</p>
      *
-     * @param vertical true if scrolling along the y-axis, false for x-axis.
-     * @param rising true to set motion as +1, false for -1.
+     *  @param vertical true if scrolling along the y-axis, false for x-axis.
+     * @param motion motion value.
+     * @param direct false to insert the NO_SCROLL_EVENT prior to the actual event.
      */
-    private void fakeHistory(boolean vertical, boolean rising)
+    private void fakeHistory(boolean vertical, float motion, boolean direct)
     {
-        mHistory.add(MIDDLE_ORD, NO_SCROLL_EVENT);
-
-        final float verticalB;
-        final float horizontalB;
-
-        if (vertical) {
-            verticalB = (rising) ? 1f : -1f;
-            horizontalB = 0f;
-        } else {
-            verticalB = 0f;
-            horizontalB = (rising) ? 1f : -1f;
+        if (!direct) {
+            mHistory.add(MIDDLE_ORD, NO_SCROLL_EVENT);
         }
 
-        final Point offsets = new Point(horizontalB, verticalB, 0f);
+        final float x;
+        final float y;
+
+        if (vertical) {
+            y = motion;
+            x = 0f;
+        } else {
+            y = 0f;
+            x = motion;
+        }
+
+        final Point offsets = new Point(x, y, 0f);
         mHistory.add(MIDDLE_ORD, new MouseEvent(System.nanoTime(), new Point(), offsets));
     }
 }
