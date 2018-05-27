@@ -1116,12 +1116,21 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
                 final Axis horizontal = axis.horizontal();
                 final PadEvent lastEvent = axisHistory.get(0, vertical.ordinal());
 
-                final float v = clampAxis(buffer.get(vertical.toInt()));
-                final float h = (horizontal == null) ? 0f : clampAxis(buffer.get(horizontal.toInt()));
+                final float v;
+                final float h;
+
+                if (horizontal == null) {
+                    // Convert trigger's value from -1/+1 range to 0/+1
+                    v = (buffer.get(vertical.toInt()) + 1f) / 2f;
+                    h = 0f;
+
+                } else {
+                    v = clampAxis(buffer.get(vertical.toInt()));
+                    h = clampAxis(buffer.get(horizontal.toInt()));
+                }
 
                 // Only create event if offsets are different than previous
-                if (lastEvent.getVertical() != v ||
-                        lastEvent.getHorizontal() != h) {
+                if (lastEvent.getVertical() != v || lastEvent.getHorizontal() != h) {
 
                     final float restingY = info.mRestOffsets.get(axis.vertical());
                     final double zone = gamepad.getDeadZone(axis);
@@ -1129,27 +1138,19 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
 
                     // Check if offsets are inside dead zone
                     final boolean inside = isInsideCircle(h, v, zone, restingY);
-                    final boolean previouslyInside = zoneHistory.get(0, ord);
+
+                    // Create event if either not in dead zone or just crossed into it
+                    if (!inside || !zoneHistory.get(0, ord)) {
+
+                        final long time = System.nanoTime();
+                        final Connection connection = gamepad.getConnection();
+                        final Point offsets = new Point(h, v, 0f);
+
+                        mBuffer.add(new PadEvent(time, connection, axis, offsets));
+                    }
 
                     // Cache dead zone presence
                     zoneHistory.add(ord, inside);
-
-                    // Create event if either not in dead zone or just crossed into it
-                    if (!inside || !previouslyInside) {
-
-                        final long time = System.nanoTime();
-                        final Point offsets;
-
-                        // Snap offset to resting position if just entered zone
-                        if (inside) {
-                            offsets = createOffsetsAtRest(info, axis);
-                        } else {
-                            // Offsets are outside zone
-                            offsets = new Point(h, v, 0f);
-                        }
-
-                        mBuffer.add(new PadEvent(time, gamepad.getConnection(), axis, offsets));
-                    }
                 }
             }
         }
