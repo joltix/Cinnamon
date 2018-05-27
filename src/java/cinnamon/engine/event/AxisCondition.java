@@ -1,19 +1,20 @@
 package cinnamon.engine.event;
 
+import cinnamon.engine.event.MotionPreferences.Axis;
 import cinnamon.engine.event.InputEvent.AxisEvent;
 import cinnamon.engine.utils.Table;
 
 /**
- * <p>Offers history checking algorithms for various kinds of axis motion.</p>
+ * <p>Offers value and history checking functions for specific kinds of translation.</p>
  */
 interface AxisCondition
 {
-    AxisCondition ALL_MOTION = (handler, constant, preferences) ->
+    AxisCondition MOTION = (handler, constant, preferences) ->
     {
         return true;
     };
 
-    AxisCondition HORIZONTAL = (handler, constant, preferences) ->
+    AxisCondition MOTION_ON_X = (handler, constant, preferences) ->
     {
         assert (handler != null);
         assert (constant != null);
@@ -28,7 +29,7 @@ interface AxisCondition
         return current.getHorizontal() != past.getHorizontal();
     };
 
-    AxisCondition VERTICAL = (handler, constant, preferences) ->
+    AxisCondition MOTION_ON_Y = (handler, constant, preferences) ->
     {
         assert (handler != null);
         assert (constant != null);
@@ -43,7 +44,59 @@ interface AxisCondition
         return current.getVertical() != past.getVertical();
     };
 
-    AxisCondition RISING_HORIZONTAL = (handler, constant, preferences) ->
+    AxisCondition POSITIVE_ON_X = (handler, constant, preferences) ->
+    {
+        assert (handler != null);
+        assert (constant != null);
+        assert (preferences != null);
+
+        @SuppressWarnings("unchecked")
+        final Table<AxisEvent> history = handler.getHistory();
+        final AxisEvent current = history.get(0, constant.ordinal());
+
+        return current.getHorizontal() >= 0f;
+    };
+
+    AxisCondition NEGATIVE_ON_X = (handler, constant, preferences) ->
+    {
+        assert (handler != null);
+        assert (constant != null);
+        assert (preferences != null);
+
+        @SuppressWarnings("unchecked")
+        final Table<AxisEvent> history = handler.getHistory();
+        final AxisEvent current = history.get(0, constant.ordinal());
+
+        return current.getHorizontal() <= 0f;
+    };
+
+    AxisCondition POSITIVE_ON_Y = (handler, constant, preferences) ->
+    {
+        assert (handler != null);
+        assert (constant != null);
+        assert (preferences != null);
+
+        @SuppressWarnings("unchecked")
+        final Table<AxisEvent> history = handler.getHistory();
+        final AxisEvent current = history.get(0, constant.ordinal());
+
+        return current.getVertical() >= 0f;
+    };
+
+    AxisCondition NEGATIVE_ON_Y = (handler, constant, preferences) ->
+    {
+        assert (handler != null);
+        assert (constant != null);
+        assert (preferences != null);
+
+        @SuppressWarnings("unchecked")
+        final Table<AxisEvent> history = handler.getHistory();
+        final AxisEvent current = history.get(0, constant.ordinal());
+
+        return current.getVertical() <= 0f;
+    };
+
+    AxisCondition INCREASING = (handler, constant, preferences) ->
     {
         assert (handler != null);
         assert (constant != null);
@@ -52,17 +105,22 @@ interface AxisCondition
         @SuppressWarnings("unchecked")
         final Table<AxisEvent> history = handler.getHistory();
         final int ord = constant.ordinal();
+        final AxisEvent previous = history.get(1, ord);
         final AxisEvent current = history.get(0, ord);
-        final AxisEvent past = history.get(1, ord);
 
-        if (preferences.isPositive()) {
-            return current.getHorizontal() > past.getHorizontal();
-        } else {
-            return current.getHorizontal() < past.getHorizontal();
-        }
+        final float previousH = previous.getHorizontal();
+        final float previousV = previous.getVertical();
+        final float currentH = current.getHorizontal();
+        final float currentV = current.getVertical();
+
+        // Compute relative distances
+        final float previousDist = (previousH * previousH) + (previousV * previousV);
+        final float currentDist = (currentH * currentH) + (currentV * currentV);
+
+        return previousDist < currentDist;
     };
 
-    AxisCondition FALLING_HORIZONTAL = (handler, constant, preferences) ->
+    AxisCondition INCREASING_ON_X = (handler, constant, preferences) ->
     {
         assert (handler != null);
         assert (constant != null);
@@ -71,17 +129,17 @@ interface AxisCondition
         @SuppressWarnings("unchecked")
         final Table<AxisEvent> history = handler.getHistory();
         final int ord = constant.ordinal();
+        final AxisEvent previous = history.get(1, ord);
         final AxisEvent current = history.get(0, ord);
-        final AxisEvent past = history.get(1, ord);
 
-        if (preferences.isPositive()) {
-            return current.getHorizontal() > past.getHorizontal();
-        } else {
-            return current.getHorizontal() < past.getHorizontal();
-        }
+        final float previousH = previous.getHorizontal();
+        final float currentH = current.getHorizontal();
+
+        // Compute relative distances
+        return (previousH * previousH) < (currentH * currentH);
     };
 
-    AxisCondition RISING_VERTICAL = (handler, constant, preferences) ->
+    AxisCondition INCREASING_ON_Y = (handler, constant, preferences) ->
     {
         assert (handler != null);
         assert (constant != null);
@@ -90,17 +148,17 @@ interface AxisCondition
         @SuppressWarnings("unchecked")
         final Table<AxisEvent> history = handler.getHistory();
         final int ord = constant.ordinal();
+        final AxisEvent previous = history.get(1, ord);
         final AxisEvent current = history.get(0, ord);
-        final AxisEvent past = history.get(1, ord);
 
-        if (preferences.isPositive()) {
-            return current.getVertical() > past.getVertical();
-        } else {
-            return current.getVertical() < past.getVertical();
-        }
+        final float previousV = previous.getVertical();
+        final float currentV = current.getVertical();
+
+        // Compute relative distances
+        return (previousV * previousV) < (currentV * currentV);
     };
 
-    AxisCondition FALLING_VERTICAL = (handler, constant, preferences) ->
+    AxisCondition DECREASING = (handler, constant, preferences) ->
     {
         assert (handler != null);
         assert (constant != null);
@@ -109,16 +167,59 @@ interface AxisCondition
         @SuppressWarnings("unchecked")
         final Table<AxisEvent> history = handler.getHistory();
         final int ord = constant.ordinal();
+        final AxisEvent previous = history.get(1, ord);
         final AxisEvent current = history.get(0, ord);
-        final AxisEvent past = history.get(1, ord);
 
-        if (preferences.isPositive()) {
-            return current.getVertical() > past.getVertical();
-        } else {
-            return current.getVertical() < past.getVertical();
-        }
+        final float previousH = previous.getHorizontal();
+        final float previousV = previous.getVertical();
+        final float currentH = current.getHorizontal();
+        final float currentV = current.getVertical();
+
+        // Compute relative distances
+        final float previousDist = (previousH * previousH) + (previousV * previousV);
+        final float currentDist = (currentH * currentH) + (currentV * currentV);
+
+        return previousDist > currentDist;
     };
 
+
+    AxisCondition DECREASING_ON_X = (handler, constant, preferences) ->
+    {
+        assert (handler != null);
+        assert (constant != null);
+        assert (preferences != null);
+
+        @SuppressWarnings("unchecked")
+        final Table<AxisEvent> history = handler.getHistory();
+        final int ord = constant.ordinal();
+        final AxisEvent previous = history.get(1, ord);
+        final AxisEvent current = history.get(0, ord);
+
+        final float previousH = previous.getHorizontal();
+        final float currentH = current.getHorizontal();
+
+        // Compute relative distances
+        return (previousH * previousH) > (currentH * currentH);
+    };
+
+    AxisCondition DECREASING_ON_Y = (handler, constant, preferences) ->
+    {
+        assert (handler != null);
+        assert (constant != null);
+        assert (preferences != null);
+
+        @SuppressWarnings("unchecked")
+        final Table<AxisEvent> history = handler.getHistory();
+        final int ord = constant.ordinal();
+        final AxisEvent previous = history.get(1, ord);
+        final AxisEvent current = history.get(0, ord);
+
+        final float previousV = previous.getVertical();
+        final float currentV = current.getVertical();
+
+        // Compute relative distances
+        return (previousV * previousV) > (currentV * currentV);
+    };
 
     /**
      * <p>Checks if the condition has been met.</p>
@@ -128,7 +229,7 @@ interface AxisCondition
      * @param preferences preferences.
      * @return true if the condition is met.
      */
-    boolean validate(AxisHandler handler, Enum constant, AxisPreferences preferences);
+    boolean validate(AxisHandler handler, Enum constant, MotionPreferences preferences);
 
     /**
      * <p>Gets the condition appropriate for the given preferences.</p>
@@ -136,27 +237,40 @@ interface AxisCondition
      * @param preferences preferences.
      * @return condition.
      */
-    static AxisCondition from(AxisPreferences preferences)
+    static AxisCondition from(MotionPreferences preferences)
     {
         assert (preferences != null);
 
+        final Axis[] axes = preferences.getAxes();
         final AxisCondition condition;
-        switch (preferences.getStyle()) {
-            case FREE:
-                condition = ALL_MOTION; break;
 
-            case HORIZONTAL:
-                if (preferences.isDiscriminating()) {
-                    condition = (preferences.isPositive()) ? RISING_HORIZONTAL : FALLING_HORIZONTAL;
+        switch (preferences.getTranslation()) {
+
+            case SPECIFIC_AXIS:
+                if (axes.length == 1) {
+                    condition = (axes[0] == Axis.X) ? MOTION_ON_X : MOTION_ON_Y;
                 } else {
-                    condition = HORIZONTAL;
+                    condition = MOTION;
                 } break;
 
-            case VERTICAL:
-                if (preferences.isDiscriminating()) {
-                    condition = (preferences.isPositive()) ? RISING_VERTICAL : FALLING_VERTICAL;
+            case POSITIVE_SIGN:
+                condition = (axes[0] == Axis.X) ? POSITIVE_ON_X : POSITIVE_ON_Y; break;
+
+            case NEGATIVE_SIGN:
+                condition = (axes[0] == Axis.X) ? NEGATIVE_ON_X : NEGATIVE_ON_Y; break;
+
+            case INCREASING_DISTANCE:
+                if (axes.length == 1) {
+                    condition = (axes[0] == Axis.X) ? INCREASING_ON_X : INCREASING_ON_Y;
                 } else {
-                    condition = VERTICAL;
+                    condition = INCREASING;
+                } break;
+
+            case DECREASING_DISTANCE:
+                if (axes.length == 1) {
+                    condition = (axes[0] == Axis.X) ? DECREASING_ON_X : DECREASING_ON_Y;
+                } else {
+                    condition = DECREASING;
                 } break;
 
             default: condition = null;
