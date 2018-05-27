@@ -3,25 +3,22 @@ package cinnamon.engine.event;
 import java.util.Arrays;
 
 /**
- * <p>Specifies requirements for targeting different axis-related actions. An {@code AxisPreferences}
- * instance describes one of the following kinds of motion.</p>
- *
+ * <p>Describes different motion-based actions. A {@code MotionPreferences} illustrates one of the following.</p>
  * <ul>
- *     <li>motion along certain (or all) axes</li>
- *     <li>motion whose offset has a specified sign along an axis</li>
- *     <li>motion in the direction away from/towards a starting position</li>
+ *     <li>translation along certain (or all) axes</li>
+ *     <li>translation whose value has a specified sign along an axis</li>
+ *     <li>translation in the direction away from/towards a position</li>
  * </ul>
  *
- * <p>{@code AxisPreferences} cannot be changed and are created through static methods.</p>
- *
+ * <p>{@code MotionPreferences} cannot be changed and are created through static methods.</p>
  * <pre>
  *     <code>
- *         // Target motion along the positive half of the x axis
- *         AxisPreferences prefs = AxisPreferences.forSignedTranslation(0, Axis.X, true);
+ *         // Translation along the positive half of the x axis
+ *         MotionPreferences prefs = MotionPreferences.forSignedTranslation(0, Axis.X, true);
  *     </code>
  * </pre>
  */
-public final class AxisPreferences implements Preferences
+public final class MotionPreferences implements Preferences
 {
     public enum Axis
     {
@@ -33,16 +30,35 @@ public final class AxisPreferences implements Preferences
         /**
          * <p>Y axis.</p>
          */
-        Y;
+        Y
     }
 
     public enum Translation
     {
+        /**
+         * <p>Translation along targeted axes.</p>
+         */
         SPECIFIC_AXIS,
+
+        /**
+         * <p>Translation with positive values.</p>
+         */
         POSITIVE_SIGN,
+
+        /**
+         * <p>Translation with negative values.</p>
+         */
         NEGATIVE_SIGN,
+
+        /**
+         * <p>Translation heading away from a position.</p>
+         */
         INCREASING_DISTANCE,
-        DECREASING_DISTANCE;
+
+        /**
+         * <p>Translation heading toward a position.</p>
+         */
+        DECREASING_DISTANCE
     }
 
     private final Axis[] mAxes;
@@ -54,7 +70,7 @@ public final class AxisPreferences implements Preferences
 
     private final int mHash;
 
-    private AxisPreferences(int priority, Axis[] axes, Translation translation)
+    private MotionPreferences(int priority, Axis[] axes, Translation translation)
     {
         mPriority = priority;
         mAxes = axes;
@@ -69,12 +85,24 @@ public final class AxisPreferences implements Preferences
         return mPriority;
     }
 
+    /**
+     * <p>Gets the affected axes</p>
+     *
+     * <p>Changes to the returned array does not change the preferences.</p>
+     *
+     * @return axes.
+     */
     public Axis[] getAxes()
     {
         return Arrays.copyOf(mAxes, mAxes.length);
     }
 
-    public Translation getTarget()
+    /**
+     * <p>Gets the desired translation style.</p>
+     *
+     * @return translation style.
+     */
+    public Translation getTranslation()
     {
         return mTranslation;
     }
@@ -94,11 +122,11 @@ public final class AxisPreferences implements Preferences
             return true;
         }
 
-        final AxisPreferences prefs = (AxisPreferences) obj;
+        final MotionPreferences prefs = (MotionPreferences) obj;
 
         return prefs.getPriority() == getPriority() &&
                 Arrays.equals(prefs.getAxes(), getAxes()) &&
-                prefs.getTarget() == prefs.getTarget();
+                prefs.getTranslation() == prefs.getTranslation();
     }
 
     @Override
@@ -120,9 +148,9 @@ public final class AxisPreferences implements Preferences
      * @param priority priority.
      * @return preferences.
      */
-    public static AxisPreferences forTranslation(int priority)
+    public static MotionPreferences forTranslation(int priority)
     {
-        return new AxisPreferences(priority, new Axis[] {Axis.X, Axis.Y}, Translation.SPECIFIC_AXIS);
+        return new MotionPreferences(priority, new Axis[] {Axis.X, Axis.Y}, Translation.SPECIFIC_AXIS);
     }
 
     /**
@@ -133,11 +161,11 @@ public final class AxisPreferences implements Preferences
      * @return preferences.
      * @throws NullPointerException if axis is null.
      */
-    public static AxisPreferences forTranslation(int priority, Axis axis)
+    public static MotionPreferences forTranslation(int priority, Axis axis)
     {
         checkNull(axis);
 
-        return new AxisPreferences(priority, new Axis[] {axis}, Translation.SPECIFIC_AXIS);
+        return new MotionPreferences(priority, new Axis[] {axis}, Translation.SPECIFIC_AXIS);
     }
 
     /**
@@ -149,32 +177,31 @@ public final class AxisPreferences implements Preferences
      * @return preferences.
      * @throws NullPointerException if axis is null.
      */
-    public static AxisPreferences forSignedTranslation(int priority, Axis axis, boolean positive)
+    public static MotionPreferences forSignedTranslation(int priority, Axis axis, boolean positive)
     {
         checkNull(axis);
 
         final Translation translation = (positive) ? Translation.POSITIVE_SIGN : Translation.NEGATIVE_SIGN;
 
-        return new AxisPreferences(priority, new Axis[] {axis}, translation);
+        return new MotionPreferences(priority, new Axis[] {axis}, translation);
     }
 
     /**
-     * <p>Creates preferences for execution on motion along both the x and y axes directed away from a starting
-     * point.</p>
+     * <p>Creates preferences for execution on motion along both the x and y axes directed away from a point.</p>
      *
      * @param priority priority.
      * @param away true if the desired motion is directed away.
      * @return preferences.
      */
-    public static AxisPreferences forDirectedTranslation(int priority, boolean away)
+    public static MotionPreferences forDirectedTranslation(int priority, boolean away)
     {
         final Translation translation = (away) ? Translation.INCREASING_DISTANCE : Translation.DECREASING_DISTANCE;
 
-        return new AxisPreferences(priority, new Axis[] {Axis.X, Axis.Y}, translation);
+        return new MotionPreferences(priority, new Axis[] {Axis.X, Axis.Y}, translation);
     }
 
     /**
-     * <p>Creates preferences for execution on motion along an axis directed away from a starting point.</p>
+     * <p>Creates preferences for execution on motion along an axis directed away from a point.</p>
      *
      * @param priority priority.
      * @param axis axis.
@@ -182,13 +209,13 @@ public final class AxisPreferences implements Preferences
      * @return preferences.
      * @throws NullPointerException if axis is null.
      */
-    public static AxisPreferences forDirectedTranslation(int priority, Axis axis, boolean away)
+    public static MotionPreferences forDirectedTranslation(int priority, Axis axis, boolean away)
     {
         checkNull(axis);
 
         final Translation translation = (away) ? Translation.INCREASING_DISTANCE : Translation.DECREASING_DISTANCE;
 
-        return new AxisPreferences(priority, new Axis[] {axis}, translation);
+        return new MotionPreferences(priority, new Axis[] {axis}, translation);
     }
 
     private static void checkNull(Object object)
