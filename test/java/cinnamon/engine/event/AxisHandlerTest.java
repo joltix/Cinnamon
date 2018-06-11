@@ -72,7 +72,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollFree()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forTranslation(0));
+        setTraceMapping(trace, MotionPreferences.forTranslation());
 
         // Scroll left
         fakeHistory(false, -1f, false);
@@ -97,7 +97,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollHorizontal()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forTranslation(0, Axis.X));
+        setTraceMapping(trace, MotionPreferences.forTranslation(Axis.X));
 
         // Scroll left
         fakeHistory(false, -1f, false);
@@ -114,7 +114,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollHorizontalDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forTranslation(0, Axis.X));
+        setTraceMapping(trace, MotionPreferences.forTranslation(Axis.X));
 
         // Scroll down
         fakeHistory(true, -1f, false);
@@ -131,7 +131,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollVertical()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forTranslation(0, Axis.Y));
+        setTraceMapping(trace, MotionPreferences.forTranslation(Axis.Y));
 
         // Scroll down
         fakeHistory(true, -1f, false);
@@ -148,7 +148,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollVerticalDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forTranslation(0, Axis.Y));
+        setTraceMapping(trace, MotionPreferences.forTranslation(Axis.Y));
 
         // Scroll left
         fakeHistory(false, -1f, false);
@@ -165,7 +165,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollLeft()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.X, false));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(Axis.X, false));
 
         fakeHistory(false, -1f, false);
         execute();
@@ -177,7 +177,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollLeftDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.X, false));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(Axis.X, false));
 
         fakeHistory(false, 1f, false);
         execute();
@@ -189,7 +189,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollUp()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.Y, true));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(Axis.Y, true));
 
         fakeHistory(true, 1f, false);
         execute();
@@ -201,7 +201,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollUpDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.Y, true));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(Axis.Y, true));
 
         fakeHistory(true, -1f, false);
         execute();
@@ -213,7 +213,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollRight()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.X, true));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(Axis.X, true));
 
         fakeHistory(false, 1f, false);
         execute();
@@ -225,7 +225,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollRightDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.X, true));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(Axis.X, true));
 
         fakeHistory(false, -1f, false);
         execute();
@@ -237,7 +237,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollDown()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.Y, false));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(Axis.Y, false));
 
         fakeHistory(true, -1f, false);
         execute();
@@ -249,7 +249,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollDownDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forSignedTranslation(0, Axis.Y, false));
+        setTraceMapping(trace, MotionPreferences.forSignedTranslation(Axis.Y, false));
 
         fakeHistory(true, 1f, false);
         execute();
@@ -265,7 +265,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollAway()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, true));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(true));
 
         fakeHistory(true, -1f, false);
         execute();
@@ -281,7 +281,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollAwayDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, true));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(true));
 
         fakeHistory(true, 0f, true);
         fakeHistory(true, 0f, true);
@@ -298,7 +298,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollAwayOnX()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.X, true));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(Axis.X, true));
 
         fakeHistory(false, -1f, false);
         execute();
@@ -314,7 +314,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollAwayOnXDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.X, true));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(Axis.X, true));
 
         fakeHistory(false, 0f, true);
         fakeHistory(false, 0f, true);
@@ -331,7 +331,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollAwayOnY()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.Y, true));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(Axis.Y, true));
 
         fakeHistory(true, -1f, false);
         execute();
@@ -347,7 +347,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollAwayOnYDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.Y, true));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(Axis.Y, true));
 
         fakeHistory(true, 0f, true);
         fakeHistory(true, 0f, true);
@@ -364,7 +364,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollTowards()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, false));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(false));
 
         fakeHistory(true, -1f, true);
         fakeHistory(true, 0f, true);
@@ -381,7 +381,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollTowardsDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, false));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(false));
 
         fakeHistory(true, 0f, true);
         fakeHistory(true, 0f, true);
@@ -398,7 +398,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollTowardsOnX()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.X, false));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(Axis.X, false));
 
         fakeHistory(false, -1f, true);
         fakeHistory(false, 0f, true);
@@ -415,7 +415,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollTowardsOnXDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.X, false));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(Axis.X, false));
 
         fakeHistory(true, -1f, true);
         fakeHistory(true, 0f, true);
@@ -432,7 +432,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollTowardsOnY()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.Y, false));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(Axis.Y, false));
 
         fakeHistory(true, -1f, true);
         fakeHistory(true, 0f, true);
@@ -449,7 +449,7 @@ public class AxisHandlerTest
     public void testExecuteOnEventScrollTowardsOnYDoesNothing()
     {
         final AtomicReference<Integer> trace = new AtomicReference<>(0);
-        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(0, Axis.Y, false));
+        setTraceMapping(trace, MotionPreferences.forDirectedTranslation(Axis.Y, false));
 
         fakeHistory(false, 0f, true);
         fakeHistory(false, -1f, true);
@@ -483,7 +483,7 @@ public class AxisHandlerTest
             {
                 return count + 1;
             });
-        }, preferences));
+        }, preferences, 0));
 
         mHandler.setMappings(mapping);
     }

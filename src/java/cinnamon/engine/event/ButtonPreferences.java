@@ -36,7 +36,7 @@ package cinnamon.engine.event;
  * <p><b>note</b> Multi-button double clicks are not expected thus {@code tolerance} for double clicks refer to the
  * time between both clicks' presses.</p>
  */
-public final class ButtonPreferences implements Preferences
+public final class ButtonPreferences
 {
     /**
      * <p>Descriptors for how {@code ButtonPreferences} should be interpreted.</p>
@@ -69,8 +69,6 @@ public final class ButtonPreferences implements Preferences
 
     private final Style mStyle;
 
-    private final int mPriority;
-
     // Time allowed between each target event when multiple events are required
     private final long mTolerance;
 
@@ -79,30 +77,22 @@ public final class ButtonPreferences implements Preferences
 
     private final int mHash;
 
-    private ButtonPreferences(int priority, boolean onPress, long tolerance, long duration)
+    private ButtonPreferences(boolean onPress, long tolerance, long duration)
     {
         mStyle = (onPress) ? Style.PRESS : Style.RELEASE;
-        mPriority = priority;
         mTolerance = clampToNano(tolerance);
         mClickDur = clampToNano(duration);
 
         mHash = computeHash();
     }
 
-    private ButtonPreferences(int priority, long tolerance, long duration)
+    private ButtonPreferences(long tolerance, long duration)
     {
         mStyle = Style.DOUBLE;
-        mPriority = priority;
         mTolerance = clampToNano(tolerance);
         mClickDur = clampToNano(duration);
 
         mHash = computeHash();
-    }
-
-    @Override
-    public int getPriority()
-    {
-        return mPriority;
     }
 
     /**
@@ -154,7 +144,7 @@ public final class ButtonPreferences implements Preferences
 
         final ButtonPreferences prefs = (ButtonPreferences) obj;
 
-        return prefs.getStyle() == getStyle() && prefs.getPriority() == getPriority() &&
+        return prefs.getStyle() == getStyle() &&
                 prefs.getTolerance() == getTolerance() &&
                 prefs.getClickDuration() == getClickDuration();
     }
@@ -173,7 +163,6 @@ public final class ButtonPreferences implements Preferences
     private int computeHash()
     {
         int hash = 17 * 31 + mStyle.hashCode();
-        hash = 31 * hash + Integer.hashCode(mPriority);
         hash = 31 * hash + Long.hashCode(mTolerance);
         return 31 * hash + Long.hashCode(mClickDur);
     }
@@ -181,12 +170,11 @@ public final class ButtonPreferences implements Preferences
     /**
      * <p>Creates preferences for execution on the {@code PRESS} event of a button.</p>
      *
-     * @param priority priority.
      * @return preferences.
      */
-    public static ButtonPreferences forPress(int priority)
+    public static ButtonPreferences forPress()
     {
-        return new ButtonPreferences(priority, true, UNUSED_TIME, UNUSED_TIME);
+        return new ButtonPreferences(true, UNUSED_TIME, UNUSED_TIME);
     }
 
     /**
@@ -196,42 +184,39 @@ public final class ButtonPreferences implements Preferences
      * specified through {@code tolerance}. This time affects the difficulty of attempting to simultaneously press
      * the desired buttons where larger values ease the need for stringent time.</p>
      *
-     * @param priority priority.
      * @param tolerance maximum time between the first and last press, in ms.
      * @return preferences.
      * @throws IllegalArgumentException if tolerance {@literal <} 0.
      */
-    public static ButtonPreferences forMultiPress(int priority, long tolerance)
+    public static ButtonPreferences forMultiPress(long tolerance)
     {
         checkTolerance(tolerance);
 
-        return new ButtonPreferences(priority, true, tolerance, UNUSED_TIME);
+        return new ButtonPreferences(true, tolerance, UNUSED_TIME);
     }
 
     /**
      * <p>Creates preferences for execution on the first {@code RELEASE} event of a button.</p>
      *
-     * @param priority priority.
      * @return preferences.
      */
-    public static ButtonPreferences forRelease(int priority)
+    public static ButtonPreferences forRelease()
     {
-        return new ButtonPreferences(priority, false, UNUSED_TIME, Long.MAX_VALUE);
+        return new ButtonPreferences(false, UNUSED_TIME, Long.MAX_VALUE);
     }
 
     /**
      * <p>Creates preferences for execution on the first {@code RELEASE} event of a button.</p>
      *
-     * @param priority priority.
      * @param duration maximum time between the press and subsequent release, in ms.
      * @return preferences.
      * @throws IllegalArgumentException if duration {@literal <} 0.
      */
-    public static ButtonPreferences forRelease(int priority, long duration)
+    public static ButtonPreferences forRelease(long duration)
     {
         checkClickDuration(duration);
 
-        return new ButtonPreferences(priority, false, UNUSED_TIME, duration);
+        return new ButtonPreferences(false, UNUSED_TIME, duration);
     }
 
     /**
@@ -241,16 +226,15 @@ public final class ButtonPreferences implements Preferences
      * specified through {@code tolerance}. This time affects the difficulty of attempting to simultaneously release
      * the desired buttons where larger values ease the need for stringent time.</p>
      *
-     * @param priority priority.
      * @param tolerance maximum time between the first and last release, in ms.
      * @return preferences.
      * @throws IllegalArgumentException if tolerance {@literal <} 0.
      */
-    public static ButtonPreferences forMultiRelease(int priority, long tolerance)
+    public static ButtonPreferences forMultiRelease(long tolerance)
     {
         checkTolerance(tolerance);
 
-        return new ButtonPreferences(priority, false, tolerance, Long.MAX_VALUE);
+        return new ButtonPreferences(false, tolerance, Long.MAX_VALUE);
     }
 
     /**
@@ -260,18 +244,17 @@ public final class ButtonPreferences implements Preferences
      * specified through {@code tolerance}. This time affects the difficulty of attempting to simultaneously release
      * the desired buttons where larger values ease the need for stringent time.</p>
      *
-     * @param priority priority.
      * @param duration maximum time between each press and its subsequent release, in ms.
      * @param tolerance maximum time between the first and last release, in ms.
      * @return preferences.
      * @throws IllegalArgumentException if tolerance or tolerance {@literal <} 0.
      */
-    public static ButtonPreferences forMultiRelease(int priority, long duration, long tolerance)
+    public static ButtonPreferences forMultiRelease(long duration, long tolerance)
     {
         checkTolerance(tolerance);
         checkClickDuration(duration);
 
-        return new ButtonPreferences(priority, false, tolerance, duration);
+        return new ButtonPreferences(false, tolerance, duration);
     }
 
     /**
@@ -280,17 +263,16 @@ public final class ButtonPreferences implements Preferences
      * <p>The time from the click's press to its release must be {@literal <}= {@code duration} and the time between
      * both presses must be {@literal <}= {@code tolerance}.</p>
      *
-     * @param priority priority.
      * @param duration maximum time between a click's press and subsequent release, in ms.
      * @param tolerance maximum time between two presses, in ms.
      * @return preferences.
      * @throws IllegalArgumentException if duration or tolerance {@literal < 0}.
      */
-    public static ButtonPreferences forDoubleClick(int priority, long duration, long tolerance)
+    public static ButtonPreferences forDoubleClick(long duration, long tolerance)
     {
         checkTolerance(tolerance);
 
-        return new ButtonPreferences(priority, tolerance, duration);
+        return new ButtonPreferences(tolerance, duration);
     }
 
     private static void checkTolerance(long tolerance)

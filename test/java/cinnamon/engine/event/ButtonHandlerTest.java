@@ -72,7 +72,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventPress()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forPress(100);
+        final ButtonPreferences o = ButtonPreferences.forPress();
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -85,7 +85,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventPressDoesNothing()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forPress(100);
+        final ButtonPreferences o = ButtonPreferences.forPress();
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE});
 
         fakeHistory(Key.KEY_SPACE, false);
@@ -98,7 +98,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventMultiPress()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forMultiPress(100, TOLERANCE);
+        final ButtonPreferences o = ButtonPreferences.forMultiPress(TOLERANCE);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE, Key.KEY_ENTER});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -112,7 +112,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventMultiPressDoesNothing()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forMultiPress(100, TOLERANCE);
+        final ButtonPreferences o = ButtonPreferences.forMultiPress(TOLERANCE);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE, Key.KEY_ENTER});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -126,7 +126,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventRelease()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forRelease(100);
+        final ButtonPreferences o = ButtonPreferences.forRelease();
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE});
 
         fakeHistory(Key.KEY_SPACE, false);
@@ -139,7 +139,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventReleaseDoesNothing()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forRelease(100);
+        final ButtonPreferences o = ButtonPreferences.forRelease();
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -152,7 +152,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventReleaseWithDurationConstraint()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forRelease(100, DURATION);
+        final ButtonPreferences o = ButtonPreferences.forRelease(DURATION);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -166,7 +166,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventReleaseWithDurationConstraintDoesNothing()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forRelease(100, DURATION);
+        final ButtonPreferences o = ButtonPreferences.forRelease(DURATION);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -181,7 +181,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventMultiRelease()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forMultiRelease(100, TOLERANCE);
+        final ButtonPreferences o = ButtonPreferences.forMultiRelease(TOLERANCE);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE, Key.KEY_ENTER});
 
         fakeHistory(Key.KEY_SPACE, false);
@@ -195,7 +195,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventMultiReleaseDoesNothing()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forMultiRelease(100, TOLERANCE);
+        final ButtonPreferences o = ButtonPreferences.forMultiRelease(TOLERANCE);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE, Key.KEY_ENTER});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -209,7 +209,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventMultiReleaseWithDurationConstraint()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forMultiRelease(100, DURATION, TOLERANCE);
+        final ButtonPreferences o = ButtonPreferences.forMultiRelease(DURATION, TOLERANCE);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE, Key.KEY_ENTER});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -226,7 +226,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventMultiReleaseWithDurationConstraintDoesNothing()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forMultiRelease(100, DURATION, TOLERANCE);
+        final ButtonPreferences o = ButtonPreferences.forMultiRelease(DURATION, TOLERANCE);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE, Key.KEY_ENTER});
 
         fakeHistory(Key.KEY_ENTER, true);
@@ -241,7 +241,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventDoubleClick()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forDoubleClick(100, DURATION, TOLERANCE);
+        final ButtonPreferences o = ButtonPreferences.forDoubleClick(DURATION, TOLERANCE);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -263,7 +263,7 @@ public class ButtonHandlerTest
     public void testExecuteOnEventDoubleClickDoesNothingClicksFarApart()
     {
         final AtomicReference<Boolean> trace = new AtomicReference<>(false);
-        final ButtonPreferences o = ButtonPreferences.forDoubleClick(0, DURATION, TOLERANCE);
+        final ButtonPreferences o = ButtonPreferences.forDoubleClick(DURATION, TOLERANCE);
         setTraceMapping(trace, o, new Key[] {Key.KEY_SPACE});
 
         fakeHistory(Key.KEY_SPACE, true);
@@ -302,7 +302,7 @@ public class ButtonHandlerTest
         mapping.put("trace", new ButtonRule<>(keys, (event) ->
         {
             trace.set(true);
-        }, preferences));
+        }, preferences, 0));
 
         mHandler.setMappings(mapping);
     }

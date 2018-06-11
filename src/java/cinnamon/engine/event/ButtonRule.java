@@ -22,6 +22,8 @@ public final class ButtonRule<K extends Enum<K>, T extends InputEvent> implement
     // Requirements
     private final ButtonPreferences mPrefs;
 
+    private final int mPriority;
+
     // Constants
     private final K[] mButtons;
 
@@ -33,10 +35,11 @@ public final class ButtonRule<K extends Enum<K>, T extends InputEvent> implement
      * @param button button.
      * @param listener listener.
      * @param preferences preferences.
+     * @param priority priority.
      * @throws NullPointerException if button, listener, or preferences is null.
      */
     @SuppressWarnings("unchecked")
-    public ButtonRule(K button, EventListener<T> listener, ButtonPreferences preferences)
+    public ButtonRule(K button, EventListener<T> listener, ButtonPreferences preferences, int priority)
     {
         checkNull(button);
         checkNull(listener);
@@ -46,6 +49,7 @@ public final class ButtonRule<K extends Enum<K>, T extends InputEvent> implement
 
         mListener = listener;
         mPrefs = preferences;
+        mPriority = priority;
         mButtons = (K[]) new Enum[] {button};
 
         mHash = computeHash();
@@ -57,12 +61,13 @@ public final class ButtonRule<K extends Enum<K>, T extends InputEvent> implement
      * @param buttons buttons.
      * @param listener listener.
      * @param preferences preferences.
+     * @param priority priority.
      * @throws NullPointerException if buttons, listener, or preferences is null.
      * @throws IllegalArgumentException if buttons has all null elements or preferences can only work with a single
      * button while more than one button is provided.
      */
     @SuppressWarnings("unchecked")
-    public ButtonRule(K[] buttons, EventListener<T> listener, ButtonPreferences preferences)
+    public ButtonRule(K[] buttons, EventListener<T> listener, ButtonPreferences preferences, int priority)
     {
         checkNull(buttons);
         checkNull(listener);
@@ -83,6 +88,7 @@ public final class ButtonRule<K extends Enum<K>, T extends InputEvent> implement
 
         mListener = listener;
         mPrefs = preferences;
+        mPriority = priority;
         mButtons = (K[]) new Enum[buttonCount];
 
         // Ensure buttons are packed
@@ -114,6 +120,12 @@ public final class ButtonRule<K extends Enum<K>, T extends InputEvent> implement
     }
 
     @Override
+    public int getPriority()
+    {
+        return mPriority;
+    }
+
+    @Override
     public int hashCode()
     {
         return mHash;
@@ -132,7 +144,8 @@ public final class ButtonRule<K extends Enum<K>, T extends InputEvent> implement
 
         return getListener() == other.getListener()
                 && getPreferences() == other.getPreferences()
-                && getConstants().equals(other.getConstants());
+                && getConstants().equals(other.getConstants())
+                && getPriority() == other.getPriority();
     }
 
     @Override
@@ -166,7 +179,8 @@ public final class ButtonRule<K extends Enum<K>, T extends InputEvent> implement
     {
         int hash = 17 * 31 + mListener.hashCode();
         hash = 31 * hash + mPrefs.hashCode();
-        return 31 * hash + Arrays.hashCode(mButtons);
+        hash = 31 * hash + Arrays.hashCode(mButtons);
+        return 31 * hash + Integer.hashCode(mPriority);
     }
 
     private void checkNull(Object object)

@@ -17,11 +17,13 @@ public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements 
     // Actual reaction
     private final EventListener<T> mListener;
 
+    // Constant
+    private final K mAxis;
+
     // Requirements
     private final MotionPreferences mPrefs;
 
-    // Constant
-    private final K mAxis;
+    private final int mPriority;
 
     private final int mHash;
 
@@ -31,9 +33,10 @@ public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements 
      * @param axis axis.
      * @param listener listener.
      * @param preferences preferences.
+     * @param priority priority.
      * @throws NullPointerException if axis, listener, or preferences is null.
      */
-    public AxisRule(K axis, EventListener<T> listener, MotionPreferences preferences)
+    public AxisRule(K axis, EventListener<T> listener, MotionPreferences preferences, int priority)
     {
         checkNull(axis);
         checkNull(listener);
@@ -42,6 +45,7 @@ public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements 
         mListener = listener;
         mAxis = axis;
         mPrefs = preferences;
+        mPriority = priority;
 
         mHash = computeHash();
     }
@@ -67,6 +71,12 @@ public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements 
     }
 
     @Override
+    public int getPriority()
+    {
+        return mPriority;
+    }
+
+    @Override
     public int hashCode()
     {
         return mHash;
@@ -85,7 +95,8 @@ public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements 
 
         return getListener() == other.getListener()
                 && getPreferences() == other.getPreferences()
-                && getConstants().equals(other.getConstants());
+                && getConstants().equals(other.getConstants())
+                && getPriority() == other.getPriority();
     }
 
     @Override
@@ -98,7 +109,8 @@ public final class AxisRule<K extends Enum<K>, T extends InputEvent> implements 
     {
         int hash = 17 * 31 + mListener.hashCode();
         hash = 31 * hash + mPrefs.hashCode();
-        return 31 * hash + mAxis.hashCode();
+        hash = 31 * hash + mAxis.hashCode();
+        return 31 * hash + Integer.hashCode(mPriority);
     }
 
     private void checkNull(Object object)

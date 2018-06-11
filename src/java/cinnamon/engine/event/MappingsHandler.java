@@ -16,16 +16,13 @@ abstract class MappingsHandler<
         ExternalType extends Enum<ExternalType>,
         InternalType extends Enum<InternalType>,
         EventType extends InputEvent,
-        PreferencesType extends Preferences,
+        PreferencesType,
         ConditionType
         >
 {
 
     // Sorts instructions by priority
-    private static final Comparator<Executable> PRIORITY_COMPARATOR = Comparator.comparingInt((exe) ->
-    {
-        return exe.getPreferences().getPriority();
-    });
+    private static final Comparator<Executable> PRIORITY_COMPARATOR = Comparator.comparingInt(Executable::getPriority);
 
     // Instructions sorted by priority, per constant
     private final Map<InternalType, List<Executable<EventType, PreferencesType, ConditionType>>> mExecutables;
@@ -193,37 +190,44 @@ abstract class MappingsHandler<
      * @param <PreferencesType>  either {@link ButtonPreferences} or {@link MotionPreferences}.
      * @param <ConditionType> either {@link ButtonCondition} or {@link AxisCondition}.
      */
-    static class Executable<EventType extends InputEvent, PreferencesType extends Preferences, ConditionType>
+    static final class Executable<EventType extends InputEvent, PreferencesType, ConditionType>
     {
         private final EventListener<EventType> mListener;
         private final PreferencesType mPreference;
         private final Enum[] mConstants;
+        private final int mPriority;
         private final ConditionType mCondition;
 
         Executable(InputRule<?, EventType, PreferencesType> rule, Enum[] constants, ConditionType condition)
         {
             mListener = rule.getListener();
             mPreference = rule.getPreferences();
+            mPriority = rule.getPriority();
             mConstants = constants;
             mCondition = condition;
         }
 
-        final EventListener<EventType> getListener()
+        EventListener<EventType> getListener()
         {
             return mListener;
         }
 
-        final PreferencesType getPreferences()
+        PreferencesType getPreferences()
         {
             return mPreference;
         }
 
-        final Enum[] getConstants()
+        int getPriority()
+        {
+            return mPriority;
+        }
+
+        Enum[] getConstants()
         {
             return mConstants;
         }
 
-        final ConditionType getCondition()
+        ConditionType getCondition()
         {
             return mCondition;
         }

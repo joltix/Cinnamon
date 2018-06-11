@@ -12,7 +12,7 @@ import java.util.List;
 interface InputRule<
         ConstantType extends Enum<ConstantType>,
         EventType extends InputEvent,
-        PreferencesType extends Preferences
+        PreferencesType
         >
 {
     /**
@@ -35,4 +35,11 @@ interface InputRule<
      * @return preferences.
      */
     PreferencesType getPreferences();
+
+    /**
+     * <p>Gets the priority.</p>
+     *
+     * @return priority.
+     */
+    int getPriority();
 }
