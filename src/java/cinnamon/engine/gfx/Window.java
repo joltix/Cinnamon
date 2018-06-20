@@ -1,6 +1,12 @@
 package cinnamon.engine.gfx;
 
-import cinnamon.engine.event.Input;
+import cinnamon.engine.event.Gamepad;
+import cinnamon.engine.event.Gamepad.Connection;
+import cinnamon.engine.event.IntegratableInput;
+import cinnamon.engine.event.IntegratableInput.GamepadConnectionCallback;
+import cinnamon.engine.event.IntegratableInput.GamepadUpdateCallback;
+import cinnamon.engine.event.IntegratableInput.MouseButtonCallback;
+import cinnamon.engine.event.IntegratableInput.MouseScrollCallback;
 import cinnamon.engine.utils.Size;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.*;
@@ -8,15 +14,15 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * <p>This class wraps a GLFW window for OpenGL operations on a separate thread, multi-window management, and
- * integration with {@code Input} for producing {@code InputEvents}. By default, a {@code Window} opens using the
- * minimum allowed size of {@link #MINIMUM_WIDTH} x {@link #MINIMUM_HEIGHT}, is decorated, not resizable, and with
- * vsync enabled.</p>
+ * <p>This class wraps a GLFW window for OpenGL operations on a separate thread and integration with {@code Input}
+ * for producing {@code InputEvents}. By default, a {@code Window} opens using the minimum allowed size of
+ * {@link #MINIMUM_WIDTH} x {@link #MINIMUM_HEIGHT}, is decorated, not resizable, and with vsync enabled.</p>
  *
  * <p><i>Warning: Raw direct GLFW calls should not be used alongside this class as methods such as
  * {@code GLFW.glfwTerminate()} interferes with the expected state of a {@code Window}.</i></p><br>
@@ -27,11 +33,15 @@ import java.util.List;
  * {@code close()} but can also enter this state through {@code destroy()}.</p>
  *
  * <p>The difference between a closed and destroyed {@code Window} is that a closed {@code Window} can still be
- * reopened whereas a destroyed one has had its resources released and whose instance is no longer usable. When the
- * last {@code Window} is destroyed, GLFW is terminated.</p>
+ * reopened whereas a destroyed one has had its resources released and whose instance is no longer usable.</p>
+ *
+ * <p>In relation to GLFW's life cycle, instantiating a {@code Window} calls {@code GLFW.glfwInit()} and
+ * destroying the last calls {@code GLFW.glfwTerminate()}. In order to ensure all resources are properly released,
+ * GLFW's termination method is wrapped by {@link Window#terminate()}, which also allows all instances to complete
+ * their life cycles without the need for direct references.</p>
  *
  * <p>Continuously calling {@code Window.pollEvents()} is required to maintain the {@code Window's} visibility and
- * and ancillary operations. This method is the same as {@code GLFW.glfwPollEvents()} but with {@code InputEvent}
+ * ancillary operations. This method is the same as {@code GLFW.glfwPollEvents()} but with {@code InputEvent}
  * processing. The following is an outline of managing a {@code Window} from instantiation to application
  * termination.</p>
  *
@@ -46,7 +56,7 @@ import java.util.List;
  *
  *         window.open();
  *
- *         while (isProcessing) {
+ *         while (isProcessing()) {
  *          // Process window and input events
  *          Window.pollEvents();
  *
@@ -54,28 +64,28 @@ import java.util.List;
  *          ...
  *         }
  *
- *         window.destroy()
+ *         window.destroy();
  *     </code>
  * </pre>
  *
  * <b>Input devices</b>
- * <p>Keyboard and mouse input depends on the {@code Window} in focus at the time of the event while gamepad input is
- * shared amongst all instances. The input's state update rate is tied to the rate of calling
- * {@code Window.pollEvents()}. It should be noted that calling this method at a low rate can result in missed gamepad
- * data since the hardware can be interacted with at moments in-between polls.</p><br>
+ * <p>Each {@code Window} produces an {@code Input} for generating events from the keyboard, mouse, and gamepads as
+ * well as allowing read-access to the devices' event histories. The input update rate is tied to the rate of calling
+ * {@code Window.pollEvents()}. It should be noted that calling this method at a low rate can result in missed
+ * gamepad data since the hardware can be interacted with at moments in-between polls.</p><br>
  *
  * <b>Multiple windows</b>
  * <p>Handling more than one window is done by instantiating the needed number and calling {@code Window.pollEvents()}
- * once per loop. All created {@code Windows} can be opened, closed, and destroyed en mass through the methods
- * {@code Window.openAll()}, {@code Window.closeAll()}, and {@code Window.destroyAll()}. The total number of created
- * windows can be retrieved with {@code Window.getWindowCount()}.</p>
+ * once per loop. While each instance's state can be controlled by their respective methods,
+ * {@link Window#terminate()} will destroy all instances.</p>
  *
- * <p><i>Note: An exception access violation has been observed to occasionally occur with 12 or more windows.
- * </i></p><br>
+ * <p><b>note</b><i> An exception access violation has been observed to occasionally occur when using multiple
+ * windows. This note will be updated as the problem is investigated.</i>
+ * </p><br>
  *
  * <b>Concurrency</b>
  * <p>The constructor and most methods should only be called on the main thread. This is noted in the documentation
- * for affected methods. All callbacks are notified on the main thread.</p>
+ * for those affected. All callbacks are notified on the main thread.</p>
  */
 public final class Window
 {
@@ -89,36 +99,67 @@ public final class Window
      */
     public static final int MINIMUM_HEIGHT = 240;
 
-    private final List<OnResizeListener> mOnResizeListeners = new ArrayList<>();
-    private final List<OnResizeListener> mOnFramebufferResizeListeners = new ArrayList<>();
-
-    // All instantiated Windows for multi-window management
+    // Tracks all instantiated Windows for automatic GLFW termination
     private static final List<Window> mWindows = new ArrayList<>();
 
+    // Window size listeners
+    private final List<OnSizeChangeListener> mOnSizeChangeListeners = new ArrayList<>();
+
+    // Pixel area listeners
+    private final List<OnSizeChangeListener> mOnFramebufferOnSizeChangeListeners = new ArrayList<>();
+
+    private final List<OnFocusChangeListener> mOnFocusChangeListeners = new ArrayList<>();
+
+    private final GamepadUpdateCallback mGamepadUpdateCallback;
+
     private Thread mRenderThread;
+
     private final Canvas mCanvas;
-    private final Input mInput;
 
-    // Window's handle
-    private final long mId;
+    private final IntegratableInput mInput;
 
-    // Primary monitor dimensions in screen coords
+    // Window's handle in GLFW
+    private final long mIdGLFW;
+
+    // Class specific identifier based on instantiation order
+    private final int mId;
+
+    // Width in screen coords
     private int mPrimaryWidth;
+
+    // Width in screen coords
     private int mPrimaryHeight;
 
-    // Framebuffer size in pixels
     private final Object mFramebufferSizeLock = new Object();
+
+    // Width in pixels
     private int mFramebufferWidth = 0;
+
+    // Height in pixels
     private int mFramebufferHeight = 0;
 
     private String mWinTitle;
-    private volatile boolean mVsync = true;
-    private volatile boolean mDestroyed = false;
-    private volatile boolean mFocused = true;
-    private volatile boolean mMinimized = false;
-    private volatile boolean mMaximized = false;
 
     private boolean mHasResized = false;
+
+    private final double[] mMousePosX = new double[1];
+
+    private final double[] mMousePosY = new double[1];
+
+    /**
+     * The following toggles reflect GLFW's corresponding window states and allow thread-safe state viewing without
+     * the need for native calls (GLFW's methods).
+     */
+
+    private volatile boolean mVsync = true;
+
+    private volatile boolean mDestroyed = false;
+
+    private volatile boolean mFocused = true;
+
+    private volatile boolean mMinimized = false;
+
+    private volatile boolean mMaximized = false;
 
     /**
      * <p>Constructs a {@code Window} with a given title and a specified drawing surface.</p>
@@ -139,16 +180,21 @@ public final class Window
             throw new IllegalStateException("GLFW initialization failed");
         }
 
+        mId = mWindows.size();
         mWindows.add(this);
+
         mCanvas = canvas;
         mWinTitle = title;
 
         // Must be read prior to creating Window for correct resolution
         readPrimaryDisplayResolution();
 
-        mId = createWindow();
-        mInput = new Input(mId);
+        mIdGLFW = createWindow();
+        mInput = new IntegratableInput();
 
+        createGamepads();
+
+        mGamepadUpdateCallback = mInput.getGamepadUpdateCallback();
         setInputCallbacks();
         setStateCallbacks();
         setSizeCallbacks();
@@ -185,7 +231,7 @@ public final class Window
 
         // Render on separate thread
         mRenderThread = new Thread(() -> {
-            GLFW.glfwMakeContextCurrent(mId);
+            GLFW.glfwMakeContextCurrent(mIdGLFW);
             GL.createCapabilities();
 
             mCanvas.initialize();
@@ -198,7 +244,7 @@ public final class Window
         // Enable Input to produce events
         setInputCallbacks();
 
-        GLFW.glfwShowWindow(mId);
+        GLFW.glfwShowWindow(mIdGLFW);
         mRenderThread.start();
     }
 
@@ -209,7 +255,7 @@ public final class Window
      */
     public boolean isClosing()
     {
-        return GLFW.glfwWindowShouldClose(mId);
+        return GLFW.glfwWindowShouldClose(mIdGLFW);
     }
 
     /**
@@ -224,16 +270,38 @@ public final class Window
             return;
         }
 
-        GLFW.glfwHideWindow(mId);
-        removeInputCallbacks();
-
-        GLFW.glfwSetWindowShouldClose(mId, true);
+        GLFW.glfwHideWindow(mIdGLFW);
+        GLFW.glfwSetWindowShouldClose(mIdGLFW, true);
 
         if (mRenderThread != null) {
             try {
                 mRenderThread.join();
             } catch (InterruptedException e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * <p>Reads the button and axis states of all connected gamepads and produces representative input events. This
+     * method does nothing if the {@code Window} does not have focus.</p>
+     */
+    public void updateGamepads()
+    {
+        if (!isFocused()) {
+
+            for (final Connection connection : Gamepad.Connection.values()) {
+
+                final Gamepad pad = mInput.getGamepad(connection);
+                if (pad == null || pad.isMuted()) {
+                    continue;
+                }
+
+                final ByteBuffer buttons = GLFW.glfwGetJoystickButtons(connection.toInt());
+                final FloatBuffer axes = GLFW.glfwGetJoystickAxes(connection.toInt());
+
+                mGamepadUpdateCallback.onButtonsUpdate(connection, buttons);
+                mGamepadUpdateCallback.onAxesUpdate(connection, axes);
             }
         }
     }
@@ -248,7 +316,7 @@ public final class Window
     public int getWidth()
     {
         final int[] width = new int[1];
-        GLFW.glfwGetWindowSize(mId, width, null);
+        GLFW.glfwGetWindowSize(mIdGLFW, width, null);
         return width[0];
     }
 
@@ -262,7 +330,7 @@ public final class Window
     public int getHeight()
     {
         final int[] height = new int[1];
-        GLFW.glfwGetWindowSize(mId, null, height);
+        GLFW.glfwGetWindowSize(mIdGLFW, null, height);
         return height[0];
     }
 
@@ -272,15 +340,11 @@ public final class Window
      * <p>This method should only be called on the main thread.</p>
      *
      * @param width width.
-     * @throws IllegalArgumentException if width is {@literal <}= 0.
      */
     public void setWidth(int width)
     {
-        if (width <= 0) {
-            throw new IllegalArgumentException("Width must be >= 0");
-        }
-
-        GLFW.glfwSetWindowSize(mId, width, getHeight());
+        width = (width < MINIMUM_WIDTH) ? MINIMUM_WIDTH : width;
+        GLFW.glfwSetWindowSize(mIdGLFW, width, getHeight());
     }
 
     /**
@@ -289,15 +353,11 @@ public final class Window
      * <p>This method should only be called on the main thread.</p>
      *
      * @param height height.
-     * @throws IllegalArgumentException if height is {@literal <}= 0.
      */
     public void setHeight(int height)
     {
-        if (height <= 0) {
-            throw new IllegalArgumentException("Height must be >= 0");
-        }
-
-        GLFW.glfwSetWindowSize(mId, getWidth(), height);
+        height = (height < MINIMUM_HEIGHT) ? MINIMUM_HEIGHT : height;
+        GLFW.glfwSetWindowSize(mIdGLFW, getWidth(), height);
     }
 
     /**
@@ -307,18 +367,13 @@ public final class Window
      *
      * @param width width.
      * @param height height.
-     * @throws IllegalArgumentException if either width or height is {@literal <}= 0.
      */
     public void setSize(int width, int height)
     {
-        if (width <= 0) {
-            throw new IllegalArgumentException("Width must be >= 0");
-        }
-        if (height <= 0) {
-            throw new IllegalArgumentException("Height must be >= 0");
-        }
+        width = (width < MINIMUM_WIDTH) ? MINIMUM_WIDTH : width;
+        height = (height < MINIMUM_HEIGHT) ? MINIMUM_HEIGHT : height;
 
-        GLFW.glfwSetWindowSize(mId, width, height);
+        GLFW.glfwSetWindowSize(mIdGLFW, width, height);
     }
 
     /**
@@ -373,13 +428,13 @@ public final class Window
 
         final int[] width = new int[1];
         final int[] height = new int[1];
-        GLFW.glfwGetWindowSize(mId, width, height);
+        GLFW.glfwGetWindowSize(mIdGLFW, width, height);
 
         final int[] x = new int[1];
         final int[] y = new int[1];
-        GLFW.glfwGetWindowPos(mId, x, y);
+        GLFW.glfwGetWindowPos(mIdGLFW, x, y);
 
-        GLFW.glfwSetWindowMonitor(mId, monitor, x[0], y[0], width[0], height[0], GLFW.GLFW_DONT_CARE);
+        GLFW.glfwSetWindowMonitor(mIdGLFW, monitor, x[0], y[0], width[0], height[0], GLFW.GLFW_DONT_CARE);
     }
 
     /**
@@ -391,7 +446,7 @@ public final class Window
      */
     public boolean isResizable()
     {
-        return GLFW.glfwGetWindowAttrib(mId, GLFW.GLFW_RESIZABLE) == GLFW.GLFW_TRUE;
+        return GLFW.glfwGetWindowAttrib(mIdGLFW, GLFW.GLFW_RESIZABLE) == GLFW.GLFW_TRUE;
     }
 
     /**
@@ -404,7 +459,7 @@ public final class Window
      */
     public void setResizable(boolean resizable)
     {
-        GLFW.glfwSetWindowAttrib(mId, GLFW.GLFW_RESIZABLE, (resizable) ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
+        GLFW.glfwSetWindowAttrib(mIdGLFW, GLFW.GLFW_RESIZABLE, (resizable) ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
     }
 
     /**
@@ -416,7 +471,7 @@ public final class Window
      */
     public boolean isDecorated()
     {
-        return GLFW.glfwGetWindowAttrib(mId, GLFW.GLFW_DECORATED) == GLFW.GLFW_TRUE;
+        return GLFW.glfwGetWindowAttrib(mIdGLFW, GLFW.GLFW_DECORATED) == GLFW.GLFW_TRUE;
     }
 
     /**
@@ -428,7 +483,7 @@ public final class Window
      */
     public void setDecorated(boolean decorated)
     {
-        GLFW.glfwSetWindowAttrib(mId, GLFW.GLFW_DECORATED, (decorated) ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
+        GLFW.glfwSetWindowAttrib(mIdGLFW, GLFW.GLFW_DECORATED, (decorated) ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
     }
 
     /**
@@ -453,7 +508,7 @@ public final class Window
     {
         checkNull(title);
 
-        GLFW.glfwSetWindowTitle(mId, title);
+        GLFW.glfwSetWindowTitle(mIdGLFW, title);
         mWinTitle = title;
     }
 
@@ -477,7 +532,7 @@ public final class Window
         mVsync = enable;
         final long actual = GLFW.glfwGetCurrentContext();
 
-        GLFW.glfwMakeContextCurrent(mId);
+        GLFW.glfwMakeContextCurrent(mIdGLFW);
         GLFW.glfwSwapInterval((mVsync) ? 1 : 0);
 
         // Restore in case was different
@@ -507,7 +562,7 @@ public final class Window
             return;
         }
 
-        GLFW.glfwFocusWindow(mId);
+        GLFW.glfwFocusWindow(mIdGLFW);
     }
 
     /**
@@ -527,7 +582,7 @@ public final class Window
      */
     public void minimize()
     {
-        GLFW.glfwIconifyWindow(mId);
+        GLFW.glfwIconifyWindow(mIdGLFW);
     }
 
     /**
@@ -547,7 +602,7 @@ public final class Window
      */
     public void maximize()
     {
-        GLFW.glfwMaximizeWindow(mId);
+        GLFW.glfwMaximizeWindow(mIdGLFW);
     }
 
     /**
@@ -557,7 +612,7 @@ public final class Window
      */
     public void restore()
     {
-        GLFW.glfwRestoreWindow(mId);
+        GLFW.glfwRestoreWindow(mIdGLFW);
     }
 
     /**
@@ -602,7 +657,7 @@ public final class Window
             buffer.height(size);
         }
 
-        GLFW.glfwSetWindowIcon(mId, buffer);
+        GLFW.glfwSetWindowIcon(mIdGLFW, buffer);
     }
 
     /**
@@ -614,15 +669,15 @@ public final class Window
      */
     public boolean isOpen()
     {
-        return GLFW.glfwGetWindowAttrib(mId, GLFW.GLFW_VISIBLE) == GLFW.GLFW_TRUE;
+        return GLFW.glfwGetWindowAttrib(mIdGLFW, GLFW.GLFW_VISIBLE) == GLFW.GLFW_TRUE;
     }
 
     /**
-     * <p>Gets the {@code Input} responsible for producing the window's {@code InputEvents}.</p>
+     * <p>Gets the point of creation for the window's input events.</p>
      *
-     * @return input processor.
+     * @return input creator.
      */
-    public Input getInput()
+    public IntegratableInput getInput()
     {
         return mInput;
     }
@@ -637,7 +692,7 @@ public final class Window
     public int getX()
     {
         final int[] x = new int[1];
-        GLFW.glfwGetWindowPos(mId, x, null);
+        GLFW.glfwGetWindowPos(mIdGLFW, x, null);
         return x[0];
     }
 
@@ -651,7 +706,7 @@ public final class Window
     public int getY()
     {
         final int[] y = new int[1];
-        GLFW.glfwGetWindowPos(mId, null, y);
+        GLFW.glfwGetWindowPos(mIdGLFW, null, y);
         return y[0];
     }
 
@@ -668,7 +723,7 @@ public final class Window
     {
         final int[] width = new int[1];
         final int[] height = new int[1];
-        GLFW.glfwGetWindowSize(mId, width, height);
+        GLFW.glfwGetWindowSize(mIdGLFW, width, height);
 
         // Keep x on screen
         if (x < 0) {
@@ -684,7 +739,7 @@ public final class Window
             y = mPrimaryHeight - height[0];
         }
 
-        GLFW.glfwSetWindowPos(mId, x, y);
+        GLFW.glfwSetWindowPos(mIdGLFW, x, y);
     }
 
     /**
@@ -696,13 +751,13 @@ public final class Window
     {
         final int width[] = new int[1];
         final int height[] = new int[1];
-        GLFW.glfwGetWindowSize(mId, width, height);
+        GLFW.glfwGetWindowSize(mIdGLFW, width, height);
 
         // Compute main display's center
         final int x =  (mPrimaryWidth / 2) - (width[0] / 2);
         final int y = (mPrimaryHeight / 2) - (height[0] / 2);
 
-        GLFW.glfwSetWindowPos(mId, x, y);
+        GLFW.glfwSetWindowPos(mIdGLFW, x, y);
     }
 
     /**
@@ -735,58 +790,109 @@ public final class Window
     }
 
     /**
-     * <p>Adds an {@link OnResizeListener} to be notified of changes to the window's screen size. These
+     * <p>Gets the window's unique identifier denoting its place in the creation order of multiple windows.</p>
+     *
+     * <p>This id does not correspond to GLFW's window handle.</p>
+     *
+     * @return id.
+     */
+    public int getId()
+    {
+        return mId;
+    }
+
+    /**
+     * <p>Adds an {@link OnSizeChangeListener} to be notified of changes to the window's screen size. These
      * dimensions are measured in screen coordinates. For dealing with pixel-based methods such as GL operations, see
-     * {@link #addOnFramebufferResizeListener(OnResizeListener)}.</p>
+     * {@link #addOnFramebufferSizeChangeListener(OnSizeChangeListener)}.</p>
      *
      * <p>This method should only be called on the main thread.</p>
      *
      * @param listener listener.
      * @throws NullPointerException if listener is null.
      */
-    public void addOnResizeListener(OnResizeListener listener)
-    {
-        mOnResizeListeners.add(listener);
-    }
-
-    /**
-     * <p>Removes an {@code OnResizeListener}.</p>
-     *
-     * <p>This method should only be called on the main thread.</p>
-     *
-     * @param listener listener.
-     */
-    public void removeOnResizeListener(OnResizeListener listener)
-    {
-        mOnResizeListeners.remove(listener);
-    }
-
-    /**
-     * <p>Sets an {@link OnResizeListener} to be notified of changes to the window's framebuffer size. These
-     * dimensions are measured in pixels. For dealing with screen coordinate-based methods such as moving the window
-     * on the display, see {@link #addOnResizeListener(OnResizeListener)}.</p>
-     *
-     * <p>This method should only be called on the main thread.</p>
-     *
-     * @param listener listener.
-     * @throws NullPointerException if listener is null.
-     */
-    public void addOnFramebufferResizeListener(OnResizeListener listener)
+    public void addOnSizeChangeListener(OnSizeChangeListener listener)
     {
         checkNull(listener);
-        mOnFramebufferResizeListeners.add(listener);
+
+        mOnSizeChangeListeners.add(listener);
     }
 
     /**
-     * <p>Removes an {@code OnResizeListener}.</p>
+     * <p>Removes an {@code OnSizeChangeListener}.</p>
      *
      * <p>This method should only be called on the main thread.</p>
      *
      * @param listener listener.
+     * @throws NullPointerException if listener is null.
      */
-    public void removeOnFramebufferResizeListener(OnResizeListener listener)
+    public void removeOnSizeChangeListener(OnSizeChangeListener listener)
     {
-        mOnFramebufferResizeListeners.remove(listener);
+        checkNull(listener);
+
+        mOnSizeChangeListeners.remove(listener);
+    }
+
+    /**
+     * <p>Adds an {@link OnSizeChangeListener} to be notified of changes to the window's framebuffer size. These
+     * dimensions are measured in pixels. For dealing with screen coordinate-based methods such as moving the window
+     * on the display, see {@link #addOnSizeChangeListener(OnSizeChangeListener)}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    public void addOnFramebufferSizeChangeListener(OnSizeChangeListener listener)
+    {
+        checkNull(listener);
+
+        mOnFramebufferOnSizeChangeListeners.add(listener);
+    }
+
+    /**
+     * <p>Removes an {@code OnSizeChangeListener}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    public void removeOnFramebufferOnSizeChangeListener(OnSizeChangeListener listener)
+    {
+        checkNull(listener);
+
+        mOnFramebufferOnSizeChangeListeners.remove(listener);
+    }
+
+    /**
+     * <p>Adds an {@code OnFocusChangeListener}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    public void addOnFocusChangeListener(OnFocusChangeListener listener)
+    {
+        checkNull(listener);
+
+        mOnFocusChangeListeners.add(listener);
+    }
+
+    /**
+     * <p>Removes an {@code OnFocusChangeListener}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    public void removeOnFocusChangeListener(OnFocusChangeListener listener)
+    {
+        checkNull(listener);
+
+        mOnFocusChangeListeners.remove(listener);
     }
 
     /**
@@ -808,7 +914,8 @@ public final class Window
         }
 
         mDestroyed = true;
-        GLFW.glfwDestroyWindow(mId);
+        GLFW.glfwDestroyWindow(mIdGLFW);
+        removeInputCallbacks();
         removeStateCallbacks();
 
         final boolean removed = mWindows.remove(this);
@@ -820,116 +927,10 @@ public final class Window
         }
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * <p>Since much of the {@code Window's} state relies on methods which require execution on the main thread, this
-     * method should also only be called on the main thread.</p>
-     *
-     * @return hash code.
-     */
-    @Override
-    public int hashCode()
-    {
-        int hash = 17 * 31 + mWinTitle.hashCode();
-        hash = 31 * hash + Integer.hashCode(getWidth());
-        hash = 31 * hash + Integer.hashCode(getHeight());
-        hash = 31 * hash + Integer.hashCode(getX());
-        return 31 * hash + Integer.hashCode(getY());
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>Since much of the {@code Window's} state relies on methods which require execution on the main thread, this
-     * method should also only be called on the main thread.</p>
-     *
-     * @param obj the {@code Window} with which to compare.
-     * @return true if the given object is a {@code Window} and both have the same title, size, position, open/close,
-     * and minimize state.
-     */
-    @Override
-    public boolean equals(Object obj)
-    {
-        if (obj == null || obj.getClass() != Window.class) {
-            return false;
-        } else if (obj == this) {
-            return true;
-        }
-
-        final Window window = (Window) obj;
-        final boolean sizeMatches = getWidth() == window.getWidth() && getHeight() == window.getHeight();
-        final boolean stateMatches = isOpen() == window.isOpen() && isMinimized() == window.isMinimized();
-        final boolean positionMatches = getX() == window.getX() && getY() == window.getY();
-
-        return getTitle().equals(window.getTitle()) && sizeMatches && stateMatches && positionMatches;
-    }
-
     @Override
     protected Object clone() throws CloneNotSupportedException
     {
         throw new CloneNotSupportedException();
-    }
-
-    /**
-     * <p>Processes windowing events and should be called continuously to trigger the window's callbacks. This method
-     * wraps {@link GLFW#glfwPollEvents()}.</p>
-     *
-     * <p>This method should only be called on the main thread.</p>
-     */
-    public static void pollEvents()
-    {
-        GLFW.glfwPollEvents();
-        Input.updateGamepads();
-    }
-
-    /**
-     * <p>Opens all openable {@code Windows}.</p>
-     *
-     * <p>This method should only be called on the main thread.</p>
-     */
-    public static void openAll()
-    {
-        for (final Window window : mWindows) {
-            window.open();
-        }
-    }
-
-    /**
-     * <p>Closes all closeable {@code Windows}.</p>
-     *
-     * <p>This method should only be called on the main thread.</p>
-     */
-    public static void closeAll()
-    {
-        for (final Window window : mWindows) {
-            window.close();
-        }
-    }
-
-    /**
-     * <p>Destroys all {@code Windows}.</p>
-     *
-     * <p>This method should only be called on the main thread.</p>
-     */
-    public static void destroyAll()
-    {
-        final Object[] objs = mWindows.toArray();
-        for (int i = 0; i < objs.length; i++) {
-            ((Window) objs[i]).destroy();
-        }
-    }
-
-    /**
-     * <p>Gets the number of {@code Windows} yet to be destroyed.</p>
-     *
-     * <p>This method should only be called on the main thread.</p>
-     *
-     * @return number of openable windows (including those already opened).
-     */
-    public static int getWindowCount()
-    {
-        return mWindows.size();
     }
 
     /**
@@ -939,19 +940,27 @@ public final class Window
      */
     private void setStateCallbacks()
     {
-        GLFW.glfwSetWindowIconifyCallback(mId, (handle, minimized) ->
+        GLFW.glfwSetWindowIconifyCallback(mIdGLFW, (handle, minimized) ->
         {
             mMinimized = minimized;
         });
-        GLFW.glfwSetWindowFocusCallback(mId, (handle, focused) ->
+        GLFW.glfwSetWindowFocusCallback(mIdGLFW, (handle, focused) ->
         {
             mFocused = focused;
+
+            if (focused) {
+                setInputCallbacks();
+            } else {
+                removeInputCallbacks();
+            }
+
+            notifyFocusListeners(focused);
         });
-        GLFW.glfwSetWindowMaximizeCallback(mId, (handle, maximized) ->
+        GLFW.glfwSetWindowMaximizeCallback(mIdGLFW, (handle, maximized) ->
         {
             mMaximized = maximized;
         });
-        GLFW.glfwSetWindowCloseCallback(mId, (handle) ->
+        GLFW.glfwSetWindowCloseCallback(mIdGLFW, (handle) ->
         {
             // Allow Window to sync state to GLFW directed close cmd
             close();
@@ -965,10 +974,10 @@ public final class Window
      */
     private void removeStateCallbacks()
     {
-        GLFW.glfwSetWindowIconifyCallback(mId, null);
-        GLFW.glfwSetWindowFocusCallback(mId, null);
-        GLFW.glfwSetWindowMaximizeCallback(mId, null);
-        GLFW.glfwSetWindowCloseCallback(mId, null);
+        GLFW.glfwSetWindowIconifyCallback(mIdGLFW, null);
+        GLFW.glfwSetWindowFocusCallback(mIdGLFW, null);
+        GLFW.glfwSetWindowMaximizeCallback(mIdGLFW, null);
+        GLFW.glfwSetWindowCloseCallback(mIdGLFW, null);
     }
 
     /**
@@ -980,31 +989,37 @@ public final class Window
      *     <li>mouse button</li>
      *     <li>mouse scroll</li>
      *     <li>keyboard key</li>
-     *     <li>joystick connection</li>
+     *     <li>text input</li>
+     *     <li>gamepad connection</li>
      * </ul>
      */
     private void setInputCallbacks()
     {
-        GLFW.glfwSetMouseButtonCallback(mId, (handle, button, action, mods) ->
+        final MouseButtonCallback buttonCallback = mInput.getMouseButtonCallback();
+        GLFW.glfwSetMouseButtonCallback(mIdGLFW, (window, button, action, mods) ->
         {
-            mInput.getMouseButtonCallback().invoke(handle, button, action, mods);
+            GLFW.glfwGetCursorPos(mIdGLFW, mMousePosX, mMousePosY);
+            buttonCallback.onButtonUpdate(button, action, mMousePosX[0], mMousePosY[0]);
         });
 
-        GLFW.glfwSetScrollCallback(mId, (handle, xOffset, yOffset) ->
+        final MouseScrollCallback scrollCallback = mInput.getMouseScrollCallback();
+        GLFW.glfwSetScrollCallback(mIdGLFW, (window, xOffset, yOffset) ->
         {
-            mInput.getMouseScrollCallback().invoke(handle, xOffset, yOffset);
+            GLFW.glfwGetCursorPos(mIdGLFW, mMousePosX, mMousePosY);
+            scrollCallback.onScrollUpdate(xOffset, yOffset, mMousePosX[0], mMousePosY[0]);
         });
 
-        GLFW.glfwSetKeyCallback(mId, (handle, key, scanCode, action, mods) ->
-        {
-            mInput.getKeyboardCallback().invoke(handle, key, scanCode, action, mods);
-        });
+        GLFW.glfwSetKeyCallback(mIdGLFW, mInput.getKeyboardKeyCallback());
+        GLFW.glfwSetCursorPosCallback(mIdGLFW, mInput.getMousePositionCallback());
 
         // No need to keep setting for all windows
-        if (mWindows.isEmpty()) {
+        if (mWindows.size() == 1) {
+
+            final GamepadConnectionCallback connCallback = mInput.getGamepadConnectionCallback();
             GLFW.glfwSetJoystickCallback((joystick, event) ->
             {
-                Input.getGamepadConnectionCallback().invoke(joystick, event);
+                final String name = GLFW.glfwGetJoystickName(joystick);
+                connCallback.onConnectionUpdate(joystick, event, name);
             });
         }
     }
@@ -1023,12 +1038,12 @@ public final class Window
      */
     private void removeInputCallbacks()
     {
-        GLFW.glfwSetMouseButtonCallback(mId, null);
-        GLFW.glfwSetScrollCallback(mId, null);
-        GLFW.glfwSetKeyCallback(mId, null);
+        GLFW.glfwSetMouseButtonCallback(mIdGLFW, null);
+        GLFW.glfwSetScrollCallback(mIdGLFW, null);
+        GLFW.glfwSetKeyCallback(mIdGLFW, null);
 
         // Only remove if no windows are available
-        if (mWindows.isEmpty()) {
+        if (mWindows.size() == 1) {
             GLFW.glfwSetJoystickCallback(null);
         }
     }
@@ -1038,7 +1053,7 @@ public final class Window
      */
     private void render()
     {
-        while (!GLFW.glfwWindowShouldClose(mId)) {
+        while (!GLFW.glfwWindowShouldClose(mIdGLFW)) {
 
             // Sync Canvas' size with framebuffer
             if (mHasResized) {
@@ -1051,7 +1066,25 @@ public final class Window
             mCanvas.consumeResourceRequests();
             mCanvas.draw();
 
-            GLFW.glfwSwapBuffers(mId);
+            GLFW.glfwSwapBuffers(mIdGLFW);
+        }
+    }
+
+    /**
+     * <p>Checks each {@code Connection} for a present joystick and notifies the {@link IntegratableInput} of its
+     * presence.</p>
+     */
+    private void createGamepads()
+    {
+        final GamepadConnectionCallback callback = mInput.getGamepadConnectionCallback();
+
+        for (final Connection connection : Connection.values()) {
+            final int joystick = connection.toInt();
+
+            if (GLFW.glfwJoystickPresent(joystick)) {
+                final String name = GLFW.glfwGetJoystickName(joystick);
+                callback.onConnectionUpdate(joystick, GLFW.GLFW_CONNECTED, name);
+            }
         }
     }
 
@@ -1065,7 +1098,7 @@ public final class Window
         // Read framebuffer size
         final IntBuffer frameWidth = BufferUtils.createIntBuffer(1);
         final IntBuffer frameHeight = BufferUtils.createIntBuffer(1);
-        GLFW.glfwGetFramebufferSize(mId, frameWidth, frameHeight);
+        GLFW.glfwGetFramebufferSize(mIdGLFW, frameWidth, frameHeight);
 
         frameWidth.clear();
         frameHeight.clear();
@@ -1084,14 +1117,14 @@ public final class Window
      */
     private void setSizeCallbacks()
     {
-        GLFW.glfwSetWindowSizeCallback(mId, (window, width, height) ->
+        GLFW.glfwSetWindowSizeCallback(mIdGLFW, (window, width, height) ->
         {
-            for (final OnResizeListener listener : mOnResizeListeners) {
-                listener.onResize(width, height);
+            for (final OnSizeChangeListener listener : mOnSizeChangeListeners) {
+                listener.onSizeChange(width, height);
             }
         });
 
-        GLFW.glfwSetFramebufferSizeCallback(mId, (window, width, height) ->
+        GLFW.glfwSetFramebufferSizeCallback(mIdGLFW, (window, width, height) ->
         {
             synchronized (mFramebufferSizeLock) {
                 mFramebufferWidth = width;
@@ -1099,8 +1132,8 @@ public final class Window
                 mHasResized = true;
             }
 
-            for (final OnResizeListener callback : mOnFramebufferResizeListeners) {
-                callback.onResize(width, height);
+            for (final OnSizeChangeListener callback : mOnFramebufferOnSizeChangeListeners) {
+                callback.onSizeChange(width, height);
             }
         });
     }
@@ -1139,12 +1172,13 @@ public final class Window
         return id;
     }
 
-    /**
-     * <p>Throws a {@code NullPointerException} if the given object is null.</p>
-     *
-     * @param object to check.
-     * @throws NullPointerException if object is null.
-     */
+    private void notifyFocusListeners(boolean focus)
+    {
+        for (final OnFocusChangeListener listener : mOnFocusChangeListeners) {
+            listener.onFocusChange(focus);
+        }
+    }
+
     private void checkNull(Object object)
     {
         if (object == null) {
@@ -1153,16 +1187,53 @@ public final class Window
     }
 
     /**
-     * <p>Notified by {@code Window} whenever its size changes.</p>
+     * <p>Processes windowing events and should be called continuously to trigger the window's callbacks. This method
+     * wraps {@link GLFW#glfwPollEvents()}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
      */
-    public interface OnResizeListener
+    public static void pollEvents()
+    {
+        GLFW.glfwPollEvents();
+    }
+
+    /**
+     * <p>Destroys all {@code Window}s and releases resources.</p>
+     *
+     * <p>This method is equivalent to calling {@code GLFW.glfwTerminate()} and should only be called on the
+     * main thread.</p>
+     */
+    public static void terminate()
+    {
+        for (final Window window : mWindows) {
+            window.destroy();
+        }
+    }
+
+    /**
+     * <p>Notified whenever the size changes.</p>
+     */
+    public interface OnSizeChangeListener
     {
         /**
-         * <p>This method is called whenever the {@code Window}'s size changes.</p>
+         * <p>Called whenever the {@code Window}'s size changes.</p>
          *
          * @param width width.
          * @param height height.
          */
-        void onResize(int width, int height);
+        void onSizeChange(int width, int height);
+    }
+
+    /**
+     * <p>Notified when focus is gained or lost.</p>
+     */
+    public interface OnFocusChangeListener
+    {
+        /**
+         * <p>Called whenever the {@code Window} gains or loses focus.</p>
+         *
+         * @param focus true if now has focus.
+         */
+        void onFocusChange(boolean focus);
     }
 }

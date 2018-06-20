@@ -19,7 +19,7 @@ import java.util.Random;
 /**
  * <p>These tests do not assert the underlying GLFW library and instead focus on the {@code Window} class' reported
  * state, with some requiring visual confirmation. Some methods, such as
- * {@code addOnFramebufferResizeListener(Window.OnResizeListener)} are not tested and are presumed correct.</p>
+ * {@code addOnFramebufferSizeChangeListener(Window.OnSizeChangeListener)} are not tested.</p>
  *
  * <p>Unless specified otherwise by the individual test, the {@code Window} test subject is expected to appear as a
  * black screen.</p>
@@ -43,14 +43,14 @@ public class WindowTest
     private static final int WINDOW_HEIGHT = 720;
     private static final String TITLE_TEST = "Window Title Changed";
 
-    private static final String mWinName = WindowTest.class.getSimpleName();
+    private static final String mWinTitle = WindowTest.class.getSimpleName();
     private Window mWindow;
 
     @Before
     public void setUp()
     {
         GLFW.glfwPollEvents();
-        mWindow = new Window(new MockCanvas(), mWinName);
+        mWindow = new Window(new MockCanvas(), mWinTitle);
     }
 
     @After
@@ -61,13 +61,13 @@ public class WindowTest
     }
 
     @Test(expected = NullPointerException.class)
-    public void testWindowCanvasNPE()
+    public void testConstructorCanvasNPE()
     {
-        mWindow = new Window(null, mWinName);
+        mWindow = new Window(null, mWinTitle);
     }
 
     @Test (expected = NullPointerException.class)
-    public void testWindowNameNPE()
+    public void testConstructorTitleNPE()
     {
         mWindow = new Window(new MockCanvas(), null);
     }
@@ -162,30 +162,30 @@ public class WindowTest
         }, TEST_DELAY, TEST_DURATION);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetSizeIllegalArgumentExceptionWidthNegative()
+    @Test
+    public void testSetSizeClampsWidthToMinimumWhenTooSmall()
     {
         mWindow.open();
 
         WindowTestSuite.keepOpenAndExecute(() ->
         {
-
-            mWindow.setSize(-42, WINDOW_HEIGHT);
-
+            mWindow.setSize(-WINDOW_WIDTH, WINDOW_HEIGHT);
         }, TEST_DELAY, TEST_DURATION);
+
+        Assert.assertEquals(Window.MINIMUM_WIDTH, mWindow.getWidth());
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetSizeIllegalArgumentExceptionHeightNegative()
+    @Test
+    public void testSetSizeClampsHeightToMinimumWhenTooSmall()
     {
         mWindow.open();
 
         WindowTestSuite.keepOpenAndExecute(() ->
         {
-
-            mWindow.setSize(WINDOW_WIDTH, -42);
-
+            mWindow.setSize(WINDOW_WIDTH, -WINDOW_HEIGHT);
         }, TEST_DELAY, TEST_DURATION);
+
+        Assert.assertEquals(Window.MINIMUM_HEIGHT, mWindow.getHeight());
     }
 
     @Test
@@ -274,7 +274,7 @@ public class WindowTest
         WindowTestSuite.keepOpenAndExecute(() ->
         {
             // Load icon
-            final byte[] bytes = Assets.loadBytesFromResource(ICON_PATH);
+            final byte[] bytes = Assets.loadBytesFromResource(ICON_PATH, 4096);
             final ByteBuffer buffer = BufferUtils.createByteBuffer(bytes.length);
             buffer.put(bytes);
             buffer.flip();
