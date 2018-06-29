@@ -23,6 +23,6 @@ final class PressChecker
         final InputEvent press = presses.get(0, ord);
         final InputEvent release = releases.get(0, ord);
 
-        return press != null && (release == null || press.getTime() >= release.getTime());
+        return press != null && (release == null || press.getTime() > release.getTime());
     }
 }
