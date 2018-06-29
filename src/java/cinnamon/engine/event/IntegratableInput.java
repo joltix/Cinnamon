@@ -124,7 +124,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
         @Override
         public void visit(PadEvent event)
         {
-            final PadInfo info = mPads.get(event.getSource());
+            final PadInfo info = mPadMeta.get(event.getSource());
 
             // Gamepad isn't connected so ignore event
             if (info == null) {
@@ -143,6 +143,8 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
 
                 // Sensor based event -> write to motion history
                 info.mState.getMotionHistory().add(event.getAxis().vertical().ordinal(), event);
+
+                cacheExistenceInDeadZone(info, event.getAxis(), event.getVertical(), event.getHorizontal());
             }
             mEventWritten = true;
         }
@@ -153,6 +155,9 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
 
     // Listeners to notify whenever a gamepad connects/disconnects
     private final List<OnConnectionChangeListener> mConnListeners = new ArrayList<>();
+
+    // Listeners to notify of new gamepad profiles
+    private final List<OnProfileAddListener> mProfileAddListeners = new ArrayList<>();
 
     // All recognized gamepad setups
     private final Map<String, PadProfile> mGamepadProfiles = new HashMap<>();
@@ -174,7 +179,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     private final Mouse mMouse;
 
     // Gamepad entries
-    private final Map<Connection, PadInfo> mPads = new EnumMap<>(Connection.class);
+    private final Map<Connection, PadInfo> mPadMeta = new EnumMap<>(Connection.class);
 
     /**
      * <p>Constructs an {@code IntegratableInput}.</p>
@@ -240,7 +245,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
         checkNull(event);
 
         // Ignore events for unavailable gamepads
-        if (mPads.get(event.getSource()) != null) {
+        if (mPadMeta.containsKey(event.getSource())) {
             mBuffer.add(event);
         }
     }
@@ -262,7 +267,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     {
         checkNull(connection);
 
-        final PadInfo data = mPads.get(connection);
+        final PadInfo data = mPadMeta.get(connection);
         return (data == null) ? null : data.mGamepad;
     }
 
@@ -271,7 +276,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     {
         final Map<Connection, Gamepad> gamepads = new EnumMap<>(Connection.class);
 
-        for (final PadInfo info : mPads.values()) {
+        for (final PadInfo info : mPadMeta.values()) {
             gamepads.put(info.mGamepad.getConnection(), info.mGamepad);
         }
 
@@ -282,9 +287,9 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
      * <p>Gets the callback to produce {@code KeyEvent}s.</p>
      *
      * <p>If this callback is notified with any {@code key} where {@link Key#from(int)} would return null, if
-     * {@code action} is neither {@link GLFW#GLFW_PRESS} nor {@link GLFW#GLFW_RELEASE}, or if
-     * {@link Keyboard#isMuted()} returns {@code true}, then this callback does nothing. The callback's {@code window}
-     * parameter is ignored and any value may be passed in.</p>
+     * {@code action} is neither {@link GLFW#GLFW_PRESS} nor {@link GLFW#GLFW_RELEASE}, or if {@link Keyboard#isMuted()}
+     * returns {@code true}, then this callback does nothing. The callback's {@code window} parameter is ignored and any
+     * value may be passed in.</p>
      *
      * @return callback.
      */
@@ -403,49 +408,45 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
      */
     public GamepadConnectionCallback getGamepadConnectionCallback()
     {
-        return (joystick, event, name) ->
+        return new GamepadConnectionCallback()
         {
-            checkNull(name);
+            @Override
+            public void onConnection(int joystick, String name)
+            {
+                checkNull(name);
 
-            final Connection conn = Gamepad.Connection.from(joystick);
-
-            // Unsupported gamepad -> ignore
-            if (conn == null) {
-                return;
-            }
-
-            // Only handle connected/disconnected events
-            if (event != GLFW.GLFW_CONNECTED && event != GLFW.GLFW_DISCONNECTED) {
-                return;
-            }
-
-            final Gamepad gamepad;
-
-            if (event == GLFW.GLFW_CONNECTED) {
+                final Connection connection = Connection.from(joystick);
                 final PadProfile profile = mGamepadProfiles.get(name);
 
-                // Ignore unrecognized gamepads
-                if (profile == null) {
+                // Ignore unsupported gamepads
+                if (connection == null || profile == null) {
                     return;
                 }
 
-                gamepad = createGamepad(conn, profile);
-
-            } else if (mPads.containsKey(conn)) {
-
-                // Discard gamepad data
-                final PadInfo data = mPads.remove(conn);
-                gamepad = data.mGamepad;
-                data.mState.setConnected(false);
-
-            } else {
-                // Can't disconnect an unavailable gamepad
-                return;
+                notifyListeners(createGamepad(connection, profile));
             }
 
-            // Notify about connection change
-            for (final OnConnectionChangeListener listener : mConnListeners) {
-                listener.onChange(gamepad);
+            @Override
+            public void onDisconnection(int joystick)
+            {
+                final Connection connection = Connection.from(joystick);
+
+                // Ignore unsupported gamepad
+                if (connection == null) {
+                    return;
+                }
+
+                final PadInfo info = mPadMeta.remove(connection);
+                info.mState.setConnected(false);
+
+                notifyListeners(info.mGamepad);
+            }
+
+            private void notifyListeners(Gamepad gamepad)
+            {
+                for (final OnConnectionChangeListener listener : mConnListeners) {
+                    listener.onChange(gamepad);
+                }
             }
         };
     }
@@ -472,6 +473,32 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
         }
 
         mGamepadProfiles.put(name, profile);
+
+        for (final OnProfileAddListener listener : mProfileAddListeners) {
+            listener.onAdd(name, profile);
+        }
+    }
+
+    @Override
+    public Map<String, PadProfile> getGamepadProfiles()
+    {
+        return new HashMap<>(mGamepadProfiles);
+    }
+
+    @Override
+    public void addOnGamepadProfileAddListener(OnProfileAddListener listener)
+    {
+        checkNull(listener);
+
+        mProfileAddListeners.add(listener);
+    }
+
+    @Override
+    public void removeOnGamepadProfileAddListener(OnProfileAddListener listener)
+    {
+        checkNull(listener);
+
+        mProfileAddListeners.remove(listener);
     }
 
     @Override
@@ -496,7 +523,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     {
         final Table<KeyEvent>[] histories = (Table<KeyEvent>[]) new Table[2];
 
-        histories[PRESS_HISTORY] = new Table<KeyEvent>()
+        histories[PRESS_HISTORY] = new Table<>()
         {
             @Override
             public KeyEvent get(int column, int row)
@@ -517,7 +544,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
             }
         };
 
-        histories[RELEASE_HISTORY] = new Table<KeyEvent>()
+        histories[RELEASE_HISTORY] = new Table<>()
         {
             @Override
             public KeyEvent get(int column, int row)
@@ -547,7 +574,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     {
         final Table<MouseEvent>[] histories = (Table<MouseEvent>[]) new Table[2];
 
-        histories[PRESS_HISTORY] = new Table<MouseEvent>()
+        histories[PRESS_HISTORY] = new Table<>()
         {
             private final Table<MouseEvent> mActual = mMouseState.getPressHistory();
 
@@ -570,7 +597,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
             }
         };
 
-        histories[RELEASE_HISTORY] = new Table<MouseEvent>()
+        histories[RELEASE_HISTORY] = new Table<>()
         {
             private final Table<MouseEvent> mActual = mMouseState.getReleaseHistory();
 
@@ -599,7 +626,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     @Override
     public Table<MouseEvent> getMouseScrollHistory()
     {
-        return new Table<MouseEvent>()
+        return new Table<>()
         {
             private final Table<MouseEvent> mActual = mMouseState.getScrollHistory();
 
@@ -629,7 +656,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     {
         checkNull(connection);
 
-        final PadInfo info = mPads.get(connection);
+        final PadInfo info = mPadMeta.get(connection);
 
         // Ignore unconnected gamepad
         if (info == null) {
@@ -638,7 +665,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
 
         final Table<PadEvent>[] histories = (Table<PadEvent>[]) new Table[2];
 
-        histories[PRESS_HISTORY] = new Table<PadEvent>()
+        histories[PRESS_HISTORY] = new Table<>()
         {
             private final Table<PadEvent> mActual = info.mState.getPressHistory();
 
@@ -661,7 +688,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
             }
         };
 
-        histories[RELEASE_HISTORY] = new Table<PadEvent>()
+        histories[RELEASE_HISTORY] = new Table<>()
         {
             private final Table<PadEvent> mActual = info.mState.getReleaseHistory();
 
@@ -692,14 +719,14 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     {
         checkNull(connection);
 
-        final PadInfo info = mPads.get(connection);
+        final PadInfo info = mPadMeta.get(connection);
 
         // Ignore unconnected gamepads
         if (info == null) {
             return null;
         }
 
-        return new Table<PadEvent>()
+        return new Table<>()
         {
             private final Table<PadEvent> mActual = info.mState.getMotionHistory();
 
@@ -721,6 +748,12 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
                 return mActual.height();
             }
         };
+    }
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException
+    {
+        throw new CloneNotSupportedException();
     }
 
     /**
@@ -772,9 +805,9 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
 
     /**
      * <p>Creates the event histories for the {@code Mouse}. For press-release events, entries are made for two clicks
-     * (four events: two presses and two releases). All events have the same creation time and return a position
-     * of (0,0). Index 0 contains the press history, index 1 contains the release history, and index 2 contains the
-     * scroll history.</p>
+     * (four events: two presses and two releases). All events have the same creation time and return a position of
+     * (0,0). Index 0 contains the press history, index 1 contains the release history, and index 2 contains the scroll
+     * history.</p>
      *
      * @return event histories.
      */
@@ -809,11 +842,11 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
 
     /**
      * <p>Creates the button history for the {@code Gamepad} of the given {@code Connection}. Entries are made for two
-     * clicks (four events: two presses and two releases) and all events have the same creation time. Index 0
-     * contains the press history and index 1 contains the release history.</p>
+     * clicks (four events: two presses and two releases) and all events have the same creation time. Index 0 contains
+     * the press history and index 1 contains the release history.</p>
      *
      * @param connection connection.
-     * @param profile profile.
+     * @param profile    profile.
      * @return button history.
      */
     @SuppressWarnings("unchecked")
@@ -848,7 +881,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
      * default resting position as returned by the {@code Gamepad}'s {@code PadProfile}.</p>
      *
      * @param connection connection.
-     * @param profile profile.
+     * @param profile    profile.
      * @return axis history.
      */
     private FixedQueueArray<PadEvent> createGamepadAxisHistory(Connection connection, PadProfile profile)
@@ -859,7 +892,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
         final Map<Axis, Float> resting = profile.getRestingAxisValues();
         final AxisWrapper[] axes = (AxisWrapper[]) profile.getAxisClass().getEnumConstants();
         final int axisCount = Axis.values().length;
-        final FixedQueueArray<PadEvent> history = new FixedQueueArray<>(axisCount,  AXIS_GENS);
+        final FixedQueueArray<PadEvent> history = new FixedQueueArray<>(axisCount, AXIS_GENS);
         final long time = System.nanoTime();
 
         // Write entries for events at resting positions
@@ -879,8 +912,8 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
 
     /**
      * <p>Creates the dead zone history for the {@code Gamepad} of the given {@code Connection}. All entries report
-     * true (i.e. the axis is presumed to be at the default resting position defined by the {@code Gamepad}'s
-     * {@code PadProfile}).</p>
+     * true (i.e. the axis is presumed to be at the default resting position defined by the {@code Gamepad}'s {@code
+     * PadProfile}).</p>
      *
      * @param profile profile.
      * @return dead zone history.
@@ -911,7 +944,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
      * {@code PadData} wrapper. When this method returns, {@link Gamepad#isConnected()} will return true.</p>
      *
      * @param connection connection.
-     * @param profile profile.
+     * @param profile    profile.
      * @return gamepad.
      */
     private Gamepad createGamepad(Connection connection, PadProfile profile)
@@ -933,7 +966,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
         final Gamepad gamepad = new Gamepad(connection, profile, state);
 
         state.setConnected(true);
-        mPads.put(connection, new PadInfo(state, gamepad));
+        mPadMeta.put(connection, new PadInfo(state, gamepad));
 
         return gamepad;
     }
@@ -965,6 +998,47 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     {
         final int ord = button.ordinal();
         ((event.isPress()) ? pressHistory : releaseHistory).add(ord, event);
+    }
+
+    /**
+     * <p>Computes whether an axis constant's offsets place it inside the associated dead zone and stores the result
+     * in the gamepad.</p>
+     *
+     * @param info gamepad entry.
+     * @param constant axis constant.
+     * @param v vertical offset.
+     * @param h horizontal offset.
+     */
+    private void cacheExistenceInDeadZone(PadInfo info, AxisWrapper constant, float v, float h)
+    {
+        final float restingY = info.mRestOffsets.get(constant.vertical());
+        final double zone = info.mGamepad.getDeadZone(constant);
+        final int ord = constant.vertical().ordinal();
+        final FixedQueueArray<Boolean> zoneHistory = info.mState.getDeadZoneHistory();
+
+        // Cache dead zone presence
+        zoneHistory.add(ord, isInsideCircle(h, v, zone, restingY));
+    }
+
+    /**
+     * <p>Checks if the position at {@code x} and {@code y} is within the radius centered on the given vertical
+     * offset. Horizontal offset is unneeded because all single-axis sensors returning a range of values are
+     * treated as vertical-only.</p>
+     *
+     * @param x x.
+     * @param y y.
+     * @param radius radius.
+     * @param offsetY center y offset.
+     * @return true if position is inside the circle.
+     */
+    private boolean isInsideCircle(float x, float y, double radius, float offsetY)
+    {
+        // Radius is how much of possible dead zone (possible radius of 2)
+        final float scaledRadius = (float) radius * (1f + Math.abs(offsetY));
+
+        y -= offsetY;
+
+        return (x * x) + (y * y) <= scaledRadius * scaledRadius;
     }
 
     /**
@@ -1008,6 +1082,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
         private final Map<Axis, Float> mRestOffsets;
 
         private final Gamepad mGamepad;
+
         private final State mState;
 
         private PadInfo(State state, Gamepad gamepad)
@@ -1034,7 +1109,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
             checkNull(connection);
             checkNull(buffer);
 
-            final PadInfo info = mPads.get(connection);
+            final PadInfo info = mPadMeta.get(connection);
 
             // Ignore unconnected gamepads
             if (info == null) {
@@ -1057,11 +1132,10 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
             for (ButtonWrapper wrapper : info.mButtons) {
 
                 final Gamepad.Button button = wrapper.button();
-                final boolean pressed = (buffer.get(button.toInt()) == 0x1);
+                final boolean pressed = (buffer.get(button.toInt()) == GLFW.GLFW_PRESS);
 
                 // No state change means no event
                 if (pressed != isCurrentlyPressed(button, info)) {
-
                     mBuffer.add(new PadEvent(System.nanoTime(), connection, wrapper, pressed));
                 }
             }
@@ -1073,7 +1147,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
             checkNull(connection);
             checkNull(buffer);
 
-            final PadInfo info = mPads.get(connection);
+            final PadInfo info = mPadMeta.get(connection);
 
             // Ignore unconnected gamepads
             if (info == null) {
@@ -1154,43 +1228,6 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
                 }
             }
         }
-
-        /**
-         * <p>Creates a {@code Point} whose x and y components are the resting (x,y) for the given
-         * {@code AxisWrapper}.</p>
-         *
-         * @param info gamepad info.
-         * @param wrapper wrapper.
-         * @return offsets at rest.
-         */
-        private Point createOffsetsAtRest(PadInfo info, AxisWrapper wrapper)
-        {
-            final PadProfile profile = info.mGamepad.getProfile();
-            final Map<Axis, Float> values = profile.getRestingAxisValues();
-
-            return new Point(0f, values.get(wrapper.vertical()), 0f);
-        }
-
-        /**
-         * <p>Checks if the position at {@code x} and {@code y} is within the radius centered on the given vertical
-         * offset. Horizontal offset is unneeded because all single-axis sensors returning a range of values are
-         * treated as vertical-only.</p>
-         *
-         * @param x x.
-         * @param y y.
-         * @param radius radius.
-         * @param offsetY center y offset.
-         * @return true if position is inside the circle.
-         */
-        private boolean isInsideCircle(float x, float y, double radius, float offsetY)
-        {
-            // Radius is how much of possible dead zone (possible radius of 2)
-            final float scaledRadius = (float) radius * (1f + Math.abs(offsetY));
-
-            y -= offsetY;
-
-            return (x * x) + (y * y) <= scaledRadius * scaledRadius;
-        }
     }
 
     /**
@@ -1238,17 +1275,26 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     public interface GamepadConnectionCallback
     {
         /**
-         * <p>Called when a gamepad's connection state has changed.</p>
+         * <p>Called when a gamepad has connected.</p>
          *
-         * <p>If the given joystick index does not match the {@code int} value of any {@code Connection} through
+         * <p>If the given joystick does not match the {@code int} value of any {@code Connection} through
          * {@link Connection#toInt()}, then this method does nothing.</p>
          *
          * @param joystick joystick.
-         * @param event event.
          * @param name joystick name.
          * @throws NullPointerException if name is null.
          */
-        void onConnectionUpdate(int joystick, int event, String name);
+        void onConnection(int joystick, String name);
+
+        /**
+         * <p>Called when a gamepad has disconnected.</p>
+         *
+         * <p>If the given joystick does not match the {@code int} value of any {@code Connection} through
+         * {@link Connection#toInt()}, then this method does nothing.</p>
+         *
+         * @param joystick joystick.
+         */
+        void onDisconnection(int joystick);
     }
 
     /**
@@ -1268,7 +1314,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
          *
          * @param connection connection.
          * @param buffer new button states.
-         * @throws NullPointerException if connection or buffer is null.
+         * @throws NullPointerException if connection is null.
          * @throws IllegalArgumentException if buffer limit {@literal <} the number of expected buttons.
          */
         void onButtonsUpdate(Connection connection, ByteBuffer buffer);
@@ -1287,7 +1333,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
          *
          * @param connection connection.
          * @param buffer new axis states.
-         * @throws NullPointerException if connection or buffer is null.
+         * @throws NullPointerException if connection is null.
          * @throws IllegalArgumentException if buffer limit {@literal <} the number of expected axes.
          */
         void onAxesUpdate(Connection connection, FloatBuffer buffer);

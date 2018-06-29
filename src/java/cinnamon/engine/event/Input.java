@@ -121,7 +121,30 @@ public interface Input
     boolean containsGamepadProfile(String name);
 
     /**
-     * <p>Adds an {@code OnConnectionChangeListener} to be notified of gamepad connections and disconnections. The
+     * <p>Gets a map of known gamepad profiles with the profile names as keys.</p>
+     *
+     * @return gamepad profiles.
+     */
+    Map<String, PadProfile> getGamepadProfiles();
+
+    /**
+     * <p>Adds a listener to be called when a new gamepad profile is added.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    void addOnGamepadProfileAddListener(OnProfileAddListener listener);
+
+    /**
+     * <p>Removes a listener from being notified of new gamepad profiles.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    void removeOnGamepadProfileAddListener(OnProfileAddListener listener);
+
+    /**
+     * <p>Adds a listener to be notified of gamepad connections and disconnections. The
      * listener will be called once the {@code Gamepad}'s connection state has been updated.</p>
      *
      * @param listener listener.
@@ -130,12 +153,26 @@ public interface Input
     void addGamepadOnConnectionChangeListener(OnConnectionChangeListener listener);
 
     /**
-     * <p>Removes an {@code OnConnectionChangeListener}.</p>
+     * <p>Removes a listener from being notified of gamepad connection changes.</p>
      *
      * @param listener listener.
      * @throws NullPointerException if listener is null.
      */
     void removeGamepadOnConnectionChangeListener(OnConnectionChangeListener listener);
+
+    /**
+     * <p>Listener for when a gamepad profile is added.</p>
+     */
+    interface OnProfileAddListener
+    {
+        /**
+         * <p>Called when a new gamepad profile has been made available.</p>
+         *
+         * @param name profile name.
+         * @param profile profile.
+         */
+        void onAdd(String name, PadProfile profile);
+    }
 
     /**
      * <p>Listener for changes to a gamepad's connection state.</p>
