@@ -56,14 +56,14 @@ public abstract class InputEvent extends Event implements InputEventVisitor.Visi
     interface AxisEvent
     {
         /**
-         * <p>Gets the offset along the horizontal axis. This offset is between -1 and 1, inclusive.</p>
+         * <p>Gets the offset along the horizontal axis.</p>
          *
          * @return horizontal offset.
          */
         float getHorizontal();
 
         /**
-         * <p>Gets the offset along the vertical axis. This offset is between -1 and 1, inclusive.</p>
+         * <p>Gets the offset along the vertical axis.</p>
          *
          * @return vertical offset.
          */
