@@ -87,7 +87,7 @@ public final class PadEvent extends InputEvent implements ButtonEvent, AxisEvent
     }
 
     /**
-     * <p>Constructs a {@code PadEvent} for motion along an axis.</p>
+     * <p>Constructs a {@code PadEvent} for motion along axes.</p>
      *
      * @param time creation timestamp.
      * @param source originating gamepad.
@@ -111,8 +111,8 @@ public final class PadEvent extends InputEvent implements ButtonEvent, AxisEvent
         mPressed = false;
 
         mAxis = axis;
-        mHorizontal = clampMotion(offsets.getX());
-        mVertical = clampMotion(offsets.getY());
+        mHorizontal = offsets.getX();
+        mVertical = offsets.getY();
 
         mHash = computeHash();
     }
@@ -262,11 +262,6 @@ public final class PadEvent extends InputEvent implements ButtonEvent, AxisEvent
     protected Object clone() throws CloneNotSupportedException
     {
         throw new CloneNotSupportedException();
-    }
-
-    private float clampMotion(float offset)
-    {
-        return Math.max(Math.min(offset, 1f), -1f);
     }
 
     private int computeHash()
