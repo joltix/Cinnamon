@@ -8,7 +8,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.lwjgl.BufferUtils;
-import org.lwjgl.glfw.GLFW;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -36,7 +35,7 @@ public class IntegratableInputCallbackExceptionsTest
     public void testGamepadConnectionCallbackNPEName()
     {
         final GamepadConnectionCallback callback = mInput.getGamepadConnectionCallback();
-        callback.onConnectionUpdate(Connection.PAD_1.toInt(), GLFW.GLFW_CONNECTED, null);
+        callback.onConnection(Connection.PAD_1.toInt(), null);
     }
 
     @Test (expected = NullPointerException.class)
@@ -107,7 +106,7 @@ public class IntegratableInputCallbackExceptionsTest
     private void fakeXboxGamepadConnection()
     {
         final GamepadConnectionCallback connCallback = mInput.getGamepadConnectionCallback();
-        connCallback.onConnectionUpdate(Connection.PAD_1.toInt(), GLFW.GLFW_CONNECTED, XB1.GAMEPAD_NAME);
+        connCallback.onConnection(Connection.PAD_1.toInt(), XB1.GAMEPAD_NAME);
     }
 
     /**
