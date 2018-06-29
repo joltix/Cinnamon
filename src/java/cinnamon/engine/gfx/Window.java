@@ -25,9 +25,9 @@ import java.util.List;
  * {@link #MINIMUM_WIDTH} x {@link #MINIMUM_HEIGHT}, is decorated, not resizable, and with vsync enabled.</p>
  *
  * <p><i>Warning: Raw direct GLFW calls should not be used alongside this class as methods such as
- * {@code GLFW.glfwTerminate()} interferes with the expected state of a {@code Window}.</i></p><br>
+ * {@code GLFW.glfwTerminate()} interferes with the expected state of a {@code Window}.</i></p>
  *
- * <b>State</b>
+ * <h3>State</h3>
  * <p>A {@code Window} can be open, closed, or destroyed. Upon instantiation, it begins in the closed
  * state and transitions to the open state with {@code open()}. Likewise, a {@code Window} closes with
  * {@code close()} but can also enter this state through {@code destroy()}.</p>
@@ -60,6 +60,9 @@ import java.util.List;
  *          // Process window and input events
  *          Window.pollEvents();
  *
+ *          // Update gamepad sensor states
+ *          Window.updateGamepads();
+ *
  *          // Do work
  *          ...
  *         }
@@ -68,22 +71,22 @@ import java.util.List;
  *     </code>
  * </pre>
  *
- * <b>Input devices</b>
+ * <h3>Input devices</h3>
  * <p>Each {@code Window} produces an {@code Input} for generating events from the keyboard, mouse, and gamepads as
  * well as allowing read-access to the devices' event histories. The input update rate is tied to the rate of calling
  * {@code Window.pollEvents()}. It should be noted that calling this method at a low rate can result in missed
- * gamepad data since the hardware can be interacted with at moments in-between polls.</p><br>
+ * gamepad data since the hardware can be interacted with at moments in-between polls.</p>
  *
- * <b>Multiple windows</b>
+ * <h3>Multiple windows</h3>
  * <p>Handling more than one window is done by instantiating the needed number and calling {@code Window.pollEvents()}
  * once per loop. While each instance's state can be controlled by their respective methods,
  * {@link Window#terminate()} will destroy all instances.</p>
  *
  * <p><b>note</b><i> An exception access violation has been observed to occasionally occur when using multiple
  * windows. This note will be updated as the problem is investigated.</i>
- * </p><br>
+ * </p>
  *
- * <b>Concurrency</b>
+ * <h3>Concurrency</h3>
  * <p>The constructor and most methods should only be called on the main thread. This is noted in the documentation
  * for those affected. All callbacks are notified on the main thread.</p>
  */
@@ -101,6 +104,12 @@ public final class Window
 
     // Tracks all instantiated Windows for automatic GLFW termination
     private static final List<Window> mWindows = new ArrayList<>();
+
+    // Used in methods called continuously; this prevents repeatedly creating arrays with values()
+    private static final Connection[] CONNECTIONS = Connection.values();
+
+    // Next available Window Id (not GLFW handle)
+    private static int mNextId = 0;
 
     // Window size listeners
     private final List<OnSizeChangeListener> mOnSizeChangeListeners = new ArrayList<>();
@@ -121,7 +130,7 @@ public final class Window
     // Window's handle in GLFW
     private final long mIdGLFW;
 
-    // Class specific identifier based on instantiation order
+    // Class specific identifier
     private final int mId;
 
     // Width in screen coords
@@ -180,7 +189,7 @@ public final class Window
             throw new IllegalStateException("GLFW initialization failed");
         }
 
-        mId = mWindows.size();
+        mId = mNextId++;
         mWindows.add(this);
 
         mCanvas = canvas;
@@ -283,22 +292,28 @@ public final class Window
     }
 
     /**
-     * <p>Reads the button and axis states of all connected gamepads and produces representative input events. This
-     * method does nothing if the {@code Window} does not have focus.</p>
+     * <p>Reads the button and axis states of all connected gamepads to produce representative input events. This
+     * method does nothing if the window does not have focus.</p>
      */
     public void updateGamepads()
     {
-        if (!isFocused()) {
+        if (isFocused()) {
+            for (int i = 0; i < CONNECTIONS.length; i++) {
 
-            for (final Connection connection : Gamepad.Connection.values()) {
-
+                final Connection connection = CONNECTIONS[i];
                 final Gamepad pad = mInput.getGamepad(connection);
+
                 if (pad == null || pad.isMuted()) {
                     continue;
                 }
 
                 final ByteBuffer buttons = GLFW.glfwGetJoystickButtons(connection.toInt());
                 final FloatBuffer axes = GLFW.glfwGetJoystickAxes(connection.toInt());
+
+                // In case disconnected at system level right before reads
+                if (buttons == null || axes == null) {
+                    continue;
+                }
 
                 mGamepadUpdateCallback.onButtonsUpdate(connection, buttons);
                 mGamepadUpdateCallback.onAxesUpdate(connection, axes);
@@ -790,7 +805,7 @@ public final class Window
     }
 
     /**
-     * <p>Gets the window's unique identifier denoting its place in the creation order of multiple windows.</p>
+     * <p>Gets the window's unique identifier.</p>
      *
      * <p>This id does not correspond to GLFW's window handle.</p>
      *
@@ -905,6 +920,18 @@ public final class Window
      */
     public void destroy()
     {
+        mWindows.remove(this);
+        destroy(true);
+    }
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException
+    {
+        throw new CloneNotSupportedException();
+    }
+
+    private void destroy(boolean cleanUp)
+    {
         if (isDestroyed()) {
             return;
 
@@ -918,19 +945,10 @@ public final class Window
         removeInputCallbacks();
         removeStateCallbacks();
 
-        final boolean removed = mWindows.remove(this);
-        assert (removed);
-
         // Release resources if destroying last window
-        if (mWindows.isEmpty()) {
+        if (cleanUp && mWindows.isEmpty()) {
             GLFW.glfwTerminate();
         }
-    }
-
-    @Override
-    protected Object clone() throws CloneNotSupportedException
-    {
-        throw new CloneNotSupportedException();
     }
 
     /**
@@ -1014,12 +1032,15 @@ public final class Window
 
         // No need to keep setting for all windows
         if (mWindows.size() == 1) {
-
-            final GamepadConnectionCallback connCallback = mInput.getGamepadConnectionCallback();
             GLFW.glfwSetJoystickCallback((joystick, event) ->
             {
-                final String name = GLFW.glfwGetJoystickName(joystick);
-                connCallback.onConnectionUpdate(joystick, event, name);
+                final GamepadConnectionCallback callback = mInput.getGamepadConnectionCallback();
+
+                if (event == GLFW.GLFW_CONNECTED) {
+                    callback.onConnection(joystick, GLFW.glfwGetJoystickName(joystick));
+                } else {
+                    callback.onDisconnection(joystick);
+                }
             });
         }
     }
@@ -1078,12 +1099,14 @@ public final class Window
     {
         final GamepadConnectionCallback callback = mInput.getGamepadConnectionCallback();
 
-        for (final Connection connection : Connection.values()) {
+        for (final Connection connection : CONNECTIONS) {
             final int joystick = connection.toInt();
 
             if (GLFW.glfwJoystickPresent(joystick)) {
                 final String name = GLFW.glfwGetJoystickName(joystick);
-                callback.onConnectionUpdate(joystick, GLFW.GLFW_CONNECTED, name);
+
+                // Alert gamepad connected
+                callback.onConnection(joystick, name);
             }
         }
     }
@@ -1206,8 +1229,10 @@ public final class Window
     public static void terminate()
     {
         for (final Window window : mWindows) {
-            window.destroy();
+            window.destroy(false);
         }
+        mWindows.clear();
+        GLFW.glfwTerminate();
     }
 
     /**
