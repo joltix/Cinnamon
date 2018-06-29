@@ -5,6 +5,6 @@ import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
 
 @RunWith(Suite.class)
-@SuiteClasses({InputControlsTest.class, ButtonHandlerTest.class, AxisHandlerTest.class, ButtonRuleTest.class,
+@SuiteClasses({InputControlsTestSuite.class, ButtonHandlerTest.class, AxisHandlerTest.class, ButtonRuleTest.class,
         AxisRuleTest.class})
 public class ControlsTestSuite { }

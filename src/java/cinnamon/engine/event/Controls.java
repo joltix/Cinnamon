@@ -81,60 +81,90 @@ public interface Controls
     /**
      * <p>Gets the current bindings for a gamepad's buttons.</p>
      *
+     * @param connection connection bound to gamepad.
+     * @param cls expected button class.
      * @param <T> type of button.
-     * @param connection gamepad.
-     * @param cls wrapper class.
      * @return bindings.
      * @throws NullPointerException if connection or cls is null.
-     * @throws IllegalArgumentException if cls is not the class for the constant type used by the gamepad's profile.
-     * @throws IllegalStateException if there is no available gamepad for the specified connection.
+     * @throws IllegalArgumentException if cls is not the class for the button constant used by the gamepad's profile.
      */
     <T extends Enum<T> & ButtonWrapper> Map<String, ButtonRule<T, PadEvent>> getGamepadButtons(Connection connection,
                                                                                                Class<T> cls);
     /**
+     * <p>Gets the bindings assigned for a gamepad's buttons when a specified gamepad profile is in use.</p>
+     *
+     * @param connection connection bound to gamepad.
+     * @param profile gamepad profile name.
+     * @param cls expected button class.
+     * @param <T> type of button.
+     * @return bindings.
+     * @throws NullPointerException if connection, profile, or cls is null.
+     * @throws IllegalArgumentException if cls is not the class for the button constant used by the gamepad's profile.
+     * @throws NoSuchElementException if the profile name does not refer to a known gamepad profile.
+     */
+    <T extends Enum<T> & ButtonWrapper> Map<String, ButtonRule<T, PadEvent>> getGamepadButtons(Connection connection,
+                                                                                               String profile,
+                                                                                               Class<T> cls);
+    /**
      * <p>Sets the bindings for a gamepad's buttons.</p>
      *
-     * <p>If the given {@code Map} is empty, any set bindings are cleared.</p>
+     * <p>If the given {@code Map} is empty, any previously set bindings are cleared.</p>
      *
-     * @param connection gamepad.
+     * @param connection connection bound to gamepad.
+     * @param profile gamepad profile name.
      * @param bindings bindings.
      * @param <T> type of button.
-     * @throws NullPointerException if connection or bindings is null.
-     * @throws IllegalArgumentException if the bindings' constant type is not used by the gamepad's profile, assuming
-     * bindings is not empty.
-     * @throws IllegalStateException if there is no available gamepad for the specified connection.
+     * @throws NullPointerException if connection, profile, or bindings is null.
+     * @throws IllegalArgumentException if there is at least one rule in the given bindings and its button constant type
+     * is not the same as the button type expected by the gamepad's profile.
+     * @throws NoSuchElementException if the profile name does not refer to a known gamepad profile.
      */
-    <T extends Enum<T> & ButtonWrapper> void setGamepadButtons(Connection connection,
+    <T extends Enum<T> & ButtonWrapper> void setGamepadButtons(Connection connection, String profile,
                                                                Map<String, ButtonRule<T, PadEvent>> bindings);
 
     /**
-     * <p>Gets the bindings for a gamepad's axes.</p>
+     * <p>Gets the current bindings for a gamepad's axes.</p>
      *
-     * @param connection gamepad.
-     * @param cls wrapper class.
+     * @param connection connection bound to gamepad.
+     * @param cls expected axis class.
      * @param <T> type of axis.
      * @return bindings.
      * @throws NullPointerException if connection or cls is null.
-     * @throws IllegalArgumentException if cls is not the class for the constant type used by the gamepad's profile.
-     * @throws IllegalStateException if there is no available gamepad for the specified connection.
+     * @throws IllegalArgumentException if cls is not the class for the axis constant used by the gamepad's profile.
      */
     <T extends Enum<T> & AxisWrapper> Map<String, AxisRule<T, PadEvent>> getGamepadAxes(Connection connection,
                                                                                         Class<T> cls);
+
+    /**
+     * <p>Gets the bindings assigned for a gamepad's axes when a specified gamepad profile is in use.</p>
+     *
+     * @param connection connection bound to gamepad.
+     * @param profile gamepad profile name.
+     * @param cls expected axis class.
+     * @param <T> type of axis.
+     * @return bindings.
+     * @throws NullPointerException if connection, profile, or cls is null.
+     * @throws IllegalArgumentException if cls is not the class for the constant type used by the gamepad's profile.
+     * @throws NoSuchElementException if the profile name does not refer to a known gamepad profile.
+     */
+    <T extends Enum<T> & AxisWrapper> Map<String, AxisRule<T, PadEvent>> getGamepadAxes(Connection connection,
+                                                                                        String profile, Class<T> cls);
 
     /**
      * <p>Sets the bindings for a gamepad's axes.</p>
      *
      * <p>If the given {@code Map} is empty, any set bindings are cleared.</p>
      *
-     * @param connection gamepad.
+     * @param connection connection bound to gamepad.
+     * @param profile gamepad profile name.
      * @param bindings bindings.
      * @param <T> type of axis.
-     * @throws NullPointerException if connection or bindings is null.
-     * @throws IllegalArgumentException if the bindings' constant type is not used by the gamepad's profile, assuming
-     * bindings is not empty.
-     * @throws IllegalStateException if there is no available gamepad for the specified connection.
+     * @throws NullPointerException if connection, profile, or bindings is null.
+     * @throws IllegalArgumentException if there is at least one rule in the given bindings and its axis constant type
+     * is not the same as the axis type expected by the gamepad's profile.
+     * @throws NoSuchElementException if the profile name does not refer to a known gamepad profile.
      */
     <T extends Enum<T> & AxisWrapper> void setGamepadAxes(Connection connection,
-                                                          Map<String, AxisRule<T, PadEvent>> bindings);
+                                                          String profile, Map<String, AxisRule<T, PadEvent>> bindings);
 
 }

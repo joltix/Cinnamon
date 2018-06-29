@@ -24,31 +24,49 @@ import java.util.*;
  */
 public final class InputControls implements Controls
 {
-    // Attempts to execute keyboard mappings from an event
+    // Represents gamepad's in-use profile when no gamepad is actually available
+    private static final PadProfile NULL_PROFILE;
+
+    static
+    {
+        // Resting value has no meaning; needed for valid profile
+        final Map<Axis, Float> resting = new HashMap<>();
+        resting.put(Axis.AXIS_0, 0f);
+
+        NULL_PROFILE = new PadProfile(XB1.Button.class, XB1.Stick.class, resting) { };
+    }
+
+    // Empty map representing lack of button bindings
+    private static final Map<String, ButtonRule<?, PadEvent>> NULL_BUTTONS = new HashMap<>();
+
+    // Empty map representing lack of axis bindings
+    private static final Map<String, AxisRule<?, PadEvent>> NULL_AXES = new HashMap<>();
+
+    // Executes keyboard bindings
     private final KeyboardHandler mKeyboard;
 
-    // Attempts to execute mouse mappings from an event
+    // Executes mouse bindings
     private final MouseHandler mMouse;
 
-    // Attempts to execute gamepad mappings from an event
-    private final Map<Connection, GamepadHandler> mPadControls = new EnumMap<>(Connection.class);
-
-    // Latest set keyboard mapping
+    // Current keyboard binding
     private Map<String, ButtonRule<Key, KeyEvent>> mKeyboardMapping = new HashMap<>();
 
-    // Latest set mouse button mapping
+    // Current mouse button binding
     private Map<String, ButtonRule<Button, MouseEvent>> mMouseButtonMapping = new HashMap<>();
 
-    // Latest set mouse scroll mapping
+    // Current mouse axis binding
     private Map<String, AxisRule<Button, MouseEvent>> mMouseAxisMapping = new HashMap<>();
 
-    // Latest set button and axis mappings per gamepad
-    private final Map<Connection, PadInfo> mPadMeta = new EnumMap<>(Connection.class);
+    // Available profiles read from Input during construction
+    private final Map<String, PadProfile> mPadProfiles;
 
-    // Releases events to trigger a mapping
+    // Current and all available bindings per gamepad
+    private final Map<Connection, ConnectionEntry> mConnectionEntries = new EnumMap<>(Connection.class);
+
+    // Provides events
     private final EventSource<InputEvent> mSource;
 
-    // Routes events to each device's handler for triggering mappings
+    // Routes events to each device's handler for executing on bindings
     private final InputEventVisitor mExecutionDispatch = new ExecutionEventVisitor();
 
     /**
@@ -70,12 +88,15 @@ public final class InputControls implements Controls
         mKeyboard = createHandlerForKeyboard(histories);
         mMouse = createHandlerForMouse(histories);
 
-        createHandlersForConnectedGamepads(input, histories);
-        watchInputForGamepadChanges(input, histories);
+        mPadProfiles = input.getGamepadProfiles();
+        createMetadataEntriesPerConnection();
+
+        associateEntriesWithConnectedGamepads(input, histories);
+        watchForGamepadChanges(input, histories);
     }
 
     /**
-     * <p>Empties the event source while attempting to execute the appropriate mappings.</p>
+     * <p>Empties the event source while attempting to execute the appropriate bindings.</p>
      *
      * <p><b>note</b> This method may take a longer than desirable time if the source has buffered too many events.</p>
      */
@@ -94,12 +115,12 @@ public final class InputControls implements Controls
     }
 
     @Override
-    public void setKeyboardKeys(Map<String, ButtonRule<Key, KeyEvent>> mappings)
+    public void setKeyboardKeys(Map<String, ButtonRule<Key, KeyEvent>> bindings)
     {
-        checkNull(mappings);
+        checkNull(bindings);
 
         // Set aside a copy to copy from during retrieval
-        mKeyboardMapping = new HashMap<>(mappings);
+        mKeyboardMapping = new HashMap<>(bindings);
         mKeyboard.setMappings(mKeyboardMapping);
     }
 
@@ -110,12 +131,12 @@ public final class InputControls implements Controls
     }
 
     @Override
-    public void setMouseButtons(Map<String, ButtonRule<Button, MouseEvent>> mappings)
+    public void setMouseButtons(Map<String, ButtonRule<Button, MouseEvent>> bindings)
     {
-        checkNull(mappings);
+        checkNull(bindings);
 
         // Set aside a copy to copy from during retrieval
-        mMouseButtonMapping = new HashMap<>(mappings);
+        mMouseButtonMapping = new HashMap<>(bindings);
         mMouse.mButtonHandler.setMappings(mMouseButtonMapping);
     }
 
@@ -126,12 +147,12 @@ public final class InputControls implements Controls
     }
 
     @Override
-    public void setMouseScrolls(Map<String, AxisRule<Button, MouseEvent>> mappings)
+    public void setMouseScrolls(Map<String, AxisRule<Button, MouseEvent>> bindings)
     {
-        checkNull(mappings);
+        checkNull(bindings);
 
         // Check each rule if they map to middle mouse button
-        for (final AxisRule<Button, MouseEvent> rule : mappings.values()) {
+        for (final AxisRule<Button, MouseEvent> rule : bindings.values()) {
             final Button constant = rule.getConstants().get(0);
 
             if (constant != Button.MIDDLE) {
@@ -141,10 +162,11 @@ public final class InputControls implements Controls
         }
 
         // Set aside a copy to copy from during retrieval
-        mMouseAxisMapping = new HashMap<>(mappings);
+        mMouseAxisMapping = new HashMap<>(bindings);
         mMouse.mAxisHandler.setMappings(mMouseAxisMapping);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T extends Enum<T> & ButtonWrapper> Map<String, ButtonRule<T, PadEvent>> getGamepadButtons
             (Connection connection, Class<T> cls)
@@ -152,42 +174,80 @@ public final class InputControls implements Controls
         checkNull(connection);
         checkNull(cls);
 
-        checkGamepadAvailability(connection, mPadControls.get(connection));
+        final ConnectionEntry entry = mConnectionEntries.get(connection);
+        final PadProfile profile = entry.mActiveProfile;
 
-        final PadInfo info = mPadMeta.get(connection);
-        checkGamepadConstantClasses(info.mExpectedButtonClass, cls);
+        checkGamepadConstantClasses(cls, profile.getButtonClass());
 
-        @SuppressWarnings("unchecked")
-        final Map<String, ButtonRule<T, PadEvent>> mappings = info.mButtonMappings;
-        return new HashMap<>(mappings);
+        return (Map) entry.mProfileButtonMaps.get(profile);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Enum<T> & ButtonWrapper> void setGamepadButtons(Connection connection,
-                                                                      Map<String, ButtonRule<T, PadEvent>> mappings)
+    public <T extends Enum<T> & ButtonWrapper> Map<String, ButtonRule<T, PadEvent>> getGamepadButtons
+            (Connection connection, String profile, Class<T> cls)
     {
         checkNull(connection);
-        checkNull(mappings);
+        checkNull(profile);
+        checkNull(cls);
 
-        final GamepadHandler ctrl = mPadControls.get(connection);
-        checkGamepadAvailability(connection, ctrl);
+        final PadProfile padProfile = mPadProfiles.get(profile);
 
-        // Check if gamepad button constant is as expected
-        if (!mappings.isEmpty()) {
-            final Class expected = mPadMeta.get(connection).mExpectedButtonClass;
-            final Class actual = mappings.values().iterator().next().getConstants().get(0).getDeclaringClass();
-
-            checkGamepadConstantClasses(expected, actual);
+        if (padProfile == null) {
+            final String format = "Gamepad profile \"%s\" is unrecognized";
+            throw new NoSuchElementException(String.format(format, profile));
         }
 
-        // Set aside a copy to copy from during retrieval
-        final PadInfo info = mPadMeta.get(connection);
-        info.mButtonMappings = new HashMap<>(mappings);
+        checkGamepadConstantClasses(cls, padProfile.getButtonClass());
 
-        ctrl.mButtonCtrl.setMappings(info.mButtonMappings);
+        final ConnectionEntry entry = mConnectionEntries.get(connection);
+        return (Map) entry.mProfileButtonMaps.get(padProfile);
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends Enum<T> & ButtonWrapper> void setGamepadButtons(Connection connection, String profile,
+                                                                      Map<String, ButtonRule<T, PadEvent>> bindings)
+    {
+        checkNull(connection);
+        checkNull(profile);
+        checkNull(bindings);
+
+        final PadProfile padProfile = mPadProfiles.get(profile);
+
+        if (padProfile == null) {
+            final String format = "Gamepad profile \"%s\" is unrecognized";
+            throw new NoSuchElementException(String.format(format, profile));
+        }
+
+        Map bindingsCopy;
+
+        // Check if button constant matches profile
+        if (!bindings.isEmpty()) {
+            final Class expected = padProfile.getButtonClass();
+            final Class actual = bindings.values().iterator().next().getConstants().get(0).getDeclaringClass();
+            checkGamepadConstantClasses(expected, actual);
+
+            // Prevent direct edits
+            bindingsCopy = new HashMap(bindings);
+        } else {
+            // Even though just empty, this guarantees implementation
+            bindingsCopy = NULL_BUTTONS;
+        }
+
+        // Update bindings for the specified profile
+        final ConnectionEntry entry = mConnectionEntries.get(connection);
+        entry.mProfileButtonMaps.put(padProfile, bindingsCopy);
+
+        // Replace active bindings if same profile
+        if (entry.mActiveProfile.equals(padProfile)) {
+            if (entry.mHandler != null) {
+                entry.mHandler.mButtonCtrl.setMappings(bindings);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     @Override
     public <T extends Enum<T> & AxisWrapper> Map<String, AxisRule<T, PadEvent>> getGamepadAxes
             (Connection connection, Class<T> cls)
@@ -195,40 +255,84 @@ public final class InputControls implements Controls
         checkNull(connection);
         checkNull(cls);
 
-        checkGamepadAvailability(connection, mPadControls.get(connection));
+        final ConnectionEntry entry = mConnectionEntries.get(connection);
+        final PadProfile profile = entry.mActiveProfile;
 
-        final PadInfo info = mPadMeta.get(connection);
-        checkGamepadConstantClasses(info.mExpectedAxisClass, cls);
+        checkGamepadConstantClasses(cls, profile.getAxisClass());
 
-        @SuppressWarnings("unchecked")
-        final Map<String, AxisRule<T, PadEvent>> mappings = info.mAxisMappings;
-        return new HashMap<>(mappings);
+        return (Map) entry.mProfileAxisMaps.get(profile);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Enum<T> & AxisWrapper> void setGamepadAxes(Connection connection,
-                                                                 Map<String, AxisRule<T, PadEvent>> mappings)
+    public <T extends Enum<T> & AxisWrapper> Map<String, AxisRule<T, PadEvent>> getGamepadAxes(Connection connection,
+                                                                                               String profile,
+                                                                                               Class<T> cls)
     {
         checkNull(connection);
-        checkNull(mappings);
+        checkNull(profile);
+        checkNull(cls);
 
-        final GamepadHandler ctrl = mPadControls.get(connection);
-        checkGamepadAvailability(connection, ctrl);
+        final PadProfile padProfile = mPadProfiles.get(profile);
 
-        // Check if gamepad axis constant is as expected
-        if (!mappings.isEmpty()) {
-            final Class expected = mPadMeta.get(connection).mExpectedAxisClass;
-            final Class actual = mappings.values().iterator().next().getConstants().get(0).getDeclaringClass();
-
-            checkGamepadConstantClasses(expected, actual);
+        if (padProfile == null) {
+            final String format = "Gamepad profile \"%s\" is unrecognized";
+            throw new NoSuchElementException(String.format(format, profile));
         }
 
-        // Set aside a copy to copy from during retrieval
-        final PadInfo info = mPadMeta.get(connection);
-        info.mAxisMappings = new HashMap<>(mappings);
+        checkGamepadConstantClasses(cls, padProfile.getAxisClass());
 
-        ctrl.mAxisCtrl.setMappings(info.mAxisMappings);
+        final ConnectionEntry entry = mConnectionEntries.get(connection);
+        return (Map) entry.mProfileAxisMaps.get(entry.mActiveProfile);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends Enum<T> & AxisWrapper> void setGamepadAxes(Connection connection, String profile,
+                                                                 Map<String, AxisRule<T, PadEvent>> bindings)
+    {
+        checkNull(connection);
+        checkNull(profile);
+        checkNull(bindings);
+
+        final PadProfile padProfile = mPadProfiles.get(profile);
+
+        if (padProfile == null) {
+            final String format = "Gamepad profile \"%s\" is unrecognized";
+            throw new NoSuchElementException(String.format(format, profile));
+        }
+
+        Map bindingsCopy;
+
+        // Check if button constant matches profile
+        if (!bindings.isEmpty()) {
+            final Class expected = padProfile.getAxisClass();
+            final Class actual = bindings.values().iterator().next().getConstants().get(0).getDeclaringClass();
+            checkGamepadConstantClasses(expected, actual);
+
+            // Prevent direct edits
+            bindingsCopy = new HashMap(bindings);
+        } else {
+            // Even though just empty, this guarantees implementation
+            bindingsCopy = NULL_AXES;
+        }
+
+        // Update bindings for the specified profile
+        final ConnectionEntry entry = mConnectionEntries.get(connection);
+        entry.mProfileAxisMaps.put(padProfile, bindingsCopy);
+
+        // Replace active bindings if same profile
+        if (entry.mActiveProfile.equals(padProfile)) {
+            if (entry.mHandler != null) {
+                entry.mHandler.mAxisCtrl.setMappings(bindings);
+            }
+        }
+    }
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException
+    {
+        throw new CloneNotSupportedException();
     }
 
     private KeyboardHandler createHandlerForKeyboard(InputHistories histories)
@@ -246,76 +350,108 @@ public final class InputControls implements Controls
         return new MouseHandler(mouseButtonHistories[0], mouseButtonHistories[1], mouseAxisHistory);
     }
 
-    private void createHandlersForConnectedGamepads(Input input, InputHistories histories)
+    /**
+     * <p>Creates a metadata entry for each supported gamepad connection. Each entry will be initialized with empty
+     * button and axis bindings. Active bindings are also empty.</p>
+     */
+    @SuppressWarnings("unchecked")
+    private void createMetadataEntriesPerConnection()
     {
-        for (final Gamepad gamepad : input.getGamepads().values()) {
-            createGamepadHandler(gamepad, histories);
+        final Iterable<PadProfile> profiles = mPadProfiles.values();
+
+        for (final Connection connection : Connection.values()) {
+            final ConnectionEntry entry = new ConnectionEntry();
+            entry.mActiveProfile = NULL_PROFILE;
+
+            // Init each supported profile to an empty map
+            for (final PadProfile profile : profiles) {
+                entry.mProfileButtonMaps.put(profile, NULL_BUTTONS);
+                entry.mProfileAxisMaps.put(profile, NULL_AXES);
+            }
+
+            // Empty profile points to empty bindings for when user submits an empty map
+            entry.mProfileButtonMaps.put(NULL_PROFILE, NULL_BUTTONS);
+            entry.mProfileAxisMaps.put(NULL_PROFILE, NULL_AXES);
+
+            mConnectionEntries.put(connection, entry);
         }
     }
 
-    private void watchInputForGamepadChanges(Input input, InputHistories histories)
+    private void associateEntriesWithConnectedGamepads(Input input, InputHistories histories)
     {
+        for (final Gamepad gamepad : input.getGamepads().values()) {
+            associateEntryWithGamepad(gamepad, histories);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void watchForGamepadChanges(Input input, InputHistories histories)
+    {
+        // Add new profile to each gamepad
+        input.addOnGamepadProfileAddListener((name, profile) ->
+        {
+            for (final Connection connection : Connection.values()) {
+
+                mPadProfiles.put(name, profile);
+
+                final ConnectionEntry entry = mConnectionEntries.get(connection);
+                entry.mProfileButtonMaps.put(profile, NULL_BUTTONS);
+                entry.mProfileAxisMaps.put(profile, NULL_AXES);
+            }
+        });
+
         input.addGamepadOnConnectionChangeListener((gamepad) ->
         {
             if (gamepad.isConnected()) {
-                createGamepadHandler(gamepad, histories);
+                associateEntryWithGamepad(gamepad, histories);
             } else {
-                destroyGamepadHandler(gamepad);
+                disassociateEntryFromGamepad(gamepad.getConnection());
             }
         });
     }
 
     /**
-     * <p>Creates a handler for the given gamepad and sets aside its desired button and axis classes. The gamepad
-     * will have no set button or axis mappings.</p>
+     * <p>Selects the gamepad's profile as the in-use profile and creates a gamepad handler with the in-use profile's
+     * associated bindings.</p>
      *
      * @param gamepad gamepad.
      * @param histories event histories.
      */
-    private void createGamepadHandler(Gamepad gamepad, InputHistories histories)
+    @SuppressWarnings("unchecked")
+    private void associateEntryWithGamepad(Gamepad gamepad, InputHistories histories)
     {
         final Connection connection = gamepad.getConnection();
         final Table<PadEvent>[] buttonHistory = histories.getGamepadButtonHistory(connection);
         final Table<PadEvent> axisHistory = histories.getGamepadMotionHistory(connection);
 
-        mPadControls.put(connection, new GamepadHandler(buttonHistory[0], buttonHistory[1], axisHistory));
-
-        // Create meta data
+        final ConnectionEntry entry = mConnectionEntries.get(connection);
         final PadProfile profile = gamepad.getProfile();
-        final PadInfo info = new PadInfo();
 
-        info.mExpectedButtonClass = profile.getButtonClass();
-        info.mExpectedAxisClass = profile.getAxisClass();
-        info.mButtonMappings = new HashMap<>();
-        info.mAxisMappings = new HashMap<>();
+        entry.mActiveProfile = profile;
+        entry.mHandler = new GamepadHandler(buttonHistory[0], buttonHistory[1], axisHistory);
 
-        mPadMeta.put(connection, info);
+        // Set bindings according to profile
+        entry.mHandler.mButtonCtrl.setMappings((Map) entry.mProfileButtonMaps.get(profile));
+        entry.mHandler.mAxisCtrl.setMappings((Map) entry.mProfileAxisMaps.get(profile));
     }
 
     /**
-     * <p>Destroys the handler for the given gamepad.</p>
+     * <p>Resets the connection entry's in-use profile and discards the entry's associated gamepad handler.</p>
      *
-     * @param gamepad gamepad.
+     * @param connection connection.
      */
-    private void destroyGamepadHandler(Gamepad gamepad)
+    private void disassociateEntryFromGamepad(Connection connection)
     {
-        final Connection connection = gamepad.getConnection();
-        mPadMeta.remove(connection);
-        mPadControls.remove(connection);
-    }
-
-    private void checkGamepadAvailability(Connection connection, GamepadHandler ctrl)
-    {
-        if (ctrl == null) {
-            throw new IllegalStateException("No available gamepad for " + connection);
-        }
+        final ConnectionEntry entry = mConnectionEntries.get(connection);
+        entry.mActiveProfile = NULL_PROFILE;
+        entry.mHandler = null;
     }
 
     private void checkGamepadConstantClasses(Class expected, Class actual)
     {
-        if (expected != actual) {
+        if (actual != expected) {
             final String format = "Gamepad is configured to use \"%s\" constants but was given \"%s\"";
-            throw new IllegalArgumentException(String.format(format, expected.getSimpleName(), actual.getSimpleName()));
+            throw new IllegalArgumentException(String.format(format, actual.getSimpleName(), expected.getSimpleName()));
         }
     }
 
@@ -327,21 +463,21 @@ public final class InputControls implements Controls
     }
 
     /**
-     * <p>Carries a gamepad's expected button and axis classes as well as its button and axis mappings.</p>
-     *
-     * @param <ButtonType> expected button.
-     * @param <AxisType> expected axis.
+     * <p>Carries a connection's in-use profile, available bindings, and the bindings' executor.</p>
      */
-    private class PadInfo<
-            ButtonType extends Enum<ButtonType> & ButtonWrapper,
-            AxisType extends Enum<AxisType> & AxisWrapper
-            >
+    private class ConnectionEntry
     {
-        private Map<String, ButtonRule<ButtonType, PadEvent>> mButtonMappings;
-        private Map<String, AxisRule<AxisType, PadEvent>> mAxisMappings;
+        // Available axis bindings per profile
+        private final Map mProfileButtonMaps = new HashMap<>();
 
-        private Class<ButtonType> mExpectedButtonClass;
-        private Class<AxisType> mExpectedAxisClass;
+        // Available axis bindings per profile
+        private final Map mProfileAxisMaps = new HashMap<>();
+
+        // Profile currently being used
+        private PadProfile mActiveProfile;
+
+        // Executes on current bindings
+        private GamepadHandler mHandler;
     }
 
     /**
@@ -365,7 +501,7 @@ public final class InputControls implements Controls
         @SuppressWarnings("unchecked")
         public void visit(PadEvent event)
         {
-            final GamepadHandler ctrl = mPadControls.get(event.getSource());
+            final GamepadHandler ctrl = mConnectionEntries.get(event.getSource()).mHandler;
             ((event.isButton()) ? ctrl.mButtonCtrl : ctrl.mAxisCtrl).submit(event);
         }
     }
@@ -395,7 +531,7 @@ public final class InputControls implements Controls
         private MouseHandler(Table<MouseEvent> pressHistory, Table<MouseEvent> releaseHistory,
                             Table<MouseEvent> axisHistory)
         {
-            mButtonHandler = new ButtonHandler<Button, Button, MouseEvent>(Button.class, pressHistory, releaseHistory)
+            mButtonHandler = new ButtonHandler<>(Button.class, pressHistory, releaseHistory)
             {
                 @Override
                 protected Button extractConstantFrom(MouseEvent event)
@@ -404,7 +540,7 @@ public final class InputControls implements Controls
                 }
             };
 
-            mAxisHandler = new AxisHandler<Button, Button, MouseEvent>(Button.class, axisHistory)
+            mAxisHandler = new AxisHandler<>(Button.class, axisHistory)
             {
                 @Override
                 protected Button extractConstantFrom(MouseEvent event)
@@ -426,8 +562,7 @@ public final class InputControls implements Controls
 
         GamepadHandler(Table<PadEvent> presses, Table<PadEvent> releases, Table<PadEvent> axisHistory)
         {
-            mButtonCtrl = new ButtonHandler<ButtonType, Gamepad.Button, PadEvent>(Gamepad.Button.class, presses,
-                    releases)
+            mButtonCtrl = new ButtonHandler<>(Gamepad.Button.class, presses, releases)
             {
                 @Override
                 protected Gamepad.Button extractConstantFrom(PadEvent event)
@@ -449,7 +584,7 @@ public final class InputControls implements Controls
                 }
             };
 
-            mAxisCtrl = new AxisHandler<AxisType, Gamepad.Axis, PadEvent>(Gamepad.Axis.class, axisHistory)
+            mAxisCtrl = new AxisHandler<>(Gamepad.Axis.class, axisHistory)
             {
                 @Override
                 protected Axis extractConstantFrom(PadEvent event)
