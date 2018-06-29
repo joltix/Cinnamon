@@ -267,6 +267,30 @@ public class IntegratableInputTest
     }
 
     @Test
+    public void testAddOnGamepadProfileAddListener()
+    {
+        mInput.addOnGamepadProfileAddListener((name, profile) -> {});
+    }
+
+    @Test (expected = NullPointerException.class)
+    public void testAddOnGamepadProfileAddListenerNPE()
+    {
+        mInput.addOnGamepadProfileAddListener(null);
+    }
+
+    @Test
+    public void testRemoveOnGamepadProfileAddListener()
+    {
+        mInput.removeOnGamepadProfileAddListener((name, profile) -> {});
+    }
+
+    @Test (expected = NullPointerException.class)
+    public void testRemoveOnGamepadProfileAddListenerNPE()
+    {
+        mInput.removeOnGamepadProfileAddListener(null);
+    }
+
+    @Test
     public void testGetKeyboard()
     {
         Assert.assertNotNull(mInput.getKeyboard());
@@ -407,18 +431,16 @@ public class IntegratableInputTest
     {
         final GamepadConnectionCallback callback = mInput.getGamepadConnectionCallback();
         final int joystick = Connection.PAD_1.toInt();
-        final int event = GLFW.GLFW_CONNECTED;
 
-        callback.onConnectionUpdate(joystick, event, XB1.GAMEPAD_NAME);
+        callback.onConnection(joystick, XB1.GAMEPAD_NAME);
     }
 
     private void fakeXboxGamepadDisconnection()
     {
         final GamepadConnectionCallback callback = mInput.getGamepadConnectionCallback();
         final int joystick = Connection.PAD_1.toInt();
-        final int event = GLFW.GLFW_DISCONNECTED;
 
-        callback.onConnectionUpdate(joystick, event, XB1.GAMEPAD_NAME);
+        callback.onDisconnection(joystick);
     }
 
     /**
