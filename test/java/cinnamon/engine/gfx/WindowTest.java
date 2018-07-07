@@ -2,7 +2,6 @@ package cinnamon.engine.gfx;
 
 import cinnamon.engine.gfx.WindowTestSuite.MockCanvas;
 import cinnamon.engine.utils.Assets;
-import cinnamon.engine.utils.Size;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -36,8 +35,10 @@ public class WindowTest
     // For testing icon change
     private static final String ICON_PATH = "cinnamon/engine/gfx/test_icon.jpg";
 
-    private static final int EXPECTED_SCREEN_WIDTH = (int) Toolkit.getDefaultToolkit().getScreenSize().getWidth();
-    private static final int EXPECTED_SCREEN_HEIGHT = (int) Toolkit.getDefaultToolkit().getScreenSize().getHeight();
+    private static final GraphicsDevice GFX_DEVICE = GraphicsEnvironment.getLocalGraphicsEnvironment()
+            .getDefaultScreenDevice();
+    private static final int EXPECTED_SCREEN_WIDTH = (int) GFX_DEVICE.getDisplayMode().getWidth();
+    private static final int EXPECTED_SCREEN_HEIGHT = (int) GFX_DEVICE.getDisplayMode().getHeight();
 
     private static final int WINDOW_WIDTH = 1280;
     private static final int WINDOW_HEIGHT = 720;
@@ -195,9 +196,9 @@ public class WindowTest
 
         WindowTestSuite.keepOpenAndExecute(() ->
         {
-            final Size primarySize = mWindow.getPrimaryDisplayResolution();
-            Assert.assertEquals(EXPECTED_SCREEN_WIDTH, primarySize.getWidth(), 0f);
-            Assert.assertEquals(EXPECTED_SCREEN_HEIGHT, primarySize.getHeight(), 0f);
+            final int[] primarySize = mWindow.getPrimaryDisplayResolution();
+            Assert.assertEquals(EXPECTED_SCREEN_WIDTH, primarySize[0], 0f);
+            Assert.assertEquals(EXPECTED_SCREEN_HEIGHT, primarySize[1], 0f);
 
         }, TEST_DELAY, TEST_DURATION);
     }

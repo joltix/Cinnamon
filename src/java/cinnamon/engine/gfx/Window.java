@@ -7,7 +7,6 @@ import cinnamon.engine.event.IntegratableInput.GamepadConnectionCallback;
 import cinnamon.engine.event.IntegratableInput.GamepadUpdateCallback;
 import cinnamon.engine.event.IntegratableInput.MouseButtonCallback;
 import cinnamon.engine.event.IntegratableInput.MouseScrollCallback;
-import cinnamon.engine.utils.Size;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.GL;
@@ -119,6 +118,10 @@ public final class Window
 
     private final List<OnFocusChangeListener> mOnFocusChangeListeners = new ArrayList<>();
 
+    private final List<OnMinimizeListener> mOnMinimizeListeners = new ArrayList<>();
+
+    private final List<OnMaximizeListener> mOnMaximizeListeners = new ArrayList<>();
+
     private final GamepadUpdateCallback mGamepadUpdateCallback;
 
     private Thread mRenderThread;
@@ -136,7 +139,7 @@ public final class Window
     // Width in screen coords
     private int mPrimaryWidth;
 
-    // Width in screen coords
+    // Height in screen coords
     private int mPrimaryHeight;
 
     private final Object mFramebufferSizeLock = new Object();
@@ -149,26 +152,21 @@ public final class Window
 
     private String mWinTitle;
 
-    private boolean mHasResized = false;
+    /**
+     * Guards the Canvas from constantly synchronizing to copy an unchanged size. This flag
+     * becomes true only after a Window instance's size has been completely updated from
+     * GLFW's size callback on the main thread. This flag becomes false after the Window's
+     * Canvas has finished copying the new size.
+     */
+    private volatile boolean mHasResized = false;
 
     private final double[] mMousePosX = new double[1];
 
     private final double[] mMousePosY = new double[1];
 
-    /**
-     * The following toggles reflect GLFW's corresponding window states and allow thread-safe state viewing without
-     * the need for native calls (GLFW's methods).
-     */
+    private boolean mVsync = true;
 
-    private volatile boolean mVsync = true;
-
-    private volatile boolean mDestroyed = false;
-
-    private volatile boolean mFocused = true;
-
-    private volatile boolean mMinimized = false;
-
-    private volatile boolean mMaximized = false;
+    private boolean mDestroyed = false;
 
     /**
      * <p>Constructs a {@code Window} with a given title and a specified drawing surface.</p>
@@ -204,8 +202,8 @@ public final class Window
         createGamepads();
 
         mGamepadUpdateCallback = mInput.getGamepadUpdateCallback();
-        setInputCallbacks();
         setStateCallbacks();
+        setInputCallbacks();
         setSizeCallbacks();
 
         readFrameBufferSize();
@@ -213,6 +211,8 @@ public final class Window
 
     /**
      * <p>Checks if the window can no longer be opened.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
      *
      * @return true if unusable.
      */
@@ -249,9 +249,6 @@ public final class Window
 
             GLFW.glfwMakeContextCurrent(MemoryUtil.NULL);
         });
-
-        // Enable Input to produce events
-        setInputCallbacks();
 
         GLFW.glfwShowWindow(mIdGLFW);
         mRenderThread.start();
@@ -398,13 +395,13 @@ public final class Window
      * used when dealing specifically with pixels (i.e. drawing operations). For screen coordinates, see
      * {@code getWidth()}.</p>
      *
+     * <p>This method should only be called on the main thread.</p>
+     *
      * @return width in pixels.
      */
     public int getFramebufferWidth()
     {
-        synchronized (mFramebufferSizeLock) {
-            return mFramebufferWidth;
-        }
+        return mFramebufferWidth;
     }
 
     /**
@@ -414,13 +411,13 @@ public final class Window
      * be used when dealing specifically with pixels (i.e. drawing operations). For screen coordinates, see
      * {@code getHeight()}.</p>
      *
+     * <p>This method should only be called on the main thread.</p>
+     *
      * @return height in pixels.
      */
     public int getFramebufferHeight()
     {
-        synchronized (mFramebufferSizeLock) {
-            return mFramebufferHeight;
-        }
+        return mFramebufferHeight;
     }
 
     /**
@@ -530,6 +527,8 @@ public final class Window
     /**
      * <p>Checks whether or not the frame rate is being limited to match the monitor's refresh rate.</p>
      *
+     * <p>This method should only be called on the main thread.</p>
+     *
      * @return true if vsync is enabled.
      */
     public boolean isVsyncEnabled()
@@ -557,11 +556,13 @@ public final class Window
     /**
      * <p>Checks if the window has focus.</p>
      *
+     * <p>This method should only be called on the main thread.</p>
+     *
      * @return true if focused.
      */
     public boolean isFocused()
     {
-        return mFocused;
+        return GLFW.glfwGetWindowAttrib(mIdGLFW, GLFW.GLFW_FOCUSED) == GLFW.GLFW_TRUE;
     }
 
     /**
@@ -583,11 +584,13 @@ public final class Window
     /**
      * <p>Checks if the window is minimized.</p>
      *
+     * <p>This method should only be called on the main thread.</p>
+     *
      * @return true if minimized.
      */
     public boolean isMinimized()
     {
-        return mMinimized;
+        return GLFW.glfwGetWindowAttrib(mIdGLFW, GLFW.GLFW_ICONIFIED) == GLFW.GLFW_TRUE;
     }
 
     /**
@@ -603,11 +606,13 @@ public final class Window
     /**
      * <p>Checks if the window is maximized.</p>
      *
+     * <p>This method should only be called on the main thread.</p>
+     *
      * @return true if maximized.
      */
     public boolean isMaximized()
     {
-        return mMaximized;
+        return GLFW.glfwGetWindowAttrib(mIdGLFW, GLFW.GLFW_MAXIMIZED) == GLFW.GLFW_TRUE;
     }
 
     /**
@@ -776,32 +781,13 @@ public final class Window
     }
 
     /**
-     * <p>Gets the resolution of the primary display. The returned {@code Size's} depth will be 0.</p>
+     * <p>Gets the resolution of the primary display.</p>
      *
      * @return primary display size.
      */
-    public Size getPrimaryDisplayResolution()
+    public int[] getPrimaryDisplayResolution()
     {
-        return new Size()
-        {
-            @Override
-            public float getWidth()
-            {
-                return mPrimaryWidth;
-            }
-
-            @Override
-            public float getHeight()
-            {
-                return mPrimaryHeight;
-            }
-
-            @Override
-            public float getDepth()
-            {
-                return 0f;
-            }
-        };
+        return new int[] {mPrimaryWidth, mPrimaryHeight};
     }
 
     /**
@@ -911,10 +897,70 @@ public final class Window
     }
 
     /**
+     * <p>Adds an {@code OnMinimizeListener}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    public void addOnMinimizeListener(OnMinimizeListener listener)
+    {
+        checkNull(listener);
+
+        mOnMinimizeListeners.add(listener);
+    }
+
+    /**
+     * <p>Removes an {@code OnMinimizeListener}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    public void removeOnMinimizeListener(OnMinimizeListener listener)
+    {
+        checkNull(listener);
+
+        mOnMinimizeListeners.remove(listener);
+    }
+
+    /**
+     * <p>Adds an {@code OnMaximizeListener}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    public void addOnMaximizeListener(OnMaximizeListener listener)
+    {
+        checkNull(listener);
+
+        mOnMaximizeListeners.add(listener);
+    }
+
+    /**
+     * <p>Removes an {@code OnMaximizeListener}.</p>
+     *
+     * <p>This method should only be called on the main thread.</p>
+     *
+     * @param listener listener.
+     * @throws NullPointerException if listener is null.
+     */
+    public void removeOnMaximizeListener(OnMaximizeListener listener)
+    {
+        checkNull(listener);
+
+        mOnMaximizeListeners.remove(listener);
+    }
+
+    /**
      * <p>Marks the window as no longer usable. Once this method executes, the window cannot be reopened.</p>
      *
      * <p>If the window is open when this method is called, it is automatically closed. If the destroyed window was
-     * the last {@code Window} instance, GLFW is terminated.</p>
+     * the last {@code Window} instance, GLFW is terminated. Added callbacks are no longer notified.</p>
      *
      * <p>This method should only be called on the main thread.</p>
      */
@@ -940,10 +986,12 @@ public final class Window
             close();
         }
 
+        removeStateCallbacks();
+        removeInputCallbacks();
+        removeSizeCallbacks();
+
         mDestroyed = true;
         GLFW.glfwDestroyWindow(mIdGLFW);
-        removeInputCallbacks();
-        removeStateCallbacks();
 
         // Release resources if destroying last window
         if (cleanUp && mWindows.isEmpty()) {
@@ -960,23 +1008,15 @@ public final class Window
     {
         GLFW.glfwSetWindowIconifyCallback(mIdGLFW, (handle, minimized) ->
         {
-            mMinimized = minimized;
+            notifyMinimizeListeners();
         });
         GLFW.glfwSetWindowFocusCallback(mIdGLFW, (handle, focused) ->
         {
-            mFocused = focused;
-
-            if (focused) {
-                setInputCallbacks();
-            } else {
-                removeInputCallbacks();
-            }
-
             notifyFocusListeners(focused);
         });
         GLFW.glfwSetWindowMaximizeCallback(mIdGLFW, (handle, maximized) ->
         {
-            mMaximized = maximized;
+            notifyMaximizeListeners();
         });
         GLFW.glfwSetWindowCloseCallback(mIdGLFW, (handle) ->
         {
@@ -986,7 +1026,7 @@ public final class Window
     }
 
     /**
-     * <p>Removes GLFW callbacks regarding the window's state such as whether it's maximized or has focus.</p>
+     * <p>Removes GLFW callbacks regarding the window's state such as whether it's maximized and has focus.</p>
      *
      * <p>This method should only be called from the main thread.</p>
      */
@@ -996,6 +1036,11 @@ public final class Window
         GLFW.glfwSetWindowFocusCallback(mIdGLFW, null);
         GLFW.glfwSetWindowMaximizeCallback(mIdGLFW, null);
         GLFW.glfwSetWindowCloseCallback(mIdGLFW, null);
+
+        // Remove externally submitted listeners
+        mOnMinimizeListeners.clear();
+        mOnFocusChangeListeners.clear();
+        mOnMaximizeListeners.clear();
     }
 
     /**
@@ -1060,6 +1105,7 @@ public final class Window
     private void removeInputCallbacks()
     {
         GLFW.glfwSetMouseButtonCallback(mIdGLFW, null);
+        GLFW.glfwSetCursorPosCallback(mIdGLFW, null);
         GLFW.glfwSetScrollCallback(mIdGLFW, null);
         GLFW.glfwSetKeyCallback(mIdGLFW, null);
 
@@ -1067,6 +1113,16 @@ public final class Window
         if (mWindows.size() == 1) {
             GLFW.glfwSetJoystickCallback(null);
         }
+    }
+
+    private void removeSizeCallbacks()
+    {
+        GLFW.glfwSetWindowSizeCallback(mIdGLFW, null);
+        GLFW.glfwSetFramebufferSizeCallback(mIdGLFW, null);
+
+        // Remove externally submitted listeners
+        mOnSizeChangeListeners.clear();
+        mOnFramebufferOnSizeChangeListeners.clear();
     }
 
     /**
@@ -1202,6 +1258,20 @@ public final class Window
         }
     }
 
+    private void notifyMinimizeListeners()
+    {
+        for (final OnMinimizeListener listener : mOnMinimizeListeners) {
+            listener.onMinimize();
+        }
+    }
+
+    private void notifyMaximizeListeners()
+    {
+        for (final OnMaximizeListener listener : mOnMaximizeListeners) {
+            listener.onMaximize();
+        }
+    }
+
     private void checkNull(Object object)
     {
         if (object == null) {
@@ -1236,12 +1306,12 @@ public final class Window
     }
 
     /**
-     * <p>Notified whenever the size changes.</p>
+     * <p>Notified when a size changes.</p>
      */
     public interface OnSizeChangeListener
     {
         /**
-         * <p>Called whenever the {@code Window}'s size changes.</p>
+         * <p>Called whenever a size changes.</p>
          *
          * @param width width.
          * @param height height.
@@ -1260,5 +1330,27 @@ public final class Window
          * @param focus true if now has focus.
          */
         void onFocusChange(boolean focus);
+    }
+
+    /**
+     * <p>Notified when the window is minimized.</p>
+     */
+    public interface OnMinimizeListener
+    {
+        /**
+         * <p>Called whenever the {@code Window} minimizes.</p>
+         */
+        void onMinimize();
+    }
+
+    /**
+     * <p>Notified when the window is maximized.</p>
+     */
+    public interface OnMaximizeListener
+    {
+        /**
+         * <p>Called whenever the {@code Window} maximizes.</p>
+         */
+        void onMaximize();
     }
 }
