@@ -4,12 +4,12 @@ import java.util.*;
 import java.util.function.Consumer;
 
 /**
- * Manages the lifecycles for a list of {@code GameSystem}s from start to stop and any number of pauses and resumes
+ * Manages the lifecycles for a list of {@code BaseSystem}s from start to stop and any number of pauses and resumes
  * in-between.
  *
  * @param <E> type of system.
  */
-public final class Domain<E extends GameSystem> implements WritableSystemDirectory<E>, SystemCoordinator<E>,
+public final class Domain<E extends BaseSystem> implements WritableSystemDirectory<E>, SystemCoordinator<E>,
         SystemGroupCoordinator<E>
 {
     private final Map<String, E> mLookup = new HashMap<>();
@@ -17,22 +17,25 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
     private final List<E> mSystems = new ArrayList<>();
 
     // Defines sort relationship
-    private final Comparator<GameSystem> mComparator;
+    private final Comparator<BaseSystem> mComparator;
 
     private boolean mSortNeeded = false;
+
+    // Guards calls with external code to block adding/removing systems
+    private boolean mPreventEdits = false;
 
     // Whether systems have been started
     private boolean mStarted;
 
     /**
-     * Constructs a {@code GameSystem}.
+     * Constructs a {@code BaseSystem}.
      *
      * @param comparator system sort order.
      * @throws NullPointerException if comparator is null.
      */
-    public Domain(Comparator<GameSystem> comparator)
+    public Domain(Comparator<BaseSystem> comparator)
     {
-        checkNull(comparator);
+        checkNotNull(comparator);
 
         mComparator = comparator;
     }
@@ -40,22 +43,18 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
     @Override
     public void startSystems()
     {
-        if (mSystems.isEmpty()) {
-            return;
-        }
         if (mStarted) {
             throw new IllegalStateException("Systems have already started");
         }
 
-        if (mSortNeeded) {
-            ensureSystemsAreSorted();
-        }
-
+        ensureSystemsAreSorted();
         mStarted = true;
 
-        for (final GameSystem system : mSystems) {
-            system.onStart();
+        mPreventEdits = true;
+        for (final BaseSystem system : mSystems) {
+            system.start();
         }
+        mPreventEdits = false;
     }
 
     @Override
@@ -63,15 +62,14 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
     {
         checkSystemsHaveStarted();
 
-        if (mSortNeeded) {
-            ensureSystemsAreSorted();
-        }
-
+        ensureSystemsAreSorted();
         mStarted = false;
 
-        for (final GameSystem system : mSystems) {
-            system.onStop();
+        mPreventEdits = true;
+        for (final BaseSystem system : mSystems) {
+            system.stop();
         }
+        mPreventEdits = false;
     }
 
     @Override
@@ -79,15 +77,15 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
     {
         checkSystemsHaveStarted();
 
-        if (mSortNeeded) {
-            ensureSystemsAreSorted();
-        }
+        ensureSystemsAreSorted();
 
-        for (final GameSystem system : mSystems) {
-            if (!system.isPaused()) {
+        mPreventEdits = true;
+        for (final BaseSystem system : mSystems) {
+            if (system.isPausable() && !system.isPaused()) {
                 system.pause(reason);
             }
         }
+        mPreventEdits = false;
     }
 
     @Override
@@ -95,75 +93,105 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
     {
         checkSystemsHaveStarted();
 
-        if (mSortNeeded) {
-            ensureSystemsAreSorted();
-        }
+        ensureSystemsAreSorted();
 
-        for (final GameSystem system : mSystems) {
+        mPreventEdits = true;
+        for (final BaseSystem system : mSystems) {
             if (system.isPaused()) {
                 system.resume(reason);
             }
         }
+        mPreventEdits = false;
     }
 
     @Override
     public void callWithSystems(Consumer<E> action)
     {
-        checkNull(action);
+        checkNotNull(action);
 
-        if (mSortNeeded) {
-            ensureSystemsAreSorted();
-        }
+        ensureSystemsAreSorted();
 
+        mPreventEdits = true;
         for (final E system : mSystems) {
             action.accept(system);
         }
+        mPreventEdits = false;
+    }
+
+    @Override
+    public void callWithUnpausedSystems(Consumer<E> action)
+    {
+        checkNotNull(action);
+
+        ensureSystemsAreSorted();
+
+        mPreventEdits = true;
+        for (final E system : mSystems) {
+            if (system.isPausable() && !system.isPaused()) {
+                action.accept(system);
+            }
+        }
+        mPreventEdits = false;
     }
 
     @Override
     public void pauseSystem(String name, int reason)
     {
-        checkNull(name);
+        checkNotNull(name);
         checkSystemsHaveStarted();
 
-        final GameSystem system = mLookup.get(name);
-        checkNoSuchElement(system);
+        final BaseSystem system = mLookup.get(name);
+        checkElementExists(system);
 
-        if (!system.isPaused()) {
+        if (system.isPausable() && !system.isPaused()) {
+            mPreventEdits = true;
             system.pause(reason);
+            mPreventEdits = false;
         }
     }
 
     @Override
     public void resumeSystem(String name, int reason)
     {
-        checkNull(name);
+        checkNotNull(name);
         checkSystemsHaveStarted();
 
-        final GameSystem system = mLookup.get(name);
-        checkNoSuchElement(system);
+        final BaseSystem system = mLookup.get(name);
+        checkElementExists(system);
 
         if (system.isPaused()) {
+            mPreventEdits = true;
             system.resume(reason);
+            mPreventEdits = false;
         }
     }
 
     @Override
     public E getSystem(String name)
     {
-        checkNull(name);
+        checkNotNull(name);
 
         final E system = mLookup.get(name);
-        checkNoSuchElement(system);
+        checkElementExists(system);
 
         return system;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @param name name.
+     * @param system system.
+     * @throws NullPointerException {@inheritDoc}
+     * @throws IllegalArgumentException {@inheritDoc}
+     * @throws IllegalStateException if this method is called from {@link BaseSystem#onStart()},
+     * {@link BaseSystem#onStop()}, {@link BaseSystem#onPause(int)}, or {@link BaseSystem#onResume(int)}.
+     */
     @Override
     public void addSystem(String name, E system)
     {
-        checkNull(name);
-        checkNull(system);
+        checkNotNull(name);
+        checkNotNull(system);
 
         if (mLookup.containsKey(name)) {
             final String format = "System name \"%s\" already in use";
@@ -171,7 +199,10 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
 
         } else if (system.getCoordinator() != null) {
             throw new IllegalArgumentException("System has already been added to a Domain");
+
         }
+
+        checkSystemsCanBeEdited();
 
         mLookup.put(name, system);
         mSystems.add(system);
@@ -180,13 +211,23 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
         mSortNeeded = true;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @param name name.
+     * @throws NullPointerException {@inheritDoc}
+     * @throws NoSuchElementException {@inheritDoc}
+     * @throws IllegalStateException if this method is called from {@link BaseSystem#onStart()},
+     * {@link BaseSystem#onStop()}, {@link BaseSystem#onPause(int)}, or {@link BaseSystem#onResume(int)}.
+     */
     @Override
     public void removeSystem(String name)
     {
-        checkNull(name);
+        checkNotNull(name);
 
-        final GameSystem system = mLookup.remove(name);
-        checkNoSuchElement(system);
+        final BaseSystem system = mLookup.remove(name);
+        checkElementExists(system);
+        checkSystemsCanBeEdited();
 
         system.setCoordinator(null);
 
@@ -201,8 +242,17 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
 
     private void ensureSystemsAreSorted()
     {
-        mSystems.sort(mComparator);
-        mSortNeeded = false;
+        if (mSortNeeded) {
+            mSystems.sort(mComparator);
+            mSortNeeded = false;
+        }
+    }
+
+    private void checkSystemsCanBeEdited()
+    {
+        if (mPreventEdits) {
+            throw new IllegalStateException("System cannot be added at this time");
+        }
     }
 
     private void checkSystemsHaveStarted()
@@ -212,16 +262,16 @@ public final class Domain<E extends GameSystem> implements WritableSystemDirecto
         }
     }
 
-    private void checkNull(Object object)
+    private void checkNotNull(Object object)
     {
         if (object == null) {
             throw new NullPointerException();
         }
     }
 
-    private void checkNoSuchElement(Object object)
+    private void checkElementExists(Object element)
     {
-        if (object == null) {
+        if (element == null) {
             throw new NoSuchElementException();
         }
     }
