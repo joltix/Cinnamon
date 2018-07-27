@@ -21,12 +21,12 @@ import java.util.List;
  *
  * <p>This lifecycle is heavily influenced by the Android <i>Activity</i> lifecycle but with some operational changes -
  * one of the major differences being that <i>the pause state is not expected to occur prior to stopping</i>.
- * Pausing a {@code GameSystem} delivers an intention to explicitly resume where the system left off.</p>
+ * Pausing a {@code BaseSystem} delivers an intention to explicitly resume where the system left off.</p>
  *
  * <p>While the start, pause, resume, and stop states outline a general progression, subclasses are expected to
  * insert additional steps among those provided, as appropriate to the system's environment.</p>
  */
-public abstract class GameSystem implements Prioritizable
+public abstract class BaseSystem implements Prioritizable
 {
     /**
      * Possible states depending on the most recent call to either {@link #start()}, {@link #stop()},
@@ -53,11 +53,11 @@ public abstract class GameSystem implements Prioritizable
     private ProcessState mState;
 
     /**
-     * Constructs a {@code GameSystem}.
+     * Constructs a {@code BaseSystem}.
      *
      * @param priority priority.
      */
-    protected GameSystem(int priority)
+    protected BaseSystem(int priority)
     {
         mPriority = priority;
     }
@@ -86,7 +86,7 @@ public abstract class GameSystem implements Prioritizable
      */
     public final void addOnPauseListener(OnPauseListener listener)
     {
-        checkNull(listener);
+        checkNotNull(listener);
 
         mOnPauseListeners.add(listener);
     }
@@ -99,7 +99,7 @@ public abstract class GameSystem implements Prioritizable
      */
     public final void removeOnPauseListener(OnPauseListener listener)
     {
-        checkNull(listener);
+        checkNotNull(listener);
 
         mOnPauseListeners.remove(listener);
     }
@@ -112,7 +112,7 @@ public abstract class GameSystem implements Prioritizable
      */
     public final void addOnResumeListener(OnResumeListener listener)
     {
-        checkNull(listener);
+        checkNotNull(listener);
 
         mOnResumeListeners.add(listener);
     }
@@ -125,7 +125,7 @@ public abstract class GameSystem implements Prioritizable
      */
     public final void removeOnResumeListener(OnResumeListener listener)
     {
-        checkNull(listener);
+        checkNotNull(listener);
 
         mOnResumeListeners.remove(listener);
     }
@@ -162,6 +162,18 @@ public abstract class GameSystem implements Prioritizable
     protected final SystemCoordinator getCoordinator()
     {
         return mCoordinator;
+    }
+
+    /**
+     * Checks if the system allows itself to be paused.
+     *
+     * <p>All systems are pausable by default.</p>
+     *
+     * @return true if pausable.
+     */
+    protected boolean isPausable()
+    {
+        return true;
     }
 
     @Override
@@ -241,7 +253,7 @@ public abstract class GameSystem implements Prioritizable
         }
     }
 
-    private void checkNull(Object object)
+    private void checkNotNull(Object object)
     {
         if (object == null) {
             throw new NullPointerException();
@@ -256,7 +268,7 @@ public abstract class GameSystem implements Prioritizable
          * @param system system.
          * @param reason reason.
          */
-        void onPause(GameSystem system, int reason);
+        void onPause(BaseSystem system, int reason);
     }
 
     public interface OnResumeListener
@@ -267,6 +279,6 @@ public abstract class GameSystem implements Prioritizable
          * @param system system.
          * @param reason reason.
          */
-        void onResume(GameSystem system, int reason);
+        void onResume(BaseSystem system, int reason);
     }
 }
