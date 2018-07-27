@@ -2,18 +2,8 @@ package cinnamon.engine.core;
 
 import java.util.function.Consumer;
 
-/**
- *
- *
- * @param <E> type of system.
- */
-public interface SystemGroupCoordinator<E extends GameSystem>
+public interface SystemGroupCoordinator<E extends BaseSystem>
 {
-    /**
-     * Reason code used when pausing and resuming systems en mass.
-     */
-    int REASON = 0;
-
     /**
      * Starts all systems.
      *
@@ -29,7 +19,7 @@ public interface SystemGroupCoordinator<E extends GameSystem>
     void stopSystems();
 
     /**
-     * Pauses all running systems. Any already paused system will not have {@link GameSystem#onPause(int)} called.
+     * Pauses all pausable yet unpaused systems.
      *
      * @param reason reason.
      * @throws IllegalStateException if systems have not yet started.
@@ -37,7 +27,7 @@ public interface SystemGroupCoordinator<E extends GameSystem>
     void pauseSystems(int reason);
 
     /**
-     * Resumes all paused systems. Any already running system will not have {@link GameSystem#onResume(int)} called.
+     * Resumes all paused systems.
      *
      * @param reason reason.
      * @throws IllegalStateException if systems have not yet started.
@@ -45,10 +35,22 @@ public interface SystemGroupCoordinator<E extends GameSystem>
     void resumeSystems(int reason);
 
     /**
-     * Calls {@link Consumer#accept(Object)} with every system.
+     * Calls {@link Consumer#accept(Object)} with every system. This method ignores whether or not a system is paused.
+     *
+     * <p>When notifying systems about an event, a pause state should be honored and a system ignored to maintain
+     * expectations. For this purpose, {@link #callWithUnpausedSystems(Consumer)} should be used instead.</p>
      *
      * @param action action.
      * @throws NullPointerException if action is null.
      */
     void callWithSystems(Consumer<E> action);
+
+    /**
+     * Calls {@link Consumer#accept(Object)} with every pausable yet unpaused system.
+     *
+     * @param action action.
+     * @throws NullPointerException if action is null.
+     * @see #callWithSystems(Consumer)
+     */
+    void callWithUnpausedSystems(Consumer<E> action);
 }
