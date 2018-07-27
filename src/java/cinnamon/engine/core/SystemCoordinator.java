@@ -7,11 +7,11 @@ import java.util.NoSuchElementException;
  *
  * @param <E> type of system.
  */
-public interface SystemCoordinator<E extends GameSystem> extends SystemDirectory<E>
+public interface SystemCoordinator<E extends BaseSystem> extends SystemDirectory<E>
 {
 
     /**
-     * Pauses a running system. If the system is already paused, this method does nothing.
+     * Pauses a pausable yet unpaused system.
      *
      * @param name name.
      * @param reason reason.
@@ -21,7 +21,7 @@ public interface SystemCoordinator<E extends GameSystem> extends SystemDirectory
     void pauseSystem(String name, int reason);
 
     /**
-     * Resumes a paused system. If the system is not paused, this method does nothing.
+     * Resumes a paused system.
      *
      * @param name name.
      * @param reason reason.
