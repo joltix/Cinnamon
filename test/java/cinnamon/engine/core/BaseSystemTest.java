@@ -1,7 +1,7 @@
 package cinnamon.engine.core;
 
-import cinnamon.engine.core.GameSystem.OnPauseListener;
-import cinnamon.engine.core.GameSystem.OnResumeListener;
+import cinnamon.engine.core.BaseSystem.OnPauseListener;
+import cinnamon.engine.core.BaseSystem.OnResumeListener;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -9,7 +9,7 @@ import org.junit.Test;
 
 import java.util.Comparator;
 
-public class GameSystemTest
+public class BaseSystemTest
 {
     // Index for primary test listener
     private static final int LISTENER_A_INDEX = 0;
@@ -23,7 +23,7 @@ public class GameSystemTest
     // Pause/resume reason code
     private static final int REASON = 42;
 
-    private GameSystem mSystem;
+    private BaseSystem mSystem;
 
     @Before
     public void setUp()
@@ -88,23 +88,25 @@ public class GameSystemTest
     @Test
     public void testResumeNotifiesEachListenerOnce()
     {
-        final int[] numberOfCalls = new int[2];
+        final int[] listenerCalls = new int[2];
 
+        // Record number of times listener A is notified
         final OnResumeListener listenerA = (system, reason) ->
         {
-            numberOfCalls[LISTENER_A_INDEX]++;
+            listenerCalls[LISTENER_A_INDEX]++;
         };
 
+        // Record number of times listener B is notified
         final OnResumeListener listenerB = (system, reason) ->
         {
-            numberOfCalls[LISTENER_B_INDEX]++;
+            listenerCalls[LISTENER_B_INDEX]++;
         };
 
         mSystem.addOnResumeListener(listenerA);
         mSystem.addOnResumeListener(listenerB);
         mSystem.resume(REASON);
 
-        for (final int callCount : numberOfCalls) {
+        for (final int callCount : listenerCalls) {
             Assert.assertEquals(1, callCount);
         }
     }
@@ -180,7 +182,7 @@ public class GameSystemTest
     @Test
     public void testSetCoordinator()
     {
-        mSystem.setCoordinator(new Domain(Comparator.comparingInt(GameSystem::getPriority)));
+        mSystem.setCoordinator(new Domain(Comparator.comparingInt(BaseSystem::getPriority)));
     }
 
     @Test
@@ -198,13 +200,13 @@ public class GameSystemTest
     @Test
     public void testGetCoordinatorReturnsCoordinatorFromSetCoordinator()
     {
-        final Domain<TestSystem> domain = new Domain<>(Comparator.comparingInt(GameSystem::getPriority));
+        final Domain<TestSystem> domain = new Domain<>(Comparator.comparingInt(BaseSystem::getPriority));
         mSystem.setCoordinator(domain);
 
         Assert.assertSame(domain, mSystem.getCoordinator());
     }
 
-    private class TestSystem extends GameSystem
+    private class TestSystem extends BaseSystem
     {
         protected TestSystem(int priority)
         {
