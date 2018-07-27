@@ -7,7 +7,7 @@ import java.util.NoSuchElementException;
  *
  * @param <E> type of system.
  */
-public interface SystemDirectory<E extends GameSystem>
+public interface SystemDirectory<E extends BaseSystem>
 {
     /**
      * Gets a system.

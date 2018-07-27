@@ -7,7 +7,7 @@ import java.util.NoSuchElementException;
  *
  * @param <E> type of system.
  */
-public interface WritableSystemDirectory<E extends GameSystem> extends SystemDirectory<E>
+public interface WritableSystemDirectory<E extends BaseSystem> extends SystemDirectory<E>
 {
     /**
      * Adds a system with the given name.
@@ -16,7 +16,7 @@ public interface WritableSystemDirectory<E extends GameSystem> extends SystemDir
      * @param system system.
      * @throws NullPointerException if name or system is null.
      * @throws IllegalArgumentException if either name or system is already in use.
-     * @throws IllegalStateException if adding systems are not currently allowed.
+     * @throws IllegalStateException if adding systems is not currently allowed.
      */
     void addSystem(String name, E system);
 
@@ -26,7 +26,7 @@ public interface WritableSystemDirectory<E extends GameSystem> extends SystemDir
      * @param name name.
      * @throws NullPointerException if name is null.
      * @throws NoSuchElementException if name does not refer to a system.
-     * @throws IllegalStateException if removing systems are not currently allowed.
+     * @throws IllegalStateException if removing systems is not currently allowed.
      */
     void removeSystem(String name);
 }
