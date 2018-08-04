@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RunWith(Suite.class)
-@SuiteClasses({GameTest.class})
+@SuiteClasses({GameTest.class, GameOptionalPropertiesTest.class})
 public class GameTestSuite
 {
     static final String TITLE = "Game Tests";
@@ -22,21 +22,7 @@ public class GameTestSuite
 
     static final int TICK_RATE = 30;
 
-    static final String CUSTOM_STRING_PROPERTY_NAME = "test_string";
-
-    static final String CUSTOM_DOUBLE_PROPERTY_NAME = "test_double";
-
-    static final String CUSTOM_INTEGER_PROPERTY_NAME = "test_integer";
-
-    static final String CUSTOM_BOOLEAN_PROPERTY_NAME = "test_boolean";
-
-    /**
-     * This property name does not exist in the map returned by {@link #createWorkingProperties()}.
-     */
-    static final String UNRECOGNIZED_PROPERTY_NAME = "test_unknown";
-
-
-    public static Map<String, Object> createWorkingProperties()
+    public static Map<String, Object> createMinimalProperties()
     {
         final Map<String, Object> properties = new HashMap<>();
 
@@ -44,14 +30,6 @@ public class GameTestSuite
         properties.put(Game.DEVELOPER, DEVELOPER);
         properties.put(Game.BUILD, BUILD);
         properties.put(Game.TICK_RATE, TICK_RATE);
-
-        properties.put(Game.WINDOW_TITLE, TITLE);
-        properties.put(Game.WINDOW_BORDERLESS, true);
-
-        properties.put(CUSTOM_STRING_PROPERTY_NAME, "something");
-        properties.put(CUSTOM_BOOLEAN_PROPERTY_NAME, false);
-        properties.put(CUSTOM_DOUBLE_PROPERTY_NAME, 42d);
-        properties.put(CUSTOM_INTEGER_PROPERTY_NAME, 343);
 
         return properties;
     }

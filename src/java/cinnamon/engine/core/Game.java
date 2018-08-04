@@ -6,19 +6,23 @@ import cinnamon.engine.gfx.Canvas;
 import cinnamon.engine.gfx.Window;
 import cinnamon.engine.core.Game.CoreSystem;
 import cinnamon.engine.utils.Properties;
+import cinnamon.engine.utils.PropertyMap;
 
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 
 /**
  * Base class for a Cinnamon game. Games should extend this class to gain basic utilities and automate common game
  * services like input handling.
  *
+ * <h3>Properties</h3>
  * <p>Some aspects or features can be adjusted through named values provided at construction. These properties may
  * contain modifiable user-defined named values. However, some names are reserved with an expected value type - these
  * are not modifiable through the property setters (e.g. {@code setStringProperty(String, String)}). While many of these
  * properties do not need to exist in the initial {@code Map}, four must be explicitly specified.</p>
  *
- * <h3>Required</h3>
+ * <h4>Required</h4>
  * <ul>
  *     <li>{@link #TITLE} : String</li>
  *     <li>{@link #DEVELOPER} : String</li>
@@ -26,17 +30,17 @@ import java.util.*;
  *     <li>{@link #TICK_RATE} : int</li>
  * </ul>
  *
- * <h3>Optional</h3>
+ * <h4>Optional</h4>
+ * <p>These properties have default values when unspecified.</p>
  * <ul>
- *     <li>{@link #VSYNC} : boolean</li>
- *     <li>{@link #WINDOW_TITLE} : String</li>
- *     <li>{@link #WINDOW_WIDTH} : int</li>
- *     <li>{@link #WINDOW_HEIGHT} : int</li>
- *     <li>{@link #WINDOW_FULLSCREEN} : boolean</li>
- *     <li>{@link #WINDOW_BORDERLESS} : boolean</li>
- *     <li>{@link #WINDOW_HIDDEN} : boolean</li>
+ *     <li>{@link #VSYNC} : boolean - true</li>
+ *     <li>{@link #WINDOW_TITLE} : String - game title</li>
+ *     <li>{@link #WINDOW_WIDTH} : int - display width</li>
+ *     <li>{@link #WINDOW_HEIGHT} : int - display height</li>
+ *     <li>{@link #WINDOW_FULLSCREEN} : boolean - true</li>
+ *     <li>{@link #WINDOW_BORDERLESS} : boolean - false</li>
+ *     <li>{@link #WINDOW_HIDDEN} : boolean - false</li>
  * </ul>
- *
  */
 public abstract class Game implements Properties, WritableSystemDirectory<CoreSystem>, SystemCoordinator<CoreSystem>
 {
@@ -108,23 +112,23 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
 
     private static final boolean DEFAULT_WINDOW_HIDDEN = false;
 
-    private static final Map<String, Class> EXPECTED_PROPERTY_TYPES = new HashMap<>();
+    private static final Map<String, Class> EXPECTED_TYPES = new HashMap<>();
 
     // Mapping between all built-in properties and expected value's type
     static
     {
-        EXPECTED_PROPERTY_TYPES.put(TITLE, String.class);
-        EXPECTED_PROPERTY_TYPES.put(DEVELOPER, String.class);
-        EXPECTED_PROPERTY_TYPES.put(BUILD, Double.class);
-        EXPECTED_PROPERTY_TYPES.put(TICK_RATE, Integer.class);
+        EXPECTED_TYPES.put(TITLE, String.class);
+        EXPECTED_TYPES.put(DEVELOPER, String.class);
+        EXPECTED_TYPES.put(BUILD, Double.class);
+        EXPECTED_TYPES.put(TICK_RATE, Integer.class);
 
-        EXPECTED_PROPERTY_TYPES.put(WINDOW_TITLE, String.class);
-        EXPECTED_PROPERTY_TYPES.put(WINDOW_WIDTH, Integer.class);
-        EXPECTED_PROPERTY_TYPES.put(WINDOW_HEIGHT, Integer.class);
-        EXPECTED_PROPERTY_TYPES.put(WINDOW_FULLSCREEN, Boolean.class);
-        EXPECTED_PROPERTY_TYPES.put(WINDOW_BORDERLESS, Boolean.class);
-        EXPECTED_PROPERTY_TYPES.put(WINDOW_HIDDEN, Boolean.class);
-        EXPECTED_PROPERTY_TYPES.put(VSYNC, Boolean.class);
+        EXPECTED_TYPES.put(WINDOW_TITLE, String.class);
+        EXPECTED_TYPES.put(WINDOW_WIDTH, Integer.class);
+        EXPECTED_TYPES.put(WINDOW_HEIGHT, Integer.class);
+        EXPECTED_TYPES.put(WINDOW_FULLSCREEN, Boolean.class);
+        EXPECTED_TYPES.put(WINDOW_BORDERLESS, Boolean.class);
+        EXPECTED_TYPES.put(WINDOW_HIDDEN, Boolean.class);
+        EXPECTED_TYPES.put(VSYNC, Boolean.class);
     }
 
     // Properties that must be given by subclass
@@ -147,6 +151,7 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         LOCKED_PROPERTIES.add(DEVELOPER);
         LOCKED_PROPERTIES.add(BUILD);
         LOCKED_PROPERTIES.add(TICK_RATE);
+        LOCKED_PROPERTIES.add(WINDOW_TITLE);
         LOCKED_PROPERTIES.add(WINDOW_WIDTH);
         LOCKED_PROPERTIES.add(WINDOW_HEIGHT);
         LOCKED_PROPERTIES.add(WINDOW_FULLSCREEN);
@@ -154,11 +159,13 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         LOCKED_PROPERTIES.add(WINDOW_HIDDEN);
     }
 
-    private final Map<String, Object> mProperties = new HashMap<>();
+    private final PropertyMap mProperties;
 
     private final Domain<CoreSystem> mSystems = new Domain<>(Comparator.comparingInt(BaseSystem::getPriority));
 
-    private final Window mWindow;
+    private final Canvas mCanvas;
+
+    private Window mWindow;
 
     private volatile boolean mContinue = false;
 
@@ -191,11 +198,11 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         checkNotNull(canvas);
         checkNotNull(properties);
         checkRequiredPropertiesExist(properties);
-        checkPropertiesHaveCorrectValueTypes(properties);
 
-        mWindow = createWindowFromProperties(canvas, properties);
+        mProperties = new PropertyMap(properties, LOCKED_PROPERTIES, EXPECTED_TYPES);
+        ensurePropertiesHaveValidValues();
 
-        ensurePropertiesHaveValidValues(properties);
+        mCanvas = canvas;
     }
 
     /**
@@ -203,6 +210,8 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
      */
     public final void start()
     {
+        mWindow = new Window(mCanvas, getStringProperty(WINDOW_TITLE));
+
         mContinue = true;
         run();
     }
@@ -297,110 +306,55 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     @Override
     public final String getStringProperty(String name)
     {
-        checkNotNull(name);
-        checkPropertyExists(name);
-        checkPropertyValueTypeMatches(name, String.class);
-
-        final Object value = mProperties.get(name);
-
-        if (value != null && value.getClass().isAssignableFrom(String.class)) {
-            return (String) value;
-        }
-        return null;
+        return mProperties.getStringProperty(name);
     }
 
     @Override
     public final double getDoubleProperty(String name)
     {
-        checkNotNull(name);
-        checkPropertyExists(name);
-        checkPropertyValueTypeMatches(name, Double.class);
-
-        final Object value = mProperties.get(name);
-
-        if (value != null && value.getClass().isAssignableFrom(Double.class)) {
-            return (Double) value;
-        }
-        return Double.NaN;
+        return mProperties.getDoubleProperty(name);
     }
 
     @Override
     public final int getIntegerProperty(String name)
     {
-        checkNotNull(name);
-        checkPropertyExists(name);
-        checkPropertyValueTypeMatches(name, Integer.class);
-
-        final Object value = mProperties.get(name);
-
-        if (value != null && value.getClass().isAssignableFrom(Integer.class)) {
-            return (Integer) value;
-        }
-        return 0;
+        return mProperties.getIntegerProperty(name);
     }
 
     @Override
     public final boolean getBooleanProperty(String name)
     {
-        checkNotNull(name);
-        checkPropertyExists(name);
-        checkPropertyValueTypeMatches(name, Boolean.class);
-
-        final Object value = mProperties.get(name);
-
-        if (value != null && value.getClass().isAssignableFrom(Boolean.class)) {
-            return (Boolean) value;
-        }
-        return false;
+        return mProperties.getBooleanProperty(name);
     }
 
     @Override
     public final void setStringProperty(String name, String value)
     {
-        checkNotNull(name);
-        checkNotNull(value);
-        checkPropertySettable(name);
-        checkPropertyValueTypeMatches(name, String.class);
-
-        mProperties.put(name, value);
+        mProperties.setStringProperty(name, value);
     }
 
     @Override
     public final void setDoubleProperty(String name, double value)
     {
-        checkNotNull(name);
-        checkPropertySettable(name);
-        checkPropertyValueTypeMatches(name, Double.class);
-
-        mProperties.put(name, value);
+        mProperties.setDoubleProperty(name, value);
     }
 
     @Override
     public final void setIntegerProperty(String name, int value)
     {
-        checkNotNull(name);
-        checkPropertySettable(name);
-        checkPropertyValueTypeMatches(name, Integer.class);
-
-        mProperties.put(name, value);
+        mProperties.setIntegerProperty(name, value);
     }
 
     @Override
     public final void setBooleanProperty(String name, boolean value)
     {
-        checkNotNull(name);
-        checkPropertySettable(name);
-        checkPropertyValueTypeMatches(name, Boolean.class);
-
-        mProperties.put(name, value);
+        mProperties.setBooleanProperty(name, value);
     }
 
     @Override
     public final boolean containsProperty(String name)
     {
-        checkNotNull(name);
-
-        return mProperties.containsKey(name);
+        return mProperties.containsProperty(name);
     }
 
     /**
@@ -480,42 +434,25 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     }
 
     /**
-     * Checks all properties for behaviorally invalid values, makes changes if necessary, and sets aside the edited
-     * copy.
-     *
-     * @param properties externally provided properties.
+     * Checks all optional properties for behaviorally invalid values and applies the properties' default values if
+     * necessary.
      */
-    private void ensurePropertiesHaveValidValues(Map<String, Object> properties)
+    private void ensurePropertiesHaveValidValues()
     {
-        mProperties.putAll(properties);
-
-        final int[] primRes = mWindow.getPrimaryDisplayResolution();
-        constrainWindowPropertySize(primRes[0], true);
-        constrainWindowPropertySize(primRes[1], false);
-
-        selectWindowAestheticIfUnspecified();
-    }
-
-    /**
-     * Creates a {@code Window} with a title either specified through the {@link #WINDOW_TITLE} property or, if
-     * not given, matching the value of {@link #TITLE}. The final title will be reflected in the game's internal
-     * properties.
-     *
-     * @param canvas canvas.
-     * @param properties externally provided properties.
-     * @return window.
-     */
-    private Window createWindowFromProperties(Canvas canvas, Map<String, Object> properties)
-    {
-        String title = (String) properties.get(WINDOW_TITLE);
-
-        // Window title defaults to game title
-        if (title == null) {
-            title = (String) properties.get(TITLE);
-            properties.put(WINDOW_TITLE, title);
+        // Window title takes game title if unspecified
+        if (!mProperties.containsProperty(WINDOW_TITLE)) {
+            final String title = mProperties.getStringProperty(TITLE);
+            mProperties.setUnmodifiableStringProperty(WINDOW_TITLE, title);
         }
 
-        return new Window(canvas, title);
+        // Read primary display's resolution
+        final GraphicsDevice main = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        final DisplayMode mode = main.getDisplayMode();
+
+        constrainWindowPropertySize(mode.getWidth(), true);
+        constrainWindowPropertySize(mode.getHeight(), false);
+
+        selectWindowAestheticIfUnspecified();
     }
 
     /**
@@ -539,17 +476,17 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         }
 
         // Check if side is specified
-        if (mProperties.containsKey(property)) {
+        if (mProperties.containsProperty(property)) {
 
-            final int desired = (Integer) mProperties.get(property);
+            final int desired = mProperties.getIntegerProperty(property);
 
             // Take fullscreen if specified is invalid
             if (desired < min || desired > max) {
-                mProperties.put(property, max);
+                mProperties.setUnmodifiableIntegerProperty(property, max);
             }
 
         } else {
-            mProperties.put(property, max);
+            mProperties.setUnmodifiableIntegerProperty(property, max);
         }
     }
 
@@ -564,14 +501,14 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
      */
     private void selectWindowAestheticIfUnspecified()
     {
-        if (!mProperties.containsKey(WINDOW_FULLSCREEN)) {
-            mProperties.put(WINDOW_FULLSCREEN, DEFAULT_WINDOW_FULLSCREEN);
+        if (!mProperties.containsProperty(WINDOW_FULLSCREEN)) {
+            mProperties.setUnmodifiableBooleanProperty(WINDOW_FULLSCREEN, DEFAULT_WINDOW_FULLSCREEN);
         }
-        if (!mProperties.containsKey(WINDOW_BORDERLESS)) {
-            mProperties.put(WINDOW_BORDERLESS, DEFAULT_WINDOW_BORDERLESS);
+        if (!mProperties.containsProperty(WINDOW_BORDERLESS)) {
+            mProperties.setUnmodifiableBooleanProperty(WINDOW_BORDERLESS, DEFAULT_WINDOW_BORDERLESS);
         }
-        if (!mProperties.containsKey(WINDOW_HIDDEN)) {
-            mProperties.put(WINDOW_HIDDEN, DEFAULT_WINDOW_HIDDEN);
+        if (!mProperties.containsProperty(WINDOW_HIDDEN)) {
+            mProperties.setUnmodifiableBooleanProperty(WINDOW_HIDDEN, DEFAULT_WINDOW_HIDDEN);
         }
     }
 
@@ -607,7 +544,6 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
                 mWindow.updateGamepads();
 
                 onTick();
-
                 mSystems.callWithSystems(CoreSystem::onTick);
 
                 mTicksPerSecondSoFar++;
@@ -651,73 +587,6 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         }
     }
 
-    /**
-     * Checks a map of properties if each property's values are both non-null and of the expected value type, if the
-     * property is recognized.
-     *
-     * @param properties properties.
-     * @throws NoSuchElementException if a property's value is null.
-     * @throws IllegalArgumentException if a property's value type does not match its expected value type.
-     */
-    private void checkPropertiesHaveCorrectValueTypes(Map<String, Object> properties)
-    {
-        for (final String property : properties.keySet()) {
-
-            final Object givenValue = properties.get(property);
-
-            // All properties must have non-null value
-            if (givenValue == null) {
-                final String format = "Property \"%s\" has no value";
-                throw new NoSuchElementException(String.format(format, property));
-            }
-
-            final Class expectedType = EXPECTED_PROPERTY_TYPES.get(property);
-
-            // Check given value type against expected
-            if (expectedType != null && expectedType != givenValue.getClass()) {
-                final String format = "Property \"%s\" expects %s, actual: %s";
-                final String expectedName = expectedType.getSimpleName();
-                final String actualName = givenValue.getClass().getSimpleName();
-                throw new IllegalArgumentException(String.format(format, property, expectedName, actualName));
-            }
-        }
-    }
-
-    private void checkPropertyExists(String name)
-    {
-        if (!mProperties.containsKey(name)) {
-            final String format = "No such property named \"%s\"";
-            throw new NoSuchElementException(String.format(format,name));
-        }
-    }
-
-    private void checkPropertySettable(String name)
-    {
-        if (LOCKED_PROPERTIES.contains(name)) {
-            final String format = "Property \"%s\" is not settable";
-            throw new IllegalArgumentException(String.format(format, name));
-        }
-    }
-
-    /**
-     * Checks if a property's expected value type matches a given type.
-     *
-     * @param name property name.
-     * @param type value type to test.
-     * @throws IllegalArgumentException if a property's value type does not match its expected value type.
-     */
-    private void checkPropertyValueTypeMatches(String name, Class type)
-    {
-        final Class actualType  = mProperties.get(name).getClass();
-
-        if (actualType != type) {
-            final String format = "Property \"%s\" accepts %s values, given: %s";
-            final String actualName = actualType.getSimpleName();
-            final String typeName = type.getSimpleName();
-            throw new IllegalArgumentException(String.format(format, name, actualName, typeName));
-        }
-    }
-
     private void checkNotNull(Object object)
     {
         if (object == null) {
@@ -726,7 +595,7 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     }
 
     /**
-     * Acts as a basis for implementing wide-reaching features.
+     * Basis for implementing wide-reaching features.
      */
     public static abstract class CoreSystem extends BaseSystem
     {
