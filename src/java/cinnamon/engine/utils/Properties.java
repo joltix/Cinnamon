@@ -3,14 +3,16 @@ package cinnamon.engine.utils;
 import java.util.NoSuchElementException;
 
 /**
- * Allows read and write of named values with basic types (i.e. {@code String}, {@code double}, {@code int}, or
- * {@code boolean}).
+ * Allows read and write of named values with the following basic types.
+ * <ul>
+ *     <li>{@code String}</li>
+ *     <li>{@code double}</li>
+ *     <li>{@code int}</li>
+ *     <li>{@code boolean}</li>
+ * </ul>
  *
  * <p>Properties are intended to always be readable; as a result, {@code String} values are not permitted to be {@code
  * null}.</p>
- *
- * <p>{@code Float} values are foregone for {@code double}s as the extra precision stored can be more useful since the
- * amount of floating point properties are not expected to be large.</p>
  */
 public interface Properties
 {
@@ -60,7 +62,8 @@ public interface Properties
      * @param name property name.
      * @param value value.
      * @throws NullPointerException if name or value is null.
-     * @throws IllegalArgumentException if the property either cannot be changed or uses a different value type.
+     * @throws IllegalArgumentException if the property cannot be changed.
+     * @throws ClassCastException if the property uses a different value type.
      */
     void setStringProperty(String name, String value);
 
@@ -70,7 +73,8 @@ public interface Properties
      * @param name property name.
      * @param value value.
      * @throws NullPointerException if name is null.
-     * @throws IllegalArgumentException if the property either cannot be changed or uses a different value type.
+     * @throws IllegalArgumentException if the property cannot be changed.
+     * @throws ClassCastException if the property uses a different value type.
      */
     void setDoubleProperty(String name, double value);
 
@@ -80,7 +84,8 @@ public interface Properties
      * @param name property name.
      * @param value value.
      * @throws NullPointerException if name is null.
-     * @throws IllegalArgumentException if the property either cannot be changed or uses a different value type.
+     * @throws IllegalArgumentException if the property cannot be changed
+     * @throws ClassCastException if the property uses a different value type.
      */
     void setIntegerProperty(String name, int value);
 
@@ -90,7 +95,8 @@ public interface Properties
      * @param name property name.
      * @param value value.
      * @throws NullPointerException if name is null.
-     * @throws IllegalArgumentException if the property either cannot be changed or uses a different value type.
+     * @throws IllegalArgumentException if the property cannot be changed
+     * @throws ClassCastException if the property uses a different value type.
      */
     void setBooleanProperty(String name, boolean value);
 
