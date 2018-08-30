@@ -9,11 +9,9 @@ import java.util.*;
  * {@link #setUnmodifiableStringProperty(String, String)}.
  *
  * <h3>Map</h3>
- * <p>Although this class is effectively a restricted {@link Map}, the {@code Map} interface is not implemented due to
- * many of its methods allowing modification of the keys and values. While some methods such as
- * {@code Map.remove(Object)} allow throwing {@code UnsupportedOperationException}s, methods such as
- * {@code Map.keySet()} do not and document the returned collection to permit modification. If needed, a {@code Map}
- * version of this container can be retrieved with {@link #asMap()}.</p>
+ * <p>Although this class is effectively a restricted {@link Map}, the {@code Map} interface is not implemented due
+ * to a lack of present need. This may change in the future as this framework's concept of properties is likely to
+ * change. If required, a {@code Map} version of this container can be retrieved with {@link #asMap()}.</p>
  */
 public final class PropertyMap implements Properties
 {
@@ -25,21 +23,44 @@ public final class PropertyMap implements Properties
     /**
      * Constructs a {@code PropertyMap} and checks if each property is associated with a value of the expected type.
      *
-     * <p>If a property does not have an entry in {@code expectations}, the property's current value type is
-     * presumed correct.</p>
+     * <p>If a property does not exist in {@code expectations}, the property's value type is presumed correct.</p>
      *
      * @param properties properties.
-     * @param unmodifiables unmodifiable properties.
      * @param expectations expected value types.
-     * @throws NullPointerException if either properties or unmodifiables is null.
-     * @throws IllegalArgumentException if a property' value type does not match an expectation.
+     * @throws NullPointerException if either properties or expectations is null.
+     * @throws ClassCastException if a property's value type does not match an expectation.
      * @throws NoSuchElementException if a key in either properties or expectations has null as its value.
      */
-    public PropertyMap(Map<String, Object> properties, List<String> unmodifiables, Map<String, Class> expectations)
+    public PropertyMap(Map<String, Object> properties, Map<String, Class> expectations)
     {
         checkNotNull(properties);
-        checkNotNull(unmodifiables);
         checkNotNull(expectations);
+
+        checkMapDoesNotHaveNullValues(properties);
+        checkMapDoesNotHaveNullValues(expectations);
+        checkPropertiesHaveCorrectValueTypes(properties, expectations);
+
+        mProperties = new HashMap<>(properties);
+        mUnmodifiables = new ArrayList<>();
+    }
+
+    /**
+     * Constructs a {@code PropertyMap} and checks if each property is associated with a value of the expected type.
+     *
+     * <p>If a property does not exist in {@code expectations}, the property's value type is presumed correct.</p>
+     *
+     * @param properties properties.
+     * @param expectations expected value types.
+     * @param unmodifiables unmodifiable properties.
+     * @throws NullPointerException if either properties, expectations, or unmodifiables is null.
+     * @throws ClassCastException if a property' value type does not match an expectation.
+     * @throws NoSuchElementException if a key in either properties or expectations has null as its value.
+     */
+    public PropertyMap(Map<String, Object> properties, Map<String, Class> expectations, Set<String> unmodifiables)
+    {
+        checkNotNull(properties);
+        checkNotNull(expectations);
+        checkNotNull(unmodifiables);
 
         checkMapDoesNotHaveNullValues(properties);
         checkMapDoesNotHaveNullValues(expectations);
@@ -53,40 +74,44 @@ public final class PropertyMap implements Properties
     public String getStringProperty(String name)
     {
         checkNotNull(name);
-        checkPropertyExists(name);
-        checkPropertyValueTypeMatches(name, String.class);
 
-        return (String) mProperties.get(name);
+        final Object value = mProperties.get(name);
+        checkPropertyExists(name, value, String.class);
+
+        return (String) value;
     }
 
     @Override
     public double getDoubleProperty(String name)
     {
         checkNotNull(name);
-        checkPropertyExists(name);
-        checkPropertyValueTypeMatches(name, Double.class);
 
-        return (Double) mProperties.get(name);
+        final Object value = mProperties.get(name);
+        checkPropertyExists(name, value, Double.class);
+
+        return (Double) value;
     }
 
     @Override
     public int getIntegerProperty(String name)
     {
         checkNotNull(name);
-        checkPropertyExists(name);
-        checkPropertyValueTypeMatches(name, Integer.class);
 
-        return (Integer) mProperties.get(name);
+        final Object value = mProperties.get(name);
+        checkPropertyExists(name, value, Integer.class);
+
+        return (Integer) value;
     }
 
     @Override
     public boolean getBooleanProperty(String name)
     {
         checkNotNull(name);
-        checkPropertyExists(name);
-        checkPropertyValueTypeMatches(name, Boolean.class);
 
-        return (Boolean) mProperties.get(name);
+        final Object value = mProperties.get(name);
+        checkPropertyExists(name, value, Boolean.class);
+
+        return (Boolean) value;
     }
 
     @Override
@@ -95,7 +120,12 @@ public final class PropertyMap implements Properties
         checkNotNull(name);
         checkNotNull(value);
         checkPropertySettable(name);
-        checkPropertyValueTypeMatches(name, String.class);
+
+        final Object current = mProperties.get(name);
+
+        if (current != null) {
+            checkTypeMatches(String.class, current.getClass());
+        }
 
         mProperties.put(name, value);
     }
@@ -105,7 +135,12 @@ public final class PropertyMap implements Properties
     {
         checkNotNull(name);
         checkPropertySettable(name);
-        checkPropertyValueTypeMatches(name, Double.class);
+
+        final Object current = mProperties.get(name);
+
+        if (current != null) {
+            checkTypeMatches(Double.class, current.getClass());
+        }
 
         mProperties.put(name, value);
     }
@@ -115,7 +150,12 @@ public final class PropertyMap implements Properties
     {
         checkNotNull(name);
         checkPropertySettable(name);
-        checkPropertyValueTypeMatches(name, Integer.class);
+
+        final Object current = mProperties.get(name);
+
+        if (current != null) {
+            checkTypeMatches(Integer.class, current.getClass());
+        }
 
         mProperties.put(name, value);
     }
@@ -125,7 +165,12 @@ public final class PropertyMap implements Properties
     {
         checkNotNull(name);
         checkPropertySettable(name);
-        checkPropertyValueTypeMatches(name, Boolean.class);
+
+        final Object current = mProperties.get(name);
+
+        if (current != null) {
+            checkTypeMatches(Boolean.class, current.getClass());
+        }
 
         mProperties.put(name, value);
     }
@@ -145,12 +190,17 @@ public final class PropertyMap implements Properties
      * @param name property name.
      * @param value value.
      * @throws NullPointerException if name is null.
-     * @throws IllegalArgumentException if the property uses a different value type.
+     * @throws ClassCastException if the property uses a different value type.
      */
     public void setUnmodifiableDoubleProperty(String name, double value)
     {
         checkNotNull(name);
-        checkPropertyValueTypeMatches(name, Double.class);
+
+        final Object current = mProperties.get(name);
+
+        if (current != null) {
+            checkTypeMatches(Double.class, current.getClass());
+        }
 
         mProperties.put(name, value);
     }
@@ -162,13 +212,18 @@ public final class PropertyMap implements Properties
      * @param name property name.
      * @param value value.
      * @throws NullPointerException if either name or value is null.
-     * @throws IllegalArgumentException if the property uses a different value type.
+     * @throws ClassCastException if the property uses a different value type.
      */
     public void setUnmodifiableStringProperty(String name, String value)
     {
         checkNotNull(name);
         checkNotNull(value);
-        checkPropertyValueTypeMatches(name, String.class);
+
+        final Object current = mProperties.get(name);
+
+        if (current != null) {
+            checkTypeMatches(String.class, current.getClass());
+        }
 
         mProperties.put(name, value);
     }
@@ -180,12 +235,17 @@ public final class PropertyMap implements Properties
      * @param name property name.
      * @param value value.
      * @throws NullPointerException if name is null.
-     * @throws IllegalArgumentException if the property uses a different value type.
+     * @throws ClassCastException if the property uses a different value type.
      */
     public void setUnmodifiableIntegerProperty(String name, int value)
     {
         checkNotNull(name);
-        checkPropertyValueTypeMatches(name, Integer.class);
+
+        final Object current = mProperties.get(name);
+
+        if (current != null) {
+            checkTypeMatches(Integer.class, current.getClass());
+        }
 
         mProperties.put(name, value);
     }
@@ -197,12 +257,17 @@ public final class PropertyMap implements Properties
      * @param name property name.
      * @param value value.
      * @throws NullPointerException if name is null.
-     * @throws IllegalArgumentException if the property uses a different value type.
+     * @throws ClassCastException if the property uses a different value type.
      */
     public void setUnmodifiableBooleanProperty(String name, boolean value)
     {
         checkNotNull(name);
-        checkPropertyValueTypeMatches(name, Boolean.class);
+
+        final Object current = mProperties.get(name);
+
+        if (current != null) {
+            checkTypeMatches(Boolean.class, current.getClass());
+        }
 
         mProperties.put(name, value);
     }
@@ -266,28 +331,43 @@ public final class PropertyMap implements Properties
     }
 
     /**
-     * Checks if a property's expected value type matches a given type.
+     * Checks a map if each key's values are both non-null and of the expected value type, if the key is expected.
      *
-     * @param name property name.
-     * @param type value type to test.
-     * @throws IllegalArgumentException if a property's value type does not match its expected value type.
+     * @param properties properties.
+     * @param expectations mapping between keys and their values' expected types.
+     * @throws ClassCastException if a value's type is not as expected.
      */
-    private void checkPropertyValueTypeMatches(String name, Class type)
+    private void checkPropertiesHaveCorrectValueTypes(Map<String, Object> properties, Map<String, Class> expectations)
     {
-        final Object value = mProperties.get(name);
+        for (final String property : properties.keySet()) {
 
-        // Check if property does not exist
-        if (value == null) {
-            return;
+            final Object givenValue = properties.get(property);
+            final Class expectedType = expectations.get(property);
+
+            // Check given value type against expected
+            if (expectedType != null && expectedType != givenValue.getClass()) {
+                final String format = "Property \"%s\" expects %s, actual: %s";
+                final String expectedName = expectedType.getSimpleName();
+                final String actualName = givenValue.getClass().getSimpleName();
+                throw new ClassCastException(String.format(format, property, expectedName, actualName));
+            }
         }
+    }
 
-        final Class actualType  = value.getClass();
-
-        if (actualType != type) {
-            final String format = "Property \"%s\" accepts %s values, given: %s";
-            final String actualName = actualType.getSimpleName();
-            final String typeName = type.getSimpleName();
-            throw new IllegalArgumentException(String.format(format, name, actualName, typeName));
+    /**
+     * Throws a {@code ClassCastException} if the actual class is not the expected.
+     *
+     * @param expected expected type.
+     * @param actual actual type.
+     * @throws ClassCastException if actual != expected.
+     */
+    private void checkTypeMatches(Class expected, Class actual)
+    {
+        if (actual != expected) {
+            final String format = "Expected %s, given: %s";
+            final String actualName = actual.getSimpleName();
+            final String expectedName = expected.getSimpleName();
+            throw new ClassCastException(String.format(format, actualName, expectedName));
         }
     }
 
@@ -304,36 +384,19 @@ public final class PropertyMap implements Properties
     }
 
     /**
-     * Checks a map of properties if each property's values are both non-null and of the expected value type, if the
-     * property is recognized.
+     * Throws a {@code NoSuchElementException} if either a property's value is {@code null} or its type is unexpected.
      *
-     * @param properties properties.
-     * @param expectations expected value types.
-     * @throws NoSuchElementException if a property's value is null.
-     * @throws IllegalArgumentException if a property's value type does not match its expected value type.
+     * @param property property name.
+     * @param value property's current value.
+     * @param type expected value type.
+     * @throws NoSuchElementException if {@code value} == null or its class != {@code type}.
      */
-    private void checkPropertiesHaveCorrectValueTypes(Map<String, Object> properties, Map<String, Class> expectations)
+    private void checkPropertyExists(String property, Object value, Class type)
     {
-        for (final String property : properties.keySet()) {
-
-            final Object givenValue = properties.get(property);
-            final Class expectedType = expectations.get(property);
-
-            // Check given value type against expected
-            if (expectedType != null && expectedType != givenValue.getClass()) {
-                final String format = "Property \"%s\" expects %s, actual: %s";
-                final String expectedName = expectedType.getSimpleName();
-                final String actualName = givenValue.getClass().getSimpleName();
-                throw new IllegalArgumentException(String.format(format, property, expectedName, actualName));
-            }
-        }
-    }
-
-    private void checkPropertyExists(String name)
-    {
-        if (!mProperties.containsKey(name)) {
-            final String format = "No such property named \"%s\"";
-            throw new NoSuchElementException(String.format(format,name));
+        if (value == null || value.getClass() != type) {
+            final String format = "No such %s property named \'%s\'";
+            final String typeName = type.getSimpleName();
+            throw new NoSuchElementException(String.format(format, typeName, property));
         }
     }
 

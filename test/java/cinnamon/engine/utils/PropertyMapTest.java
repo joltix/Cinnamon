@@ -51,7 +51,7 @@ public class PropertyMapTest
     private Map<String, Class> mExpectations;
 
     // Unmodifiable properties
-    private List<String> mUnmodifiables;
+    private Set<String> mUnmodifiables;
 
     private PropertyMap mMap;
 
@@ -60,7 +60,7 @@ public class PropertyMapTest
     {
         setUpPropertyMapArguments();
 
-        mMap = new PropertyMap(mProperties, mUnmodifiables, mExpectations);
+        mMap = new PropertyMap(mProperties, mExpectations, mUnmodifiables);
     }
 
     @After
@@ -76,28 +76,28 @@ public class PropertyMapTest
     @Test (expected = NullPointerException.class)
     public void testConstructorNPEProperties()
     {
-        new PropertyMap(null, new ArrayList<>(mUnmodifiables), new HashMap<>(mExpectations));
+        new PropertyMap(null, new HashMap<>(mExpectations), new HashSet<>(mUnmodifiables));
     }
 
     @Test (expected = NullPointerException.class)
     public void testConstructorNPEUnmodifiables()
     {
-        new PropertyMap(new HashMap<>(mProperties), null, new HashMap<>(mExpectations));
+        new PropertyMap(new HashMap<>(mProperties), new HashMap<>(mExpectations), null);
     }
 
     @Test (expected = NullPointerException.class)
     public void testConstructorNPEExpectations()
     {
-        new PropertyMap(new HashMap<>(mProperties), new ArrayList<>(mUnmodifiables), null);
+        new PropertyMap(new HashMap<>(mProperties), null, new HashSet<>(mUnmodifiables));
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testConstructorIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testConstructorClassCastExceptionUnexpectedValueType()
     {
         final Map<String, Class> expectations = new HashMap<>(mExpectations);
         expectations.put(PROPERTY_STRING, Double.class);
 
-        new PropertyMap(new HashMap<>(mProperties), new ArrayList<>(mUnmodifiables), expectations);
+        new PropertyMap(new HashMap<>(mProperties), expectations, new HashSet<>(mUnmodifiables));
     }
 
     @Test (expected = NoSuchElementException.class)
@@ -106,7 +106,7 @@ public class PropertyMapTest
         final Map<String, Object> properties = new HashMap<>(mProperties);
         properties.put(UNRECOGNIZED_PROPERTY_NAME, null);
 
-        new PropertyMap(properties, new ArrayList<>(mUnmodifiables), new HashMap<>(mExpectations));
+        new PropertyMap(properties, new HashMap<>(mExpectations), new HashSet<>(mUnmodifiables));
     }
 
     @Test (expected = NoSuchElementException.class)
@@ -115,13 +115,13 @@ public class PropertyMapTest
         final Map<String, Class> expectations = new HashMap<>(mExpectations);
         expectations.put(PROPERTY_STRING, null);
 
-        new PropertyMap(new HashMap<>(mProperties), new ArrayList<>(mUnmodifiables), expectations);
+        new PropertyMap(new HashMap<>(mProperties), expectations, new HashSet<>(mUnmodifiables));
     }
 
     @Test (expected = NullPointerException.class)
     public void testConstructorNPELocked()
     {
-        new PropertyMap(new HashMap<>(mProperties), null, new HashMap<>(mExpectations));
+        new PropertyMap(new HashMap<>(mProperties), new HashMap<>(mExpectations), null);
     }
 
     @Test
@@ -166,8 +166,8 @@ public class PropertyMapTest
         mMap.setStringProperty(PROPERTY_STRING_UNMODIFIABLE, STRING);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetStringPropertyIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testSetStringPropertyClassCastExceptionUnexpectedValueType()
     {
         mMap.setStringProperty(PROPERTY_DOUBLE, STRING);
     }
@@ -208,8 +208,8 @@ public class PropertyMapTest
         mMap.setDoubleProperty(PROPERTY_DOUBLE_UNMODIFIABLE, DOUBLE);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetDoublePropertyIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testSetDoublePropertyClassCastExceptionUnexpectedValueType()
     {
         mMap.setDoubleProperty(PROPERTY_STRING, DOUBLE);
     }
@@ -250,8 +250,8 @@ public class PropertyMapTest
         mMap.setIntegerProperty(PROPERTY_INTEGER_UNMODIFIABLE, INTEGER);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetIntegerPropertyIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testSetIntegerPropertyClassCastExceptionUnexpectedValueType()
     {
         mMap.setIntegerProperty(PROPERTY_DOUBLE, INTEGER);
     }
@@ -292,8 +292,8 @@ public class PropertyMapTest
         mMap.setBooleanProperty(PROPERTY_BOOLEAN_UNMODIFIABLE, BOOLEAN);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetBooleanPropertyIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testSetBooleanPropertyClassCastExceptionUnexpectedValueType()
     {
         mMap.setBooleanProperty(PROPERTY_INTEGER, BOOLEAN);
     }
@@ -316,8 +316,8 @@ public class PropertyMapTest
         mMap.setUnmodifiableStringProperty(PROPERTY_STRING_UNMODIFIABLE, null);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetUnmodifiableStringPropertyIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testSetUnmodifiableStringPropertyClassCastExceptionUnexpectedValueType()
     {
         mMap.setUnmodifiableStringProperty(PROPERTY_DOUBLE_UNMODIFIABLE, STRING);
     }
@@ -334,8 +334,8 @@ public class PropertyMapTest
         mMap.setUnmodifiableDoubleProperty(null, DOUBLE);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetUnmodifiableDoublePropertyIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testSetUnmodifiableDoublePropertyClassCastExceptionUnexpectedValueType()
     {
         mMap.setUnmodifiableDoubleProperty(PROPERTY_STRING_UNMODIFIABLE, DOUBLE);
     }
@@ -352,8 +352,8 @@ public class PropertyMapTest
         mMap.setUnmodifiableIntegerProperty(null, INTEGER);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetUnmodifiableIntegerPropertyIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testSetUnmodifiableIntegerPropertyClassCastExceptionUnexpectedValueType()
     {
         mMap.setUnmodifiableIntegerProperty(PROPERTY_STRING_UNMODIFIABLE, INTEGER);
     }
@@ -370,8 +370,8 @@ public class PropertyMapTest
         mMap.setUnmodifiableBooleanProperty(null, BOOLEAN);
     }
 
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetUnmodifiableBooleanPropertyIAEUnexpectedValueType()
+    @Test (expected = ClassCastException.class)
+    public void testSetUnmodifiableBooleanPropertyClassCastExceptionUnexpectedValueType()
     {
         mMap.setUnmodifiableBooleanProperty(PROPERTY_STRING_UNMODIFIABLE, BOOLEAN);
     }
@@ -423,7 +423,7 @@ public class PropertyMapTest
     @Test
     public void testEqualsSymmetric()
     {
-        final PropertyMap other = new PropertyMap(mProperties, mUnmodifiables, mExpectations);
+        final PropertyMap other = new PropertyMap(mProperties, mExpectations, mUnmodifiables);
 
         Assert.assertTrue(mMap.equals(other) && other.equals(mMap));
     }
@@ -431,8 +431,8 @@ public class PropertyMapTest
     @Test
     public void testEqualsTransitive()
     {
-        final PropertyMap mapB = new PropertyMap(mProperties, mUnmodifiables, mExpectations);
-        final PropertyMap mapC = new PropertyMap(mProperties, mUnmodifiables, mExpectations);
+        final PropertyMap mapB = new PropertyMap(mProperties, mExpectations, mUnmodifiables);
+        final PropertyMap mapC = new PropertyMap(mProperties, mExpectations, mUnmodifiables);
 
         Assert.assertTrue(mMap.equals(mapB) && mapB.equals(mapC) && mMap.equals(mapC));
     }
@@ -446,7 +446,7 @@ public class PropertyMapTest
     @Test
     public void testHashCodesAreEqual()
     {
-        final PropertyMap other = new PropertyMap(mProperties, mUnmodifiables, mExpectations);
+        final PropertyMap other = new PropertyMap(mProperties, mExpectations, mUnmodifiables);
 
         Assert.assertEquals(mMap.hashCode(), other.hashCode());
     }
@@ -455,7 +455,7 @@ public class PropertyMapTest
     public void testNonexistentUnmodifiablePropertyFailsToStopChanges()
     {
         mUnmodifiables.remove(PROPERTY_STRING_UNMODIFIABLE);
-        final PropertyMap map = new PropertyMap(mProperties, mUnmodifiables, mExpectations);
+        final PropertyMap map = new PropertyMap(mProperties, mExpectations, mUnmodifiables);
 
         map.setStringProperty(PROPERTY_STRING_UNMODIFIABLE, STRING);
     }
@@ -464,7 +464,7 @@ public class PropertyMapTest
     {
         mProperties = new HashMap<>();
         mExpectations = new HashMap<>();
-        mUnmodifiables = new ArrayList<>();
+        mUnmodifiables = new HashSet<>();
 
         mProperties.put(PROPERTY_STRING, STRING);
         mProperties.put(PROPERTY_STRING_UNMODIFIABLE, STRING_UNMODIFIABLE);
