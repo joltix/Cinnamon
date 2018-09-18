@@ -2,111 +2,83 @@ package cinnamon.engine.gfx;
 
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
+import org.lwjgl.opengl.GL11;
 
 @RunWith(Suite.class)
-@Suite.SuiteClasses({WindowTest.class})
+@Suite.SuiteClasses({WindowTest.class, WindowLoopStyleTest.class, WindowMultiInstanceTest.class})
 public class WindowTestSuite
 {
     /**
-     * <p>Holds all {@code Windows} open for the given number of milliseconds and executes a {@code Runnable} once
-     * after a specified delay elapses.</p>
-     *
-     * @param oneShot to execute, or null if just holding window open.
-     * @param executionDelay delay until execution in ms.
-     * @param openDuration how long to hold open in ms.
+     * Skeletal {@code Canvas}. This implementation does not explicitly render anything. As such, the output screen
+     * will simply be the default color (typically black).
      */
-    static void keepOpenAndExecute(Runnable oneShot, long executionDelay, long openDuration)
+    public static class DummyCanvas extends Canvas
     {
-        if (executionDelay >= openDuration) {
-            throw new IllegalArgumentException("Execution delay must be < length of time to keep Window open");
+        public DummyCanvas()
+        {
+            super();
         }
-
-        final long start = System.currentTimeMillis();
-        long soFar;
-        boolean executed = false;
-
-        while ((soFar = System.currentTimeMillis() - start) <= openDuration) {
-            Window.pollEvents();
-
-            if (oneShot != null && soFar >= executionDelay && !executed) {
-                executed = true;
-                oneShot.run();
-            }
-        }
-
-        // In case delay is so little the loop didn't execute
-        if (oneShot != null && !executed) {
-            oneShot.run();
-        }
-    }
-
-    /**
-     * <p>Holds all {@code Windows} open for the given number of milliseconds and executes a {@code Runnable} repeatedly
-     * after a specified delay.</p>
-     *
-     * @param oneShot to execute.
-     * @param executionDelay delay until execution in ms.
-     * @param openDuration how long to hold open in ms.
-     * @throws NullPointerException if oneShot is null.
-     */
-    static void keepOpenAndExecuteRepeatedly(Runnable oneShot, long executionDelay, long openDuration)
-    {
-        if (oneShot == null) {
-            throw new NullPointerException();
-        }
-        if (executionDelay >= openDuration) {
-            throw new IllegalArgumentException("Execution delay must be < length of time to keep Window open");
-        }
-
-        final long start = System.currentTimeMillis();
-        long soFar;
-        boolean executed = false;
-
-        while ((soFar = System.currentTimeMillis() - start) <= openDuration) {
-            Window.pollEvents();
-
-            if (soFar >= executionDelay) {
-                executed = true;
-                oneShot.run();
-            }
-        }
-
-        // In case delay is so little the loop didn't execute
-        if (!executed) {
-            oneShot.run();
-        }
-    }
-
-    /**
-     * <p>Skeletal {@code Canvas} for use with {@code Window} tests. This implementation does not explicitly render
-     * anything. As such, the output screen will simply be the default color (typically black).</p>
-     */
-    static class MockCanvas extends Canvas
-    {
-        public MockCanvas() { }
 
         @Override
-        protected void onInitialize() { }
+        protected void onStartUp() { }
 
         @Override
-        protected void onTerminate() { }
+        protected void onShutDown() { }
 
         @Override
-        protected void draw(Scene scene, ShaderManager shaders) { }
+        protected void onDraw() { }
 
         @Override
         protected void onResize() { }
+    }
 
-        @Override
-        protected float[] createProjectionMatrix()
+    /**
+     * {@code Canvas} implementation that changes the background color over time.
+     */
+    public static class ColorFadeCanvas extends Canvas
+    {
+        private final double mAdditive;
+
+        private double mRed = Math.random();
+
+        private double mGreen = Math.random();
+
+        private double mBlue = Math.random();
+
+        /**
+         * Constructs a {@code ColorFadeCanvas} to step through colors by a given amount.
+         *
+         * @param speed normalized color change speed.
+         */
+        public ColorFadeCanvas(double speed)
         {
-            return new float[0];
+            assert (speed > 0d && speed <= 1d);
+
+            mAdditive = 0.01d * speed;
         }
 
         @Override
-        protected Scene createScene()
+        protected void onStartUp() { }
+
+        @Override
+        protected void onShutDown() { }
+
+        @Override
+        protected void onDraw()
         {
-            return null;
+            mRed += mAdditive;
+            mGreen += mAdditive;
+            mBlue += mAdditive;
+
+            final float r = (float) (0.5d * Math.sin(mRed) + 0.5d);
+            final float g = (float) (0.5d * Math.sin(mGreen - 1.5d) + 0.5d);
+            final float b = (float) (0.5d * Math.sin(mBlue - 3d) + 0.5d);
+
+            GL11.glClearColor(r, g, b, 1f);
+            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
         }
+
+        @Override
+        protected void onResize() { }
     }
 }
