@@ -3,47 +3,211 @@ package cinnamon.engine.core;
 import cinnamon.engine.event.ControlsSystem;
 import cinnamon.engine.event.IntegratableInput;
 import cinnamon.engine.gfx.Canvas;
+import cinnamon.engine.gfx.Monitor;
 import cinnamon.engine.gfx.Window;
 import cinnamon.engine.core.Game.CoreSystem;
+import cinnamon.engine.utils.Assets;
 import cinnamon.engine.utils.Properties;
 import cinnamon.engine.utils.PropertyMap;
+import cinnamon.engine.utils.LoopMeasure;
+import org.lwjgl.stb.STBImage;
+import org.lwjgl.system.MemoryUtil;
 
-import java.awt.*;
+import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.List;
+import java.util.function.Function;
 
 /**
  * Base class for a Cinnamon game. Games should extend this class to gain basic utilities and automate common game
- * services like input handling.
+ * services.
  *
- * <h3>Properties</h3>
- * <p>Some aspects or features can be adjusted through named values provided at construction. These properties may
- * contain modifiable user-defined named values. However, some names are reserved with an expected value type - these
- * are not modifiable through the property setters (e.g. {@code setStringProperty(String, String)}). While many of these
- * properties do not need to exist in the initial {@code Map}, four must be explicitly specified.</p>
+ * <h3>Lifecycle</h3>
+ * <ol>
+ *     <li>configuration</li>
+ *     <li>start up</li>
+ *     <li>systems loop</li>
+ *     <li>shut down</li>
+ * </ol>
  *
- * <h4>Required</h4>
- * <ul>
- *     <li>{@link #TITLE} : String</li>
- *     <li>{@link #DEVELOPER} : String</li>
- *     <li>{@link #BUILD} : double</li>
- *     <li>{@link #TICK_RATE} : int</li>
- * </ul>
+ * <p>A {@code Game} makes adjustments to built-in systems and features based on the {@link Configuration} provided
+ * during creation. This is also the point where critical, unchangeable, values are set such as the game's target tick
+ * rate, though not all submitted during this point are immutable.</p>
  *
- * <h4>Optional</h4>
- * <p>These properties have default values when unspecified.</p>
- * <ul>
- *     <li>{@link #VSYNC} : boolean - true</li>
- *     <li>{@link #WINDOW_TITLE} : String - game title</li>
- *     <li>{@link #WINDOW_WIDTH} : int - display width</li>
- *     <li>{@link #WINDOW_HEIGHT} : int - display height</li>
- *     <li>{@link #WINDOW_FULLSCREEN} : boolean - true</li>
- *     <li>{@link #WINDOW_BORDERLESS} : boolean - false</li>
- *     <li>{@link #WINDOW_HIDDEN} : boolean - false</li>
- * </ul>
+ * <p>{@link #onStartUp()} and {@link #onShutDown()} callbacks surround the core game loop for set up and tear down.</p>
+ *
+ * <p>Major game-specific systems are given the opportunity to execute once per tick. Implementations may insert
+ * their own systems with {@link #addSystem(String, CoreSystem)}.</p>
+ *
+ * <p>If no monitors are detected or a resolution smaller than {@link Window#MINIMUM_WIDTH} x
+ * {@link Window#MINIMUM_HEIGHT} is specified, the game will run as if {@link Preference#HIDDEN_WINDOW} was set to
+ * {@code true}.</p>
+ *
+ * <h3>Configuration</h3>
+ * <p>While some configuration steps are necessary, as shown below, {@link Preference}s can optionally be specified.
+ * These preferences' default behaviors are outlined in their documentation.</p>
+ *
+ * <pre>
+ *     <code>
+ *
+ *         Game.Configuration config = new Game.Configuration.Builder()
+ *             .withHeader("Title", "Developer")
+ *             .withVersion("0.343a", 42)
+ *             .withTickRate(30)
+ *             .withCanvas(new CanvasImpl())
+ *
+ *             // Preference calls are optional
+ *             .withPreference(Game.Preference.FULLSCREEN, true)
+ *             .withPreference(Game.Preference.RESOLUTION_X, 1366)
+ *             .withPreference(Game.Preference.RESOLUTION_Y, 768)
+ *
+ *             .build();
+ *
+ *         new GameImpl(config).start();
+ *     </code>
+ * </pre>
+ *
+ * <p>The header, version, and tick rate will be available during the game's runtime through property getters (e.g.
+ * {@code getStringProperty(Game.TITLE)}).</p>
+ *
+ * <h3>Concurrency</h3>
+ * <p>Most methods are expected to be called on the main thread. Methods not explicitly documenting safety should be
+ * presumed to expect main thread execution.</p>
  */
 public abstract class Game implements Properties, WritableSystemDirectory<CoreSystem>, SystemCoordinator<CoreSystem>
 {
+    /**
+     * Configurable features to be set during a {@link Configuration}'s construction.
+     *
+     * <p>The default values for each {@code Preference} is as follows (expected value types are noted in each
+     * {@code Preference}'s documentation).</p>
+     * <ul>
+     *     <li>{@link #MONITOR}: primary monitor</li>
+     *     <li>{@link #VSYNC}: true</li>
+     *     <li>{@link #FULLSCREEN}: true</li>
+     *     <li>{@link #BORDERLESS}: false</li>
+     *     <li>{@link #HIDDEN_WINDOW}: false</li>
+     *     <li>{@link #RESOLUTION_X}: primary monitor's width</li>
+     *     <li>{@link #RESOLUTION_Y}: primary monitor's height</li>
+     *     <li>{@link #ICON}: none</li>
+     * </ul>
+     */
+    public enum Preference
+    {
+        /**
+         * Monitor to display on.
+         *
+         * <p>Monitor indices begin at 0 (the primary monitor) and increment.</p>
+         *
+         * <p>This preference expects an {@code int}.</p>
+         */
+        MONITOR(0, (value) ->
+        {
+            return Preference.isNotNull(value) && ((int) value) >= 0;
+        }),
+
+        /**
+         * Enables vertical synchronization.
+         *
+         * <p>This preference expects a {@code boolean}.</p>
+         */
+        VSYNC(true, Preference::isNotNull),
+
+        /**
+         * Makes the game fullscreen.
+         *
+         * <p>If the {@link #MONITOR} preference has been specified, the game will go fullscreen on the specified
+         * monitor.</p>
+         *
+         * <p>This preference expects a {@code boolean}.</p>
+         */
+        FULLSCREEN(true, Preference::isNotNull),
+
+        /**
+         * Removes the window's frame and title bar.
+         *
+         * <p>This preference expects a {@code boolean}.</p>
+         */
+        BORDERLESS(false, Preference::isNotNull),
+
+        /**
+         * Hides the window; rendering will not begin.
+         *
+         * <p>This preference expects a {@code boolean}.</p>
+         */
+        HIDDEN_WINDOW(false, Preference::isNotNull),
+
+        /**
+         * Horizontal resolution.
+         *
+         * <p>This preference expects an {@code int}.</p>
+         */
+        RESOLUTION_X(-1, (value) ->
+        {
+            final Integer x = (Integer) value;
+            return Preference.isNotNull(x) && x >= Window.MINIMUM_WIDTH;
+        }),
+
+        /**
+         * Vertical resolution.
+         *
+         * <p>This preference expects an {@code int}.</p>
+         */
+        RESOLUTION_Y(-1, (value) ->
+        {
+            final Integer y = (Integer) value;
+            return Preference.isNotNull(y) && y >= Window.MINIMUM_HEIGHT;
+        }),
+
+        /**
+         * Path to task and title bar icon resource.
+         *
+         * <p>This preference expects a {@code String}.</p>
+         */
+        ICON("", Preference::isNotNull);
+
+        // Returns true if user-specified value is valid for the preference
+        private final Function<Object, Boolean> mValidator;
+
+        private final Object mDefaultValue;
+
+        Preference(Object defaultValue, Function<Object, Boolean> valueValidator)
+        {
+            mDefaultValue = defaultValue;
+            mValidator = valueValidator;
+        }
+
+        /**
+         * Returns the given value if it is valid for the preference. Otherwise, the preference's default value is
+         * returned.
+         *
+         * @param value value.
+         * @return value if valid, otherwise default value.
+         */
+        private Object autoCorrect(Object value)
+        {
+            return (mValidator.apply(value)) ? value : mDefaultValue;
+        }
+
+        private Class getType()
+        {
+            return mDefaultValue.getClass();
+        }
+
+        private static Map<String, Class> getExpectedTypeMapping()
+        {
+            final Map<String, Class> expectations = new HashMap<>();
+            for (final Preference pref : Preference.values()) {
+                expectations.put(pref.toString(), pref.getType());
+            }
+            return expectations;
+        }
+
+        private static boolean isNotNull(Object object)
+        {
+            return object != null;
+        }
+    }
+
     /**
      * Game name property.
      */
@@ -53,6 +217,11 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
      * Developer name property.
      */
     public static final String DEVELOPER = "developer";
+
+    /**
+     * Game version property.
+     */
+    public static final String VERSION = "version";
 
     /**
      * Game build property.
@@ -65,159 +234,66 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     public static final String TICK_RATE = "tick_rate";
 
     /**
-     * Vsync state property.
-     */
-    public static final String VSYNC = "vsync";
-
-    /**
-     * Window title property.
-     */
-    public static final String WINDOW_TITLE = "win_title";
-
-    /**
-     * Window width property.
-     */
-    public static final String WINDOW_WIDTH = "win_width";
-
-    /**
-     * Window height property.
-     */
-    public static final String WINDOW_HEIGHT = "win_height";
-
-    /**
-     * Window fullscreen property.
-     */
-    public static final String WINDOW_FULLSCREEN = "win_fullscreen";
-
-    /**
-     * Window borderless state property.
-     */
-    public static final String WINDOW_BORDERLESS = "win_borderless";
-
-    /**
-     * Window hidden state property.
-     */
-    public static final String WINDOW_HIDDEN = "win_hidden";
-
-    /**
      * Input devices and controls mapping system.
      */
     public static final String CONTROLS_SYSTEM = "controls";
 
     private static final long NANOSECONDS_PER_SECOND = 1_000_000_000L;
 
-    private static final boolean DEFAULT_WINDOW_FULLSCREEN = true;
-
-    private static final boolean DEFAULT_WINDOW_BORDERLESS = false;
-
-    private static final boolean DEFAULT_WINDOW_HIDDEN = false;
-
-    private static final Map<String, Class> EXPECTED_TYPES = new HashMap<>();
-
-    // Mapping between all built-in properties and expected value's type
-    static
-    {
-        EXPECTED_TYPES.put(TITLE, String.class);
-        EXPECTED_TYPES.put(DEVELOPER, String.class);
-        EXPECTED_TYPES.put(BUILD, Double.class);
-        EXPECTED_TYPES.put(TICK_RATE, Integer.class);
-
-        EXPECTED_TYPES.put(WINDOW_TITLE, String.class);
-        EXPECTED_TYPES.put(WINDOW_WIDTH, Integer.class);
-        EXPECTED_TYPES.put(WINDOW_HEIGHT, Integer.class);
-        EXPECTED_TYPES.put(WINDOW_FULLSCREEN, Boolean.class);
-        EXPECTED_TYPES.put(WINDOW_BORDERLESS, Boolean.class);
-        EXPECTED_TYPES.put(WINDOW_HIDDEN, Boolean.class);
-        EXPECTED_TYPES.put(VSYNC, Boolean.class);
-    }
-
-    // Properties that must be given by subclass
-    private static final List<String> REQUIRED_PROPERTIES = new ArrayList<>();
-
-    static
-    {
-        REQUIRED_PROPERTIES.add(TITLE);
-        REQUIRED_PROPERTIES.add(DEVELOPER);
-        REQUIRED_PROPERTIES.add(BUILD);
-        REQUIRED_PROPERTIES.add(TICK_RATE);
-    }
-
-    // Properties that cannot be changed through the property setters
-    private static final List<String> LOCKED_PROPERTIES = new ArrayList<>();
-
-    static
-    {
-        LOCKED_PROPERTIES.add(TITLE);
-        LOCKED_PROPERTIES.add(DEVELOPER);
-        LOCKED_PROPERTIES.add(BUILD);
-        LOCKED_PROPERTIES.add(TICK_RATE);
-        LOCKED_PROPERTIES.add(WINDOW_TITLE);
-        LOCKED_PROPERTIES.add(WINDOW_WIDTH);
-        LOCKED_PROPERTIES.add(WINDOW_HEIGHT);
-        LOCKED_PROPERTIES.add(WINDOW_FULLSCREEN);
-        LOCKED_PROPERTIES.add(WINDOW_BORDERLESS);
-        LOCKED_PROPERTIES.add(WINDOW_HIDDEN);
-    }
-
     private final PropertyMap mProperties;
 
     private final Domain<CoreSystem> mSystems = new Domain<>(Comparator.comparingInt(BaseSystem::getPriority));
 
-    private final Canvas mCanvas;
+    private final Configuration mConfig;
 
     private Window mWindow;
 
     private volatile boolean mContinue = false;
 
-    // Number of ticks measured within the last second
-    private int mMeasuredTicksPerSecond = 0;
-
-    // Number of ticks performed since "mTicksPerSecondTime"
-    private int mTicksPerSecondSoFar = 0;
+    private final LoopMeasure mMeasure = new LoopMeasure(3);
 
     /**
      * Constructs a {@code Game}.
      *
-     * <p>At a minimum, some keys are required in the map and are as follows.</p>
-     * <ul>
-     *     <li>{@link #TITLE}</li>
-     *     <li>{@link #DEVELOPER}</li>
-     *     <li>{@link #BUILD}</li>
-     *     <li>{@link #TICK_RATE}</li>
-     * </ul>
+     * <p>If the configuration requests an unusable preference value, the request is ignored.</p>
      *
-     * @param canvas canvas.
-     * @param properties properties.
-     * @throws NullPointerException if canvas or properties is null.
-     * @throws IllegalArgumentException if a property's value has an unexpected type.
-     * @throws NoSuchElementException if a required property is either not a key in the given map or a property's
-     * value is null.
+     * @param configuration configuration.
+     * @throws NullPointerException if configuration is null.
      */
-    protected Game(Canvas canvas, Map<String, Object> properties)
+    protected Game(Game.Configuration configuration)
     {
-        checkNotNull(canvas);
-        checkNotNull(properties);
-        checkRequiredPropertiesExist(properties);
+        checkNotNull(configuration);
 
-        mProperties = new PropertyMap(properties, LOCKED_PROPERTIES, EXPECTED_TYPES);
-        ensurePropertiesHaveValidValues();
+        mConfig = configuration;
 
-        mCanvas = canvas;
+        final Map<String, Object> props = configuration.mProps;
+        mProperties = new PropertyMap(props, Preference.getExpectedTypeMapping(), props.keySet());
     }
 
     /**
-     * Begins the main game loop.
+     * Begins the game.
+     *
+     * <p>{@link #onStartUp()} will be called for games to initialize resources.</p>
+     *
+     * @throws IllegalStateException if window creation fails.
      */
     public final void start()
     {
-        mWindow = new Window(mCanvas, getStringProperty(WINDOW_TITLE));
-
+        mWindow = new Window(mConfig.mCanvas);
         mContinue = true;
+
+        configureWindow();
+        installBasicSystems();
+
         run();
     }
 
     /**
-     * Stops the main game loop.
+     * Stops the game.
+     *
+     * <p>{@link #onShutDown()} will be called for games to perform clean up.</p>
+     *
+     * <p>This method may be called from any thread.</p>
      */
     public final void stop()
     {
@@ -225,7 +301,9 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     }
 
     /**
-     * Checks if {@link #stop()} has been called.
+     * Checks if the game is ongoing. This method returns {@code false} once {@link #stop()} is called.
+     *
+     * <p>This method may be called from any thread.</p>
      *
      * @return true if the game continues.
      */
@@ -358,13 +436,46 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     }
 
     /**
-     * Gets the most recent measurement of the number of ticks per second.
+     * Gets the most recent tick rate.
      *
-     * @return actual tick rate.
+     * <p>This is a measurement of the actual tick rate and is not necessarily the same as the target rate specified
+     * at construction.</p>
+     *
+     * @return measured ticks per second.
      */
-    public final int getMeasuredTickRate()
+    public final int getTickRate()
     {
-        return mMeasuredTicksPerSecond;
+        return mMeasure.getRate();
+    }
+
+    /**
+     * Gets the average tick duration.
+     *
+     * @return duration in milliseconds.
+     */
+    public final double getTickDuration()
+    {
+        return mMeasure.getAverageDuration();
+    }
+
+    /**
+     * Gets the shortest recent tick duration.
+     *
+     * @return shortest duration in milliseconds.
+     */
+    public final double getMinimumTickDuration()
+    {
+        return mMeasure.getMinimumDuration();
+    }
+
+    /**
+     * Gets the longest recent tick duration.
+     *
+     * @return longest duration in milliseconds.
+     */
+    public final double getMaximumTickDuration()
+    {
+        return mMeasure.getMaximumDuration();
     }
 
     /**
@@ -382,6 +493,15 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
      */
     protected abstract void onShutDown();
 
+    /**
+     * Called when the window is asked to close through the title bar's close button. The default implementation
+     * stops the game.
+     */
+    protected void onWindowClose()
+    {
+        stop();
+    }
+
     @Override
     protected final Object clone() throws CloneNotSupportedException
     {
@@ -390,43 +510,103 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
 
     private void run()
     {
-        configureWindow();
+        onStartUp();
 
-        addBasicSystems();
-
-        if (!getBooleanProperty(WINDOW_HIDDEN)) {
+        if (!mConfig.getBoolean(Preference.HIDDEN_WINDOW)) {
             mWindow.open();
         }
 
-        onStartUp();
         mSystems.startSystems();
-
         loop();
-
         mSystems.stopSystems();
+
         onShutDown();
 
-        mWindow.close();
         Window.terminate();
+        Monitor.terminate();
     }
 
     /**
-     * Applies properties to the window.
+     * Configures the {@code Window} based off {@code Preference}s. After this completes, the {@code Window} just
+     * needs to be opened.
      */
     private void configureWindow()
     {
-        mWindow.setPositionCenter();
-        mWindow.setDecorated(!getBooleanProperty(WINDOW_BORDERLESS));
+        mWindow.setVsync(mConfig.getBoolean(Preference.VSYNC));
+        mWindow.setDecorated(!mConfig.getBoolean(Preference.BORDERLESS));
+        attemptToSetWindowIcon();
 
-        // Set resolution
-        final int w = getIntegerProperty(WINDOW_WIDTH);
-        final int h = getIntegerProperty(WINDOW_HEIGHT);
-        mWindow.setSize(w, h);
+        final Monitor[] monitors = Monitor.getConnectedMonitors();
+        if (monitors.length > 0) {
 
-        mWindow.setFullscreen(getBooleanProperty(WINDOW_FULLSCREEN));
+            // Select monitor to place on
+            final int monitorIndex = mConfig.getInteger(Preference.MONITOR);
+            final Monitor monitor = (monitorIndex >= monitors.length) ? monitors[0] : monitors[monitorIndex];
+
+            final int w = mConfig.getInteger(Preference.RESOLUTION_X);
+            final int h = mConfig.getInteger(Preference.RESOLUTION_Y);
+
+            // Take monitor's resolution if desired resolution was invalid
+            if (w < 0 || h < 0) {
+                mWindow.setSize(monitor.getWidth(), monitor.getHeight());
+            } else {
+                mWindow.setSize(w, h);
+            }
+
+            // Position window
+            if (mConfig.getBoolean(Preference.FULLSCREEN)) {
+                mWindow.setFullscreen(monitor);
+            } else {
+                mWindow.setPositionCenter(monitor);
+            }
+        } else {
+            // Choose arbitrary size and position since window won't be shown
+            mWindow.setSize(Window.MINIMUM_WIDTH, Window.MINIMUM_HEIGHT);
+            mWindow.setPosition(0, 0);
+            mConfig.mPrefs.put(Preference.HIDDEN_WINDOW.toString(), true);
+        }
+
+        // Let game callback override close requests
+        mWindow.setCloseCallback(() ->
+        {
+            onWindowClose();
+            return true;
+        });
+
+        mWindow.setTitle(mProperties.getStringProperty(TITLE));
     }
 
-    private void addBasicSystems()
+    /**
+     * Tries to set the window's icon from the path given as {@link Preference#ICON}. Any {@code Exception} thrown
+     * during this attempt will be caught; in this case, no icon is set.
+     */
+    private void attemptToSetWindowIcon()
+    {
+        final String iconPath = mConfig.getString(Preference.ICON);
+
+        try {
+            final byte[] bytes = Assets.loadResource(iconPath, Assets.BYTE_ARRAY);
+
+            final ByteBuffer buffer = MemoryUtil.memAlloc(bytes.length);;
+            buffer.put(bytes);
+            buffer.flip();
+
+            // Format colors
+            final int[] width = new int[1];
+            final int[] height = new int[1];
+            final int[] channels = new int[1];
+            final ByteBuffer pulled = STBImage.stbi_load_from_memory(buffer, width, height, channels, 4);
+
+            MemoryUtil.memFree(buffer);
+
+            if (pulled != null) {
+                mWindow.setIcon(pulled);
+            }
+
+        } catch (Exception e) { }
+    }
+
+    private void installBasicSystems()
     {
         final IntegratableInput input = mWindow.getInput();
 
@@ -434,163 +614,319 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     }
 
     /**
-     * Checks all optional properties for behaviorally invalid values and applies the properties' default values if
-     * necessary.
-     */
-    private void ensurePropertiesHaveValidValues()
-    {
-        // Window title takes game title if unspecified
-        if (!mProperties.containsProperty(WINDOW_TITLE)) {
-            final String title = mProperties.getStringProperty(TITLE);
-            mProperties.setUnmodifiableStringProperty(WINDOW_TITLE, title);
-        }
-
-        // Read primary display's resolution
-        final GraphicsDevice main = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
-        final DisplayMode mode = main.getDisplayMode();
-
-        constrainWindowPropertySize(mode.getWidth(), true);
-        constrainWindowPropertySize(mode.getHeight(), false);
-
-        selectWindowAestheticIfUnspecified();
-    }
-
-    /**
-     * Changes either the {@link #WINDOW_WIDTH} or {@link #WINDOW_HEIGHT} property value to some maximum size if a
-     * specified target size is either smaller than the window allows or larger than the given maximum.
+     * Begins the main game loop.
      *
-     * @param max maximum size.
-     * @param width true if width should be constrained, false for height.
-     */
-    private void constrainWindowPropertySize(int max, boolean width)
-    {
-        final String property;
-        final int min;
-
-        if (width) {
-            property = WINDOW_WIDTH;
-            min = Window.MINIMUM_WIDTH;
-        } else {
-            property = WINDOW_HEIGHT;
-            min = Window.MINIMUM_HEIGHT;
-        }
-
-        // Check if side is specified
-        if (mProperties.containsProperty(property)) {
-
-            final int desired = mProperties.getIntegerProperty(property);
-
-            // Take fullscreen if specified is invalid
-            if (desired < min || desired > max) {
-                mProperties.setUnmodifiableIntegerProperty(property, max);
-            }
-
-        } else {
-            mProperties.setUnmodifiableIntegerProperty(property, max);
-        }
-    }
-
-    /**
-     * Applies the default values for the following window properties, if unspecified.
-     *
-     * <ul>
-     *     <li>{@link #WINDOW_FULLSCREEN}</li>
-     *     <li>{@link #WINDOW_BORDERLESS}</li>
-     *     <li>{@link #WINDOW_HIDDEN}</li>
-     * </ul>
-     */
-    private void selectWindowAestheticIfUnspecified()
-    {
-        if (!mProperties.containsProperty(WINDOW_FULLSCREEN)) {
-            mProperties.setUnmodifiableBooleanProperty(WINDOW_FULLSCREEN, DEFAULT_WINDOW_FULLSCREEN);
-        }
-        if (!mProperties.containsProperty(WINDOW_BORDERLESS)) {
-            mProperties.setUnmodifiableBooleanProperty(WINDOW_BORDERLESS, DEFAULT_WINDOW_BORDERLESS);
-        }
-        if (!mProperties.containsProperty(WINDOW_HIDDEN)) {
-            mProperties.setUnmodifiableBooleanProperty(WINDOW_HIDDEN, DEFAULT_WINDOW_HIDDEN);
-        }
-    }
-
-    /**
-     * Controls the game's tick timing.
-     *
-     * <p><b>The current loop implementation was learned from "Game Programming Patterns" by Robert Nystrom at
-     * http://gameprogrammingpatterns.com/game-loop.html.</b></p>
+     * <p>The current loop implementation was learned from "Game Programming Patterns" by Robert Nystrom at
+     * http://gameprogrammingpatterns.com/game-loop.html.</p>
      */
     private void loop()
     {
-        final long tickDuration = NANOSECONDS_PER_SECOND / getIntegerProperty(TICK_RATE);
-        long timeLastStart = System.nanoTime();
-        long frameDuration = 0L;
+        final int desiredRate = getIntegerProperty(Game.TICK_RATE);
+        final long desiredTickDuration = NANOSECONDS_PER_SECOND / desiredRate;
 
-        // Nanosecond timestamp of the current second when measuring tick rate
-        long mTicksPerSecondTime = timeLastStart;
+        long lastStartTimestamp = System.nanoTime();
+        long tickDuration = 0L;
 
-        // Begin game loop
-        while (mContinue && !mWindow.isClosing()) {
+        mMeasure.markLoopBegins(lastStartTimestamp);
 
-            // Figure last set duration
-            final long current = System.nanoTime();
+        while (mContinue) {
 
-            final long elapsed = current - timeLastStart;
-            assert (elapsed >= 0);
+            final long now = System.nanoTime();
 
-            timeLastStart = current;
-            frameDuration += elapsed;
+            // Should be monotonic
+            assert (now - lastStartTimestamp >= 0);
 
-            while (frameDuration >= tickDuration) {
+            // Measure how long last tick took
+            tickDuration += now - lastStartTimestamp;
+            lastStartTimestamp = now;
+
+            // Game steps forward so long as time is available
+            while (tickDuration >= desiredTickDuration) {
+
+                mMeasure.markIterationBegins(System.nanoTime());
                 Window.pollEvents();
-                mWindow.updateGamepads();
 
+                // Process game
                 onTick();
                 mSystems.callWithSystems(CoreSystem::onTick);
 
-                mTicksPerSecondSoFar++;
-                final long time = System.nanoTime();
-
-                // Measure ticks per second
-                if (time - mTicksPerSecondTime >= NANOSECONDS_PER_SECOND) {
-                    mMeasuredTicksPerSecond = mTicksPerSecondSoFar;
-                    mTicksPerSecondSoFar = 0;
-                    mTicksPerSecondTime = time;
-                }
-
-                frameDuration -= tickDuration;
+                tickDuration -= desiredTickDuration;
+                mMeasure.markIterationEnds(System.nanoTime());
             }
+        }
+    }
+
+    private static void checkStringNotBlank(String name, String string)
+    {
+        if (string.trim().isEmpty()) {
+            final String format = "%s cannot be empty or made of whitespace";
+            throw new IllegalArgumentException(String.format(format, name));
+        }
+    }
+
+    private static void checkNotNull(Object object)
+    {
+        if (object == null) {
+            throw new NullPointerException();
         }
     }
 
     /**
-     * Checks whether or not the set properties have the required entries and throws a
-     * {@link NoSuchElementException} if any are missing or invalid.
+     * Carries various initialization details for a {@code Game}'s startup such as the title, version, and
+     * runtime tweaks.
      *
-     * <h3>Required properties</h3>
-     * <ul>
-     *     <li>{@link Game#TITLE}</li>
-     *     <li>{@link Game#DEVELOPER}</li>
-     *     <li>{@link Game#BUILD}</li>
-     *     <li>{@link Game#TICK_RATE}</li>
-     * </ul>
-     *
-     * @param properties properties.
-     * @throws NoSuchElementException if a required property has no value.
+     * <p>{@code Configuration}s are built step-by-step with a {@code Configuration.Builder}.</p>
      */
-    private void checkRequiredPropertiesExist(Map<String, Object> properties)
+    public static final class Configuration
     {
-        final String format = "Game must be provided with a \"%s\" property";
+        // String keys are preferred here over enums to eventually allow enabling undocumented experimental features.
+        // Such features can be enabled by manually entering its corresponding String key without explicitly listing
+        // it as an option
 
-        for (final String property : REQUIRED_PROPERTIES) {
-            if (!properties.containsKey(property)) {
-                throw new NoSuchElementException(String.format(format, property));
-            }
+        private final Map<String, Object> mProps = new HashMap<>();
+
+        private final Map<String, Object> mPrefs = new HashMap<>();
+
+        private Canvas mCanvas;
+
+        private Configuration() { }
+
+        private Configuration(Configuration configuration)
+        {
+            mProps.putAll(configuration.mProps);
+            mPrefs.putAll(configuration.mPrefs);
+            mCanvas = configuration.mCanvas;
         }
-    }
 
-    private void checkNotNull(Object object)
-    {
-        if (object == null) {
-            throw new NullPointerException();
+        @Override
+        protected Object clone() throws CloneNotSupportedException
+        {
+            throw new CloneNotSupportedException();
+        }
+
+        private String getString(Preference preference)
+        {
+            return (String) preference.autoCorrect(mPrefs.get(preference.toString()));
+        }
+
+        private int getInteger(Preference preference)
+        {
+            return (int) preference.autoCorrect(mPrefs.get(preference.toString()));
+        }
+
+        private boolean getBoolean(Preference preference)
+        {
+            return (boolean) preference.autoCorrect(mPrefs.get(preference.toString()));
+        }
+
+        /**
+         * Progressively builds a {@link #Configuration}.
+         *
+         * <p>The following is the minimum needed to produce a {@code Configuration}.</p>
+         * <pre>
+         *     <code>
+         *
+         *         Configuration config = new Game.Configuration.Builder()
+         *             .withHeader("Title", "Developer")
+         *             .withVersion("0.343a", 42)
+         *             .withTickRate(30)
+         *             .withCanvas(new CanvasImpl())
+         *             .build();
+         *     </code>
+         * </pre>
+         */
+        public static final class Builder
+        {
+            private Configuration mConfig;
+
+            /**
+             * Builds a {@code Configuration}.
+             *
+             * <p>Repeated calls to this method will produce instances with the same information.</p>
+             *
+             * @throws IllegalStateException if header, version, tick rate, or a canvas was not specified.
+             */
+            public Configuration build()
+            {
+                if (mConfig == null || !mConfig.mProps.containsKey(Game.TITLE)) {
+                    throw new IllegalStateException("Title and developer were not specified");
+                }
+                if (!mConfig.mProps.containsKey(Game.VERSION)) {
+                    throw new IllegalStateException("Version and build were not specified");
+                }
+                if (!mConfig.mProps.containsKey(Game.TICK_RATE)) {
+                    throw new IllegalStateException("Tick rate was not specified");
+                }
+                if (mConfig.mCanvas == null) {
+                    throw new IllegalStateException("Canvas was not specified");
+                }
+
+                return new Configuration(mConfig);
+            }
+
+            /**
+             * Specifies the name and developer.
+             *
+             * @param title title.
+             * @param developer developer.
+             * @return builder.
+             * @throws NullPointerException if title or developer is null.
+             * @throws IllegalArgumentException if title or developer is empty or whitespace.
+             */
+            public Builder withHeader(String title, String developer)
+            {
+                checkNotNull(title);
+                checkNotNull(developer);
+                checkStringNotBlank("Game title", title);
+                checkStringNotBlank("Game developer", developer);
+                ensureConfigurationExists();
+
+                mConfig.mProps.put(Game.TITLE, title);
+                mConfig.mProps.put(Game.DEVELOPER, developer);
+                return this;
+            }
+
+            /**
+             * Specifies the version and build number.
+             *
+             * @param version outward facing version.
+             * @param build internal build number.
+             * @return builder.
+             * @throws NullPointerException if version is null.
+             * @throws IllegalArgumentException if version is empty or whitespace or build is {@literal <} 0.
+             */
+            public Builder withVersion(String version, int build)
+            {
+                checkNotNull(version);
+                checkStringNotBlank("Game version", version);
+
+                if (build < 0) {
+                    throw new IllegalArgumentException("Game build number must be >= 0");
+                }
+                ensureConfigurationExists();
+
+                mConfig.mProps.put(Game.VERSION, version);
+                mConfig.mProps.put(Game.BUILD, build);
+                return this;
+            }
+
+            /**
+             * Specifies the target tick rate.
+             *
+             * @param rate tick rate.
+             * @return builder.
+             * @throws IllegalArgumentException if rate < 1.
+             */
+            public Builder withTickRate(int rate)
+            {
+                if (rate < 1) {
+                    final String format = "Tick rate must be >= 1, given: %d";
+                    throw new IllegalArgumentException(String.format(format, rate));
+                }
+                ensureConfigurationExists();
+
+                mConfig.mProps.put(Game.TICK_RATE, rate);
+                return this;
+            }
+
+            /**
+             * Specifies the renderer.
+             *
+             * @param canvas renderer.
+             * @return builder.
+             * @throws NullPointerException if canvas is null.
+             */
+            public Builder withCanvas(Canvas canvas)
+            {
+                checkNotNull(canvas);
+                ensureConfigurationExists();
+
+                mConfig.mCanvas = canvas;
+                return this;
+            }
+
+            /**
+             * Specifies a {@code String} value for a launch preference.
+             *
+             * @param key key.
+             * @param value value.
+             * @return builder.
+             * @throws NullPointerException if key or value is null.
+             * @throws IllegalArgumentException if the preference does not expect a {@code String} value.
+             */
+            public Builder withPreference(Preference key, String value)
+            {
+                checkNotNull(key);
+                checkNotNull(value);
+                checkExpectedType(key, value);
+                ensureConfigurationExists();
+
+                mConfig.mPrefs.put(key.toString(), value);
+                return this;
+            }
+
+            /**
+             * Specifies an {@code int} value for a launch preference.
+             *
+             * @param key key.
+             * @param value value.
+             * @return builder.
+             * @throws NullPointerException if key is null.
+             * @throws IllegalArgumentException if the preference does not expect an {@code int} value.
+             */
+            public Builder withPreference(Preference key, int value)
+            {
+                checkNotNull(key);
+                checkExpectedType(key, value);
+                ensureConfigurationExists();
+
+                mConfig.mPrefs.put(key.toString(), value);
+                return this;
+            }
+
+            /**
+             * Specifies a {@code boolean} value for a launch preference.
+             *
+             * @param key key.
+             * @param value value.
+             * @return builder.
+             * @throws NullPointerException if key is null.
+             * @throws IllegalArgumentException if the preference does not expect a {@code boolean} value.
+             */
+            public Builder withPreference(Preference key, boolean value)
+            {
+                checkNotNull(key);
+                checkExpectedType(key, value);
+                ensureConfigurationExists();
+
+                mConfig.mPrefs.put(key.toString(), value);
+                return this;
+            }
+
+            @Override
+            protected Object clone() throws CloneNotSupportedException
+            {
+                throw new CloneNotSupportedException();
+            }
+
+            private void ensureConfigurationExists()
+            {
+                if (mConfig == null) {
+                    mConfig = new Configuration();
+                }
+            }
+
+            private void checkExpectedType(Preference key, Object value)
+            {
+                if (value != null && value.getClass() != key.getType()) {
+
+                    final String format = "Preference expects a %s value but given: %s";
+                    final String expName = key.getType().getSimpleName();
+                    final String actName = value.getClass().getSimpleName();
+
+                    throw new IllegalArgumentException(String.format(format, expName, actName));
+                }
+            }
         }
     }
 
