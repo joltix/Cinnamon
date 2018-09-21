@@ -1,32 +1,26 @@
 package cinnamon.engine.core;
 
-import cinnamon.engine.core.GameTestSuite.TestCanvas;
+import cinnamon.engine.core.Game.Configuration;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.Map;
-import java.util.NoSuchElementException;
 
 import static cinnamon.engine.core.GameTestSuite.*;
 
 public class GameTest
 {
     // How long game should run, in milliseconds
-    private static final long GAME_DURATION = 4000L;
+    private static final long GAME_DURATION = 2_000L;
 
-    private static final int TEST_SPECIFIC_TICK_RATE = 70;
-
-    private Game mGame;
+    private AutoStopGame mGame;
 
     @Before
     public void setUp()
     {
-        final Map<String, Object> properties = GameTestSuite.createMinimalProperties();
-        properties.put(Game.TICK_RATE, TEST_SPECIFIC_TICK_RATE);
+        final Configuration.Builder builder = GameTestSuite.createMinimalConfigurationBuilder();
 
-        mGame = new AutoStopGame(new TestCanvas(), properties, GAME_DURATION);
+        mGame = new AutoStopGame(builder.build(), GAME_DURATION);
     }
 
     @After
@@ -37,34 +31,9 @@ public class GameTest
     }
 
     @Test (expected = NullPointerException.class)
-    public void testConstructorNPECanvas()
+    public void testConstructorNPEConfiguration()
     {
-        final Map<String, Object> properties = GameTestSuite.createMinimalProperties();
-        new AutoStopGame(null, properties);
-    }
-
-    @Test (expected = NullPointerException.class)
-    public void testConstructorNPEProperties()
-    {
-        new AutoStopGame(new TestCanvas(), null);
-    }
-
-    @Test (expected = IllegalArgumentException.class)
-    public void testConstructorIAEUnexpectedValueType()
-    {
-        final Map<String, Object> properties = GameTestSuite.createMinimalProperties();
-        properties.put(Game.TITLE, 42f);
-
-        new AutoStopGame(new TestCanvas(), properties);
-    }
-
-    @Test (expected = NoSuchElementException.class)
-    public void testConstructorNSEEPropertyHasMissingValue()
-    {
-        final Map<String, Object> properties = GameTestSuite.createMinimalProperties();
-        properties.put(Game.TITLE, null);
-
-        new AutoStopGame(new TestCanvas(), properties);
+        new AutoStopGame(null);
     }
 
     @Test
@@ -92,21 +61,33 @@ public class GameTest
     }
 
     @Test
+    public void testGetVersionReturnsExpectedVersion()
+    {
+        Assert.assertEquals(GameTestSuite.VERSION, mGame.getStringProperty(Game.VERSION));
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testSetVersionIAEUnmodifiableProperty()
+    {
+        mGame.setStringProperty(Game.VERSION, "343");
+    }
+
+    @Test
     public void testGetBuildReturnsExpectedBuild()
     {
-        Assert.assertEquals(GameTestSuite.BUILD, mGame.getDoubleProperty(Game.BUILD), 0d);
+        Assert.assertEquals(GameTestSuite.BUILD, mGame.getIntegerProperty(Game.BUILD));
     }
 
     @Test (expected = IllegalArgumentException.class)
     public void testSetBuildIAEUnmodifiableProperty()
     {
-        mGame.setDoubleProperty(Game.BUILD, 343.343d);
+        mGame.setIntegerProperty(Game.BUILD, 343);
     }
 
     @Test
     public void testGetTickRateReturnsExpectedTickRate()
     {
-        Assert.assertEquals(TEST_SPECIFIC_TICK_RATE, mGame.getIntegerProperty(Game.TICK_RATE));
+        Assert.assertEquals(GameTestSuite.TICK_RATE, mGame.getIntegerProperty(Game.TICK_RATE));
     }
 
     @Test (expected = IllegalArgumentException.class)
@@ -116,25 +97,47 @@ public class GameTest
     }
 
     @Test
-    public void testGetMeasuredTickRate()
+    public void testGetTickRate()
     {
         mGame.start();
 
-        final int diff = Math.abs(mGame.getMeasuredTickRate() - TEST_SPECIFIC_TICK_RATE);
+        final int diff = Math.abs(mGame.getTickRate() - GameTestSuite.TICK_RATE);
 
         Assert.assertTrue(diff >= 0 && diff < 2);
     }
 
     @Test
-    public void testIsRunning()
+    public void testGetTickDuration()
     {
-        final Map<String, Object> properties = GameTestSuite.createMinimalProperties();
-        mGame = new AutoStopGame(new TestCanvas(), properties, GAME_DURATION / 4, () ->
+        mGame.setTickAction(() ->
         {
-            Assert.assertTrue(mGame.isRunning());
+            // Fake work to lengthen out each tick's duration
+            try {
+                Thread.sleep(1_000L / GameTestSuite.TICK_RATE);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        mGame.start();
+
+        final double diff = Math.abs(mGame.getTickDuration() - (1_000d / GameTestSuite.TICK_RATE));
+
+        Assert.assertTrue(diff >=  0d && diff < 2d);
+    }
+
+    @Test
+    public void testIsRunningReturnsTrue()
+    {
+        final boolean[] trace = {false};
+
+        mGame.setTickAction(() ->
+        {
+            trace[0] = mGame.isRunning();
         });
 
         mGame.start();
+
+        Assert.assertTrue(trace[0]);
     }
 
     @Test
@@ -146,13 +149,16 @@ public class GameTest
     @Test
     public void testIsRunningReturnsFalseAfterStop()
     {
-        final Map<String, Object> properties = GameTestSuite.createMinimalProperties();
-        mGame = new AutoStopGame(new TestCanvas(), properties, 0L, () ->
+        final boolean[] trace = {true};
+
+        mGame.setTickAction(() ->
         {
             mGame.stop();
-            Assert.assertFalse(mGame.isRunning());
+            trace[0] = mGame.isRunning();
         });
 
         mGame.start();
+
+        Assert.assertFalse(trace[0]);
     }
 }
