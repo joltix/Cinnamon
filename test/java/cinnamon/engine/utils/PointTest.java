@@ -2,137 +2,154 @@ package cinnamon.engine.utils;
 
 import org.junit.*;
 
-import java.util.Random;
-
 /**
- * <p>{@code Point}'s getters and setters are not explicitly tested and are presumed correct.</p>
- *
- * <p>Each test performs its operations on points of all combinations of the following value types
- * (positive and negative zeros are not differentiated).</p>
- *
- * <ul>
- *     <li>0</li>
- *     <li>+infinity</li>
- *     <li>-infinity</li>
- *     <li>NaN</li>
- *     <li>non-zero finite positive and negative numbers</li>
- * </ul>
+ * Individual getters and setters are presumed correct.
  */
 public class PointTest
 {
-    private static final float DELTA = 0.00001f;
+    private static final float EPSILON = 0.01f;
 
-    private Random mRNG;
+    private static final float X = 0.42f;
+
+    private static final float Y = 0.343f;
+
+    private static final float Z = 0.7f;
 
     private Point mPointA;
-    private Point mPointB;
 
-    // Setting aside Point A's values
-    private Point mPointCopyA;
+    private Point mPointB;
 
     @Before
     public void setUp()
     {
-        mRNG = new Random(System.nanoTime());
-        mPointA = new Point();
-        mPointB = new Point();
-        mPointCopyA = new Point();
+        mPointA = new Point(X, Y, Z);
+        mPointB = new Point(X, Y, Z);
     }
 
     @After
     public void tearDown()
     {
-        mRNG = null;
         mPointA = null;
         mPointB = null;
-        mPointCopyA = null;
-    }
-
-    @Test
-    public void testCopy()
-    {
-        PositionableTestSuite.generatePermutations(mPointA, () -> {
-            mPointCopyA.copy(mPointA);
-
-            PositionableTestSuite.assertEquals(mPointA, mPointCopyA);
-        }, mRNG);
     }
 
     @Test (expected = NullPointerException.class)
-    public void testCopyNullPointerException()
+    public void testConstructorNPESource()
+    {
+        new Point(null);
+    }
+
+    @Test
+    public void testCopyCopiesAllCoordinates()
+    {
+        final Point copy = new Point();
+        copy.copy(mPointA);
+
+        Assert.assertEquals(X, copy.getX(), 0f);
+        Assert.assertEquals(Y, copy.getY(), 0f);
+        Assert.assertEquals(Z, copy.getZ(), 0f);
+    }
+
+    @Test (expected = NullPointerException.class)
+    public void testCopyNPESource()
     {
         mPointA.copy(null);
     }
 
     @Test
-    public void testHashCode()
+    public void testSetSetsAllCoordinates()
     {
-        PositionableTestSuite.generatePermutations(mPointA, () -> {
+        final float x = mPointA.getX();
+        final float y = mPointA.getY();
+        final float z = mPointA.getZ();
 
-            PositionableTestSuite.copyPositionFromTo(mPointA, mPointB);
+        mPointA.set(-x, -y, -z);
 
-            // Test affirmative
-            Assert.assertEquals(mPointA.hashCode(), mPointB.hashCode());
-            Assert.assertEquals(mPointA.hashCode(), mPointA.hashCode());
-
-            // Permutations will not use max so should not be equivalent
-            mPointB.setX(Float.MAX_VALUE);
-            mPointB.setY(Float.MAX_VALUE);
-            mPointB.setZ(Float.MAX_VALUE);
-
-            // Test negative
-            Assert.assertNotEquals(mPointA.hashCode(), mPointB.hashCode());
-            Assert.assertNotEquals(mPointA.hashCode(), new Object().hashCode());
-        }, mRNG);
+        Assert.assertEquals(-x, mPointA.getX(), 0f);
+        Assert.assertEquals(-y, mPointA.getY(), 0f);
+        Assert.assertEquals(-z, mPointA.getZ(), 0f);
     }
 
     @Test
-    public void testEquals()
+    public void testShiftTranslatesAllCoordinates()
     {
-        PositionableTestSuite.generatePermutations(mPointA, () -> {
+        final float x = mPointA.getX();
+        final float y = mPointA.getY();
+        final float z = mPointA.getZ();
 
-            PositionableTestSuite.copyPositionFromTo(mPointA, mPointCopyA);
-            PositionableTestSuite.copyPositionFromTo(mPointA, mPointB);
+        mPointA.shift(1f, 1f, 1f);
 
-            // Symmetric
-            Assert.assertTrue(mPointA.equals(mPointB));
-            Assert.assertTrue(mPointB.equals(mPointA));
-
-            // Reflexive
-            Assert.assertTrue(mPointA.equals(mPointA));
-
-            // Transitive
-            Assert.assertTrue(mPointB.equals(mPointCopyA));
-            Assert.assertTrue(mPointA.equals(mPointCopyA));
-
-            // Permutations will not use max so should not be equivalent
-            mPointB.setX(Float.MAX_VALUE);
-            mPointB.setY(Float.MAX_VALUE);
-            mPointB.setZ(Float.MAX_VALUE);
-
-            Assert.assertFalse(mPointA.equals(mPointB));
-            Assert.assertFalse(mPointA.equals(null));
-            Assert.assertFalse(mPointA.equals(new Object()));
-        }, mRNG);
+        Assert.assertEquals(x + 1, mPointA.getX(), 0f);
+        Assert.assertEquals(y + 1, mPointA.getY(), 0f);
+        Assert.assertEquals(z + 1, mPointA.getZ(), 0f);
     }
 
     @Test
-    public void testStaticDistanceBetween()
+    public void testEqualsSymmetric()
     {
-        // Short aliases
-        final Point pA = mPointA;
-        final Point pB = mPointB;
+        Assert.assertEquals(mPointA, mPointB);
+        Assert.assertEquals(mPointB, mPointA);
+    }
 
-        PositionableTestSuite.generatePermutations(mPointA, () -> {
-            PositionableTestSuite.generatePermutations(mPointB, () -> {
+    @Test
+    public void testEqualsReflexive()
+    {
+        Assert.assertEquals(mPointA, mPointA);
+    }
 
-                final float expDist = distance(pA.getX(), pA.getY(), pA.getZ(), pB.getX(), pB.getY(), pB.getZ());
-                final float actualDist = Point.distanceBetween(pA, pB);
+    @Test
+    public void testEqualsTransitive()
+    {
+        final Point pointC = new Point(X, Y, Z);
 
-                Assert.assertEquals(expDist, actualDist, 0f);
+        Assert.assertEquals(mPointB, pointC);
+        Assert.assertEquals(mPointA, pointC);
+        Assert.assertEquals(mPointA, mPointB);
+    }
 
-            }, mRNG);
-        }, mRNG);
+    @Test
+    public void testEqualsReturnsFalseWhenACoordinateIsDifferent()
+    {
+        mPointB.setX(-mPointB.getX());
+
+        Assert.assertNotEquals(mPointA, mPointB);
+    }
+
+    @Test
+    public void testEqualsReturnsFalseWhenObjectIsNotAPoint()
+    {
+        Assert.assertNotEquals(mPointA, new Object());
+    }
+
+    @Test
+    public void testEqualsReturnsFalseWhenNullObject()
+    {
+        Assert.assertNotEquals(mPointA, null);
+    }
+
+    @Test
+    public void testHashCodeIsSameWhenPointsAreEqual()
+    {
+        final int expected = mPointA.hashCode();
+        final int actual = mPointB.hashCode();
+
+        Assert.assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testStaticDistanceBetweenReturnsZeroWhenSameCoordinates()
+    {
+        Assert.assertEquals(0f, Point.distanceBetween(mPointA, mPointB), 0f);
+    }
+
+    @Test
+    public void testStaticDistanceBetweenReturnsNonZeroWhenDifferingCoordinates()
+    {
+        final float expectedDistance = distance(mPointA, mPointB) + X;
+
+        mPointA.setX(mPointA.getX() + X);
+
+        Assert.assertEquals(expectedDistance, Point.distanceBetween(mPointA, mPointB), 0f);
     }
 
     @Test (expected = NullPointerException.class)
@@ -148,105 +165,75 @@ public class PointTest
     }
 
     @Test
-    public void testStaticIsEqual()
+    public void testStaticIsEqualReturnsTrueWhenZeroDifferenceWithZeroEpsilon()
     {
-        // Test special case values
-        PositionableTestSuite.generatePermutations(mPointA, () -> {
-            PositionableTestSuite.generatePermutations(mPointB, () -> {
+        Assert.assertTrue(Point.isEqual(mPointA, mPointB, 0f));
+    }
 
-                Assert.assertEquals(coordinatesEqual(mPointA, mPointB), Point.isEqual(mPointA, mPointB, DELTA));
+    @Test
+    public void testStaticIsEqualReturnsTrueWhenZeroDifferenceWithNonZeroEpsilon()
+    {
+        Assert.assertTrue(Point.isEqual(mPointA, mPointB, EPSILON));
+    }
 
-            }, mRNG);
-        }, mRNG);
+    @Test
+    public void testStaticIsEqualReturnsTrueWhenNonZeroDifferenceIsLessThanEpsilonButNotExact()
+    {
+        mPointA.setX(mPointA.getX() + (EPSILON / 2f));
 
-        // Diff < DELTA should be eq
-        mPointA.setPosition(1f, 1f, 1f);
-        mPointB.setPosition(1f, 1f, 1f);
-        mPointB.addX(DELTA / 2f);
-        mPointB.addY(DELTA / 2f);
-        mPointB.addZ(DELTA / 2f);
+        Assert.assertTrue(Point.isEqual(mPointA, mPointB, EPSILON));
+    }
 
-        Assert.assertTrue(coordinatesEqual(mPointA, mPointB));
+    @Test
+    public void testStaticIsEqualReturnsFalseWhenNonZeroDifferenceIsGreaterThanOrEqualToEpsilon()
+    {
+        mPointA.setX(mPointA.getX() + (EPSILON * 2f));
 
-        // Diff now > DELTA so not eq
-        mPointB.addX(DELTA * 2f);
-        mPointB.addY(DELTA * 2f);
-        mPointB.addZ(DELTA * 2f);
-
-        Assert.assertFalse(coordinatesEqual(mPointA, mPointB));
+        Assert.assertFalse(Point.isEqual(mPointA, mPointB, EPSILON));
     }
 
     @Test (expected = NullPointerException.class)
     public void testStaticIsEqualNPEPointA()
     {
-        Point.isEqual(null, mPointB, DELTA);
+        Point.isEqual(null, mPointB, EPSILON);
     }
 
     @Test (expected = NullPointerException.class)
     public void testStaticIsEqualNPEPointB()
     {
-        Point.isEqual(mPointA, null, DELTA);
+        Point.isEqual(mPointA, null, EPSILON);
     }
 
     @Test (expected = IllegalArgumentException.class)
-    public void testStaticIsEqualIAEDelta()
+    public void testStaticIsEqualIAENaNEpsilon()
+    {
+        Point.isEqual(mPointA, mPointB, Float.NaN);
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testStaticIsEqualIAEPositivelyInfiniteEpsilon()
+    {
+        Point.isEqual(mPointA, mPointB, Float.POSITIVE_INFINITY);
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testStaticIsEqualIAENegativelyInfiniteEpsilon()
+    {
+        Point.isEqual(mPointA, mPointB, Float.NEGATIVE_INFINITY);
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testStaticIsEqualIAENegativeEpsilon()
     {
         Point.isEqual(mPointA, mPointB, -1f);
     }
 
-    /**
-     * <p>Computes the distance between two sets of coordinates.</p>
-     *
-     * @param x0 first x.
-     * @param y0 first y.
-     * @param z0 first z.
-     * @param x1 second x.
-     * @param y1 second y.
-     * @param z1 second z.
-     * @return distance.
-     */
-    private float distance(float x0, float y0, float z0, float x1, float y1, float z1)
+    private float distance(Point a, Point b)
     {
-        final float x = x0 - x1;
-        final float y = y0 - y1;
-        final float z = z0 - z1;
+        final float x = a.getX() - b.getX();
+        final float y = a.getY() - b.getY();
+        final float z = a.getZ() - b.getZ();
 
         return (float) Math.sqrt((x * x) + (y * y) + (z * z));
-    }
-
-    /**
-     * <p>Checks if two points can be considered equal with a delta of {@link #DELTA}. NaN values are considered
-     * equal.</p>
-     *
-     * @param pointA first point.
-     * @param pointB second point.
-     * @return true if equal.
-     * @throws NullPointerException if either point is null.
-     */
-    private boolean coordinatesEqual(Point pointA, Point pointB)
-    {
-        if (pointA == null) {
-            throw new NullPointerException("Point A cannot be null");
-        }
-        if (pointB == null) {
-            throw new NullPointerException("Point B cannot be null");
-        }
-
-        boolean expEq = coordinatesEqual(mPointA.getX(), mPointB.getX());
-        expEq = expEq && coordinatesEqual(mPointA.getY(), mPointB.getY());
-        return expEq && coordinatesEqual(mPointA.getZ(), mPointB.getZ());
-    }
-
-    /**
-     * <p>Checks if two floats can be considered equal with a delta of {@link #DELTA}. NaN values are considered
-     * equal.</p>
-     *
-     * @param valueA first float.
-     * @param valueB second float.
-     * @return true if equal.
-     */
-    private boolean coordinatesEqual(float valueA, float valueB)
-    {
-        return (Float.isNaN(valueA) && Float.isNaN(valueB)) || Math.abs(valueA - valueB) <= DELTA;
     }
 }

@@ -1,16 +1,20 @@
 package cinnamon.engine.utils;
 
+import static java.util.Objects.requireNonNull;
+
 /**
- * <p>A movable point in three dimensions.</p>
+ * A movable position in three dimensions.
  */
-public final class Point implements Positionable, Copier<Point>
+public final class Point implements Position, Copier<Point>
 {
     private float mX;
+
     private float mY;
+
     private float mZ;
 
     /**
-     * <p>Constructs a {@code Point} whose coordinates are (0,0,0).</p>
+     * Constructs a {@code Point} whose coordinates are (0,0,0).
      */
     public Point()
     {
@@ -18,7 +22,18 @@ public final class Point implements Positionable, Copier<Point>
     }
 
     /**
-     * <p>Constructs a {@code Point} from the given coordinates.</p>
+     * Constructs a {@code Point} with the same coordinates as another.
+     *
+     * @param source to copy.
+     * @throws NullPointerException if point is null.
+     */
+    public Point(Point source)
+    {
+        copy(source);
+    }
+
+    /**
+     * Constructs a {@code Point} from the given coordinates.
      *
      * @param x x.
      * @param y y.
@@ -32,58 +47,47 @@ public final class Point implements Positionable, Copier<Point>
     }
 
     /**
-     * <p>Constructs a {@code Point} with the same coordinates as another.</p>
+     * Copies all coordinates from a given {@code Point}.
      *
-     * @param point to copy.
-     * @throws NullPointerException if the given point is null.
+     * @param source to copy.
+     * @throws NullPointerException if point is null.
      */
-    public Point(Point point)
+    @Override
+    public void copy(Point source)
     {
-        copy(point);
+        requireNonNull(source);
+
+        mX = source.getX();
+        mY = source.getY();
+        mZ = source.getZ();
     }
 
     /**
-     * <p>Copies all coordinates from the given {@code Point}.</p>
+     * Sets the position.
      *
-     * @param point to copy.
-     * @throws NullPointerException if the given point is null.
+     * @param x x.
+     * @param y y.
+     * @param z z.
      */
-    @Override
-    public void copy(Point point)
-    {
-        if (point == null) {
-            throw new NullPointerException("Cannot copy null point");
-        }
-
-        mX = point.getX();
-        mY = point.getY();
-        mZ = point.getZ();
-    }
-
-    @Override
-    public void setPosition(float x, float y, float z)
+    public void set(float x, float y, float z)
     {
         mX = x;
         mY = y;
         mZ = z;
     }
 
-    @Override
-    public void addX(float x)
+    /**
+     * Shifts the position.
+     *
+     * @param dx change in x.
+     * @param dy change in y.
+     * @param dz change in z.
+     */
+    public void shift(float dx, float dy, float dz)
     {
-        mX += x;
-    }
-
-    @Override
-    public void addY(float y)
-    {
-        mY += y;
-    }
-
-    @Override
-    public void addZ(float z)
-    {
-        mZ += z;
+        mX += dx;
+        mY += dy;
+        mZ += dz;
     }
 
     @Override
@@ -92,7 +96,11 @@ public final class Point implements Positionable, Copier<Point>
         return mX;
     }
 
-    @Override
+    /**
+     * Sets the x position.
+     *
+     * @param x x.
+     */
     public void setX(float x)
     {
         mX = x;
@@ -104,7 +112,11 @@ public final class Point implements Positionable, Copier<Point>
         return mY;
     }
 
-    @Override
+    /**
+     * Sets the y position.
+     *
+     * @param y y.
+     */
     public void setY(float y)
     {
         mY = y;
@@ -116,28 +128,24 @@ public final class Point implements Positionable, Copier<Point>
         return mZ;
     }
 
-    @Override
+    /**
+     * Sets the z position.
+     *
+     * @param z z.
+     */
     public void setZ(float z)
     {
         mZ = z;
     }
 
-    @Override
-    public int hashCode()
-    {
-        int hash = 17 * 31 + ((Float) mX).hashCode();
-        hash = 31 * hash + ((Float) mY).hashCode();
-        return 31 * hash + ((Float) mZ).hashCode();
-    }
-
     /**
-     * {@inheritDoc}
+     * If the given object is also a {@code Point}, coordinate comparison follows {@link Float#compareTo(Float)},
+     * i.e. equality is tested <i>exactly</i> (but with {@code NaN} equal to itself).
      *
-     * <p>Comparison between two coordinates of {@link Float#NaN} are treated as true and no distinction is made
-     * between positive and negative zeros. Floating point comparison is exact (delta of 0).</p>
+     * <p>For testing equality with an epsilon, see {@link Point#isEqual(Point, Point, float)}.</p>
      *
-     * @param obj the point with which to compare.
-     * @return true if the given object is a point and both points refer to the exact same coordinates.
+     * @param obj object to compare with.
+     * @return true if {@code obj} is a {@code Point} and both refer to the same position.
      */
     @Override
     public boolean equals(Object obj)
@@ -148,92 +156,119 @@ public final class Point implements Positionable, Copier<Point>
             return false;
         }
 
-        final Point pt = (Point) obj;
+        final Point other = (Point) obj;
 
-        // Compare coordinates (account for corresponding being NaN)
-        boolean sameComps = (mX == pt.mX || (Float.isNaN(mX) && Float.isNaN(pt.mX)));
-        sameComps = sameComps && (mY == pt.mY || (Float.isNaN(mY) && Float.isNaN(pt.mY)));
-        sameComps = sameComps && (mZ == pt.mZ || (Float.isNaN(mZ) && Float.isNaN(pt.mZ)));
-
-        return sameComps;
+        return Float.compare(mX, other.mX) == 0 &&
+                Float.compare(mY, other.mY) == 0 &&
+                Float.compare(mZ, other.mZ) == 0;
     }
+
+    @Override
+    public int hashCode()
+    {
+        int hash = 17 * 31 + Float.hashCode(mX);
+        hash = 31 * hash + Float.hashCode(mY);
+        return 31 * hash + Float.hashCode(mZ);
+    }
+
 
     @Override
     public String toString()
     {
-        return "(" + mX + "," + mY + "," + mZ + ")";
+        return String.format("(%.4f,%.4f,%.4f)", mX, mY, mZ);
     }
 
     @Override
     protected Object clone() throws CloneNotSupportedException
     {
-        throw new CloneNotSupportedException("Use the copy constructor instead");
+        throw new CloneNotSupportedException();
     }
 
     /**
-     * <p>Computes the distance between two points.</p>
+     * Computes the distance between two points.
      *
-     * @param pointA first point.
-     * @param pointB second point.
+     * @param a first point.
+     * @param b second point.
      * @return distance between.
      * @throws NullPointerException if either of the given points are null.
      */
-    public static float distanceBetween(Point pointA, Point pointB)
+    public static float distanceBetween(Point a, Point b)
     {
-        if (pointA == null) {
-            throw new NullPointerException("Point A cannot be null");
-        }
-        if (pointB == null) {
-            throw new NullPointerException("Point B cannot be null");
-        }
+        requireNonNull(a, "Point A cannot be null");
+        requireNonNull(b, "Point B cannot be null");
 
         // Compute diffs
-        final float x = pointA.mX - pointB.mX;
-        final float y = pointA.mY - pointB.mY;
-        final float z = pointA.mZ - pointB.mZ;
+        final float x = a.mX - b.mX;
+        final float y = a.mY - b.mY;
+        final float z = a.mZ - b.mZ;
 
         return (float) Math.sqrt((x * x) + (y * y) + (z * z));
     }
 
     /**
-     * <p>Checks if two Points are roughly equivalent using a given delta. If corresponding coordinates are NaN, they
-     * are considered equal.</p>
+     * Returns true if two positions are roughly equivalent within a given error.
      *
-     * @param pointA first point.
-     * @param pointB second point.
-     * @param delta difference allowed between coordinates before they are no longer considered equal.
-     * @return true if coordinates are roughly equivalent.
+     * <p>This test will adjust {@code epsilon} when either of the coordinates is {@literal >} 1 to compensate for
+     * larger coordinate values.</p>
+     *
+     * <p>If corresponding coordinates are both {@code NaN}, they are considered equal.</p>
+     *
+     * @param a first point.
+     * @param b second point.
+     * @param epsilon distance between coordinates before they are no longer considered equal.
+     * @return true if points can be considered equal.
      * @throws NullPointerException if either of the given points are null.
-     * @throws IllegalArgumentException if delta &lt; 0.
+     * @throws IllegalArgumentException if epsilon is {@link Float#NaN}, {@link Float#POSITIVE_INFINITY},
+     * {@link Float#NEGATIVE_INFINITY}, or {@literal <} 0.
      */
-    public static boolean isEqual(Point pointA, Point pointB, float delta)
+    public static boolean isEqual(Point a, Point b, float epsilon)
     {
-        if (pointA == null) {
-            throw new NullPointerException("Point A cannot be null");
+        requireNonNull(a, "Point A cannot be null");
+        requireNonNull(a, "Point B cannot be null");
+
+        if (Float.isNaN(epsilon)) {
+            throw new IllegalArgumentException("Epsilon cannot be NaN");
         }
-        if (pointB == null) {
-            throw new NullPointerException("Point B cannot be null");
+        if (Float.isInfinite(epsilon)) {
+            throw new IllegalArgumentException("Epsilon cannot be infinite");
         }
-        if (delta < 0f) {
-            throw new IllegalArgumentException("Delta must be >= 0");
+        if (epsilon < 0f) {
+            throw new IllegalArgumentException("Epsilon must be >= 0");
         }
 
-        boolean equal = isEqual(pointA.mX, pointB.mX, delta);
-        equal = equal && isEqual(pointA.mY, pointB.mY, delta);
-        return equal && isEqual(pointA.mZ, pointB.mZ, delta);
+        return isRoughlyEqual(a.mX, b.mX, epsilon) &&
+                isRoughlyEqual(a.mY, b.mY, epsilon) &&
+                isRoughlyEqual(a.mZ, b.mZ, epsilon);
     }
 
     /**
-     * <p>Checks if two coordinates are roughly equivalent using a given delta. If corresponding coordinates are NaN,
-     * they are considered equal.</p>
+     * Returns {@code true} if two values are roughly equivalent (within a given epsilon). The specified epsilon is
+     * adjusted when at least one of the given {@code float} values is {@literal >} 1.
      *
-     * @param valueA first coordinate.
-     * @param valueB second coordinate.
-     * @param delta difference allowed between coordinates before they are no longer considered equal.
-     * @return true if coordinates can be considered equal.
+     * <p>Corresponding {@code NaN} coordinates are considered equal.</p>
+     *
+     * <p>This comparison is given at Christer Ericson's blog
+     * <a href="http://realtimecollisiondetection.net/blog/?p=89">Realtime Collision Detection</a>
+     * and also briefly from his GDC 2007 presentation "Physics for Game Programmers: Numerical Robustness".</p>
+     *
+     * @param a first value.
+     * @param b second value.
+     * @param epsilon exclusive difference before which values are considered equal.
+     * @return true if values are roughly equal.
      */
-    private static boolean isEqual(float valueA, float valueB, float delta)
+    private static boolean isRoughlyEqual(float a, float b, float epsilon)
     {
-        return (Float.isNaN(valueA) && Float.isNaN(valueB)) || (Math.abs(valueA - valueB) < delta);
+        // Exact equality for normal values as well as NaNs and infinities
+        if (Float.compare(a, b) == 0) {
+            return true;
+        }
+
+        final float largerInput = Math.max(Math.abs(a), Math.abs(b));
+
+        // When |input| < 1, epsilon is unchanged, otherwise scale to input
+        final float scale = Math.max(1f, largerInput);
+
+        // Ignore relatively small errors
+        return Math.abs(a - b) < epsilon * scale;
     }
 }

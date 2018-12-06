@@ -51,7 +51,7 @@ public class MouseTest
     @Test
     public void testGetPositionChangesDoNotAffectPosition()
     {
-        mMouse.getPosition().setPosition(3f, 4f, 3f);
+        mMouse.getPosition().set(3f, 4f, 3f);
 
         Assert.assertEquals(new Point(0f, 0f, 0f), mState.getPosition());
     }

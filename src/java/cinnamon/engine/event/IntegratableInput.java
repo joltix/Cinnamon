@@ -329,7 +329,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
     {
         return (window, x, y) ->
         {
-            mMouseState.getPosition().setPosition((float) x, (float) y, 0f);
+            mMouseState.getPosition().set((float) x, (float) y, 0f);
         };
     }
 
@@ -360,7 +360,7 @@ public final class IntegratableInput implements Input, InputHistories, EventSour
             }
 
             final Point position = mMouseState.getPosition();
-            position.setPosition((float) x, (float) y, 0f);
+            position.set((float) x, (float) y, 0f);
 
             final boolean press = action == GLFW.GLFW_PRESS;
             mBuffer.add(new MouseEvent(System.nanoTime(), position, constant, press));
