@@ -5,67 +5,58 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * {@code Component} producer with the ability to create from prototypes.
  */
-public final class ComponentManager
+public final class ComponentFactory
 {
     // Component producers
-    private final Map<Class<? extends Component>, ComponentFactory> mSources = new HashMap<>();
+    private final Map<Class<? extends Component>, Source> mSources = new HashMap<>();
 
     // Named templates to copy from
     private final Map<String, Component> mPrototypes = new HashMap<>();
 
     /**
-     * Constructs a {@code ComponentManager}.
+     * Constructs a {@code ComponentFactory}.
      */
-    public ComponentManager()
+    public ComponentFactory()
     {
         super();
     }
 
     /**
-     * Gets a map of prototypes. Changes to the map have no effect on set prototypes.
+     * Sets a prototype.
      *
-     * @return map of prototypes.
+     * <p>If {@code prototype} is {@code null}, any set prototype with the same name is removed.</p>
+     *
+     * @param name prototype name.
+     * @param prototype component prototype.
+     * @param <T> type of prototype.
+     * @throws NullPointerException if {@code name} is {@code null}.
      */
-    public Map<String, Component> getPrototypes()
+    public <T extends Component> void setPrototype(String name, T prototype)
     {
-        return new HashMap<>(mPrototypes);
-    }
+        requireNonNull(name);
 
-    /**
-     * Sets a map of prototypes.
-     *
-     * <p>Changes to the map have no effect on set prototypes. Previously set prototypes are removed.</p>
-     *
-     * @param prototypes named prototypes.
-     * @throws NullPointerException if prototypes is null.
-     * @throws IllegalArgumentException if a prototype name specifies a null component.
-     */
-    public void setPrototypes(Map<String, Component> prototypes)
-    {
-        checkNotNull(prototypes);
-        checkNoNullValues(prototypes);
-
-        mPrototypes.clear();
-        mPrototypes.putAll(prototypes);
+        mPrototypes.compute(name, (key, value) -> prototype);
     }
 
     /**
      * Sets a component's source of new instances.
      *
      * @param cls component class.
-     * @param factory component source.
+     * @param src component source.
      * @param <T> component type.
-     * @throws NullPointerException if cls or factory is null.
+     * @throws NullPointerException if {@code cls} or {@code src} is {@code null}.
      */
-    public <T extends Component> void setSource(Class<T> cls, ComponentFactory<T> factory)
+    public <T extends Component> void setSource(Class<T> cls, Source<T> src)
     {
-        checkNotNull(cls);
-        checkNotNull(factory);
+        requireNonNull(cls);
+        requireNonNull(src);
 
-        mSources.put(cls, factory);
+        mSources.put(cls, src);
     }
 
     /**
@@ -74,18 +65,18 @@ public final class ComponentManager
      * @param cls component class.
      * @param <T> component type.
      * @return new component.
-     * @throws NullPointerException if cls is null.
+     * @throws NullPointerException if {@code cls} is {@code null}.
      * @throws IllegalStateException if no source has been set for the component class.
      */
     public <T extends Component> T createComponent(Class<T> cls)
     {
-        checkNotNull(cls);
+        requireNonNull(cls);
 
         @SuppressWarnings("unchecked")
-        final ComponentFactory<T> factory = mSources.get(cls);
-        checkSourceExists(factory);
+        final Source<T> src = mSources.get(cls);
+        checkSourceExists(src);
 
-        return factory.createComponent();
+        return src.createComponent();
     }
 
     /**
@@ -93,23 +84,22 @@ public final class ComponentManager
      *
      * @param prototype prototype name.
      * @return new component.
-     * @throws NullPointerException if prototype is null.
-     * @throws NoSuchElementException if prototype is unrecognized.
-     * @throws IllegalStateException if no component source has been set
+     * @throws NullPointerException if {@code prototype} is {@code null}.
+     * @throws NoSuchElementException if {@code prototype} is unrecognized.
+     * @throws IllegalStateException if no component source has been set.
      */
     public Component createComponent(String prototype)
     {
-        checkNotNull(prototype);
+        requireNonNull(prototype);
 
         final Component protoComp = mPrototypes.get(prototype);
         checkPrototypeExists(prototype, protoComp);
 
-        @SuppressWarnings("unchecked")
-        final ComponentFactory factory = mSources.get(protoComp.getClass());
-        checkSourceExists(factory);
+        final Source src = mSources.get(protoComp.getClass());
+        checkSourceExists(src);
 
         // Configure new instance after prototype
-        final Component newInstance = factory.createComponent();
+        final Component newInstance = src.createComponent();
         newInstance.copy(protoComp);
 
         return newInstance;
@@ -126,20 +116,9 @@ public final class ComponentManager
         return Collections.unmodifiableMap(mPrototypes);
     }
 
-    private void checkNoNullValues(Map<String, Component> prototypes)
+    private static void checkSourceExists(Source src)
     {
-        prototypes.forEach((name, prototype) ->
-        {
-            if (prototype == null) {
-                final String format = "Prototype \'%s\' specifies a null component";
-                throw new IllegalArgumentException(String.format(format, name));
-            }
-        });
-    }
-
-    private static void checkSourceExists(ComponentFactory factory)
-    {
-        if (factory == null) {
+        if (src == null) {
             throw new IllegalStateException("Component source has not been set");
         }
     }
@@ -152,19 +131,12 @@ public final class ComponentManager
         }
     }
 
-    private static void checkNotNull(Object object)
-    {
-        if (object == null) {
-            throw new NullPointerException();
-        }
-    }
-
     /**
      * Instantiates new {@code Component} instances.
      *
      * @param <T> type of component.
      */
-    public interface ComponentFactory<T extends Component>
+    public interface Source<T extends Component>
     {
         /**
          * Creates a new component instance.

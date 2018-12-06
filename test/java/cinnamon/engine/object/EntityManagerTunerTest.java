@@ -15,7 +15,7 @@ public class EntityManagerTunerTest
     @Before
     public void setUp()
     {
-        mTuner = new Tuner(new ComponentManager());
+        mTuner = new Tuner(0);
     }
 
     @After

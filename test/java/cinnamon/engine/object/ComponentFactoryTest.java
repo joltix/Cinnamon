@@ -5,80 +5,60 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.NoSuchElementException;
 
-public class ComponentManagerTest
+public class ComponentFactoryTest
 {
     private static final String PROTOTYPE_NAME = "dummy";
 
-    private ComponentManager mManager;
+    private ComponentFactory mFactory;
 
     @Before
     public void setUp()
     {
-        mManager = new ComponentManager();
+        mFactory = new ComponentFactory();
     }
 
     @After
     public void tearDown()
     {
-        mManager = null;
+        mFactory = null;
     }
 
     @Test
-    public void testGetPrototypesReturnsEmptyMapWhenNoSetPrototypes()
+    public void testSetPrototypeCompletes()
     {
-        Assert.assertTrue(mManager.getPrototypes().isEmpty());
+        mFactory.setPrototype(PROTOTYPE_NAME, new DummyComponent());
     }
 
     @Test
-    public void testGetPrototypesReturnsSetPrototypes()
+    public void testSetPrototypeNullPrototypeCompletes()
     {
-        final Map<String, Component> prototypes = createPrototypeMap(new DummyComponent());
-        mManager.setPrototypes(prototypes);
-
-        Assert.assertEquals(prototypes, mManager.getPrototypes());
-    }
-
-    @Test
-    public void testSetPrototypesOverwritesPreviouslySet()
-    {
-        setPrototype();
-
-        mManager.setPrototypes(new HashMap<>());
-        Assert.assertTrue(mManager.getPrototypes().isEmpty());
+        mFactory.setPrototype(PROTOTYPE_NAME, null);
     }
 
     @Test (expected = NullPointerException.class)
-    public void testSetPrototypesNPEMap()
+    public void testSetPrototypeNPEName()
     {
-        mManager.setPrototypes(null);
-    }
-
-    @Test (expected = IllegalArgumentException.class)
-    public void testSetPrototypesIAENameSpecifiesNullComponent()
-    {
-        mManager.setPrototypes(createPrototypeMap(null));
+        mFactory.setPrototype(null, new DummyComponent());
     }
 
     @Test
-    public void testSetComponentSource()
+    public void testSetSourceCompletes()
     {
-        mManager.setSource(DummyComponent.class, DummyComponent::new);
+        mFactory.setSource(DummyComponent.class, DummyComponent::new);
     }
 
     @Test (expected = NullPointerException.class)
-    public void testSetComponentSourceNPEClass()
+    public void testSetSourceNPEClass()
     {
-        mManager.setSource(null, DummyComponent::new);
+        mFactory.setSource(null, DummyComponent::new);
     }
 
     @Test (expected = NullPointerException.class)
-    public void testSetComponentSourceNPEFactory()
+    public void testSetSourceNPESource()
     {
-        mManager.setSource(DummyComponent.class, null);
+        mFactory.setSource(DummyComponent.class, null);
     }
 
     @Test
@@ -86,7 +66,7 @@ public class ComponentManagerTest
     {
         setSource();
 
-        final Component component = mManager.createComponent(DummyComponent.class);
+        final Component component = mFactory.createComponent(DummyComponent.class);
 
         Assert.assertEquals(DummyComponent.class, component.getClass());
     }
@@ -94,16 +74,7 @@ public class ComponentManagerTest
     @Test (expected = IllegalStateException.class)
     public void testCreateComponentISENoSourceSet()
     {
-        mManager.createComponent(DummyComponent.class);
-    }
-
-    @Test
-    public void testCreateComponentFromPrototype()
-    {
-        setSource();
-        setPrototype();
-
-        mManager.createComponent(PROTOTYPE_NAME);
+        mFactory.createComponent(DummyComponent.class);
     }
 
     @Test
@@ -112,7 +83,7 @@ public class ComponentManagerTest
         setSource();
         setPrototype();
 
-        final Component component = mManager.createComponent(PROTOTYPE_NAME);
+        final Component component = mFactory.createComponent(PROTOTYPE_NAME);
 
         Assert.assertEquals(DummyComponent.class, component.getClass());
     }
@@ -124,7 +95,7 @@ public class ComponentManagerTest
         setPrototype();
 
         final String prototype = null;
-        mManager.createComponent(prototype);
+        mFactory.createComponent(prototype);
     }
 
     @Test (expected = IllegalStateException.class)
@@ -132,7 +103,7 @@ public class ComponentManagerTest
     {
         setPrototype();
 
-        mManager.createComponent(PROTOTYPE_NAME);
+        mFactory.createComponent(PROTOTYPE_NAME);
     }
 
     @Test (expected = NoSuchElementException.class)
@@ -140,24 +111,17 @@ public class ComponentManagerTest
     {
         setSource();
 
-        mManager.createComponent(PROTOTYPE_NAME);
+        mFactory.createComponent(PROTOTYPE_NAME);
     }
 
     private void setSource()
     {
-        mManager.setSource(DummyComponent.class, DummyComponent::new);
+        mFactory.setSource(DummyComponent.class, DummyComponent::new);
     }
 
     private void setPrototype()
     {
-        mManager.setPrototypes(createPrototypeMap(new DummyComponent()));
-    }
-
-    private Map<String, Component> createPrototypeMap(Component component)
-    {
-        final Map<String, Component> prototypes = new HashMap<>();
-        prototypes.put(PROTOTYPE_NAME, component);
-        return prototypes;
+        mFactory.setPrototype(PROTOTYPE_NAME, new DummyComponent());
     }
 
     public static class DummyComponent extends Component

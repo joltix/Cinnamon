@@ -1,6 +1,10 @@
 package cinnamon.engine.object;
 
+import cinnamon.engine.core.Game.CoreSystem;
+
 import java.util.*;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Creates and tracks {@link Entity} objects.
@@ -11,14 +15,14 @@ import java.util.*;
  *
  * <p>An {@code Entity} can be produced with preset {@code Component} elements by setting a {code Map} of
  * configuration names to the desired component prototype names. These prototypes must already be available for use
- * with the {@link ComponentManager} given during the {@code EntityManager}'s setup.</p>
+ * with the {@link ComponentFactory} given during the {@code EntityManager}'s setup.</p>
  *
  * <h3>Tuning</h3>
  * <p>Finer-grain control is provided through the {@link Tuner} required to construct the {@code EntityManager}. This
  * includes performance-affecting operations like entity capacity changes or clean up of destroyed entities. This
  * access is meant for infrastructure - not gameplay code.</p>
  */
-public final class EntityManager
+public final class EntityManager extends CoreSystem
 {
     // Bits in an integer reserved for array index
     private static final int INDEX_BITS = 20;
@@ -56,7 +60,7 @@ public final class EntityManager
     private final Map<String, String[]> mConfigs = new HashMap<>();
 
     // Source of components
-    private final ComponentManager mCompMan;
+    private final ComponentFactory mCompMan = new ComponentFactory();
 
     // Entities to be destroyed on the next cleanup
     private final Queue<Entity> mDestroyedEntities = new ArrayDeque<>();
@@ -79,9 +83,10 @@ public final class EntityManager
     // New index to use when none are recyclable
     private int mNextUnusedIndex = 0;
 
-    private EntityManager(ComponentManager manager)
+    private EntityManager(int priority)
     {
-        mCompMan = manager;
+        super(priority);
+
         mEntities = new Entity[INITIAL_ENTITY_CAPACITY];
     }
 
@@ -100,13 +105,13 @@ public final class EntityManager
      * Sets a map of entity configurations and utilized component prototypes.
      *
      * @param configurations map of configurations.
-     * @throws NullPointerException if configurations is null.
+     * @throws NullPointerException if {@code configurations} is {@code null}.
      * @throws IllegalArgumentException if component prototypes are not specified.
      * @throws NoSuchElementException if a component prototype is unrecognized.
      */
     public void setConfigurations(Map<String, String[]> configurations)
     {
-        checkNotNull(configurations);
+        requireNonNull(configurations);
 
         configurations.forEach((name, prototypes) ->
         {
@@ -121,7 +126,7 @@ public final class EntityManager
      * Gets the entity with the specified id.
      *
      * @param id entity id.
-     * @return entity or null if id is unused.
+     * @return entity or {@code null} if {@code id} is unused.
      */
     public Entity getEntity(int id)
     {
@@ -151,14 +156,14 @@ public final class EntityManager
      *
      * @param configuration configuration name.
      * @return entity.
-     * @throws NullPointerException if configuration is null.
-     * @throws NoSuchElementException if configuration does not exist or any of the required component prototypes are
-     * unrecognized.
+     * @throws NullPointerException if {@code configuration} is {@code null}.
+     * @throws NoSuchElementException if {@code configuration} does not exist or any of the required component
+     * prototypes are unrecognized.
      * @throws IllegalStateException if the entity limit has been reached or there are no available ids.
      */
     public Entity createEntity(String configuration)
     {
-        checkNotNull(configuration);
+        requireNonNull(configuration);
 
         final String[] prototypes = mConfigs.get(configuration);
 
@@ -201,11 +206,30 @@ public final class EntityManager
         return mAliveCount;
     }
 
-    @Override
-    protected Object clone() throws CloneNotSupportedException
+    /**
+     * Gets the {@code ComponentFactory} responsible for producing the entities' components.
+     *
+     * @return component factory.
+     */
+    public ComponentFactory getComponentFactory()
     {
-        throw new CloneNotSupportedException();
+        return mCompMan;
     }
+
+    @Override
+    protected void onTick() { }
+
+    @Override
+    protected void onStart() { }
+
+    @Override
+    protected void onPause(int reason) { }
+
+    @Override
+    protected void onResume(int reason) { }
+
+    @Override
+    protected void onStop() { }
 
     private Entity instantiateNewEntity()
     {
@@ -370,13 +394,6 @@ public final class EntityManager
         }
     }
 
-    private static void checkNotNull(Object object)
-    {
-        if (object == null) {
-            throw new NullPointerException();
-        }
-    }
-
     /**
      * Exposes details of the {@link EntityManager} for diagnostics and adjustment.
      *
@@ -389,14 +406,11 @@ public final class EntityManager
         /**
          * Constructs an {@code EntityManager.Tuner}.
          *
-         * @param manager component producer.
-         * @throws NullPointerException if manager is null.
+         * @param priority priority.
          */
-        public Tuner(ComponentManager manager)
+        public Tuner(int priority)
         {
-            checkNotNull(manager);
-
-            mManager = new EntityManager(manager);
+            mManager = new EntityManager(priority);
         }
 
         /**
@@ -405,7 +419,7 @@ public final class EntityManager
          * <p>Capacity will not be increased past {@code EntityManager.MAXIMUM_ENTITY_COUNT}.</p>
          *
          * @param space capacity to add.
-         * @throws IllegalArgumentException if space {@literal <} 0.
+         * @throws IllegalArgumentException if space {@literal <} {@code 0}.
          */
         public void increaseEntityCapacityBy(int space)
         {
@@ -423,10 +437,10 @@ public final class EntityManager
          * Decreases the manager's capacity for entities.
          *
          * <p>This method cannot guarantee decreasing capacity by the exact amount specified and may only partially
-         * shrink capacity. Capacity will not be decreased {@literal <} 1.</p>
+         * shrink capacity. Capacity will not be decreased {@literal <} {@code 1}.</p>
          *
          * @param space capacity to remove.
-         * @throws IllegalArgumentException if space {@literal <} 0.
+         * @throws IllegalArgumentException if space {@literal <} {@code 0}.
          */
         public void decreaseEntityCapacityBy(int space)
         {
@@ -501,7 +515,7 @@ public final class EntityManager
 
         /**
          * Finds the index in the manager's entity array such that no higher index refers to a usable entity. If
-         * there are no usable entities, the index is 0.
+         * there are no usable entities, the index is {@code 0}.
          */
         private void updateEffectiveLastIndex()
         {

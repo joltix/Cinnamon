@@ -1,8 +1,12 @@
 package cinnamon.engine.object;
 
+import cinnamon.engine.utils.Transform;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Set of {@link Component} elements describing a game object.
@@ -18,6 +22,8 @@ import java.util.List;
 public final class Entity
 {
     private static final int INITIAL_COMPONENT_CAPACITY = 4;
+
+    private final Transform mTransform = new Transform();
 
     private final List<Component> mComponents = new ArrayList<>(INITIAL_COMPONENT_CAPACITY);
 
@@ -41,15 +47,18 @@ public final class Entity
     @SuppressWarnings("unchecked")
     public <T extends Component> T getComponent(Class<T> cls)
     {
-        checkNotNull(cls);
+        requireNonNull(cls);
+
+        T target = null;
 
         for (final Component component : mComponents) {
             if (component.getClass() == cls) {
-                return (T) component;
+                target = (T) component;
+                break;
             }
         }
 
-        return null;
+        return target;
     }
 
     /**
@@ -61,7 +70,7 @@ public final class Entity
      */
     public Component addComponent(Component component)
     {
-        checkNotNull(component);
+        requireNonNull(component);
 
         final Component removed = removeComponent(component.getClass());
         mComponents.add(component);
@@ -81,7 +90,7 @@ public final class Entity
     @SuppressWarnings("unchecked")
     public <T extends Component> T removeComponent(Class<T> cls)
     {
-        checkNotNull(cls);
+        requireNonNull(cls);
 
         final Iterator<Component> iter = mComponents.iterator();
 
@@ -118,7 +127,7 @@ public final class Entity
      */
     public boolean containsComponent(Class<? extends Component> cls)
     {
-        checkNotNull(cls);
+        requireNonNull(cls);
 
         return getComponent(cls) != null;
     }
@@ -134,13 +143,13 @@ public final class Entity
     }
 
     /**
-     * Gets the instance id.
+     * Gets this entity's orientation.
      *
-     * @return id.
+     * @return transform.
      */
-    public int getId()
+    public Transform getTransform()
     {
-        return mId;
+        return mTransform;
     }
 
     /**
@@ -153,6 +162,16 @@ public final class Entity
         return mAlive;
     }
 
+    /**
+     * Gets the instance id.
+     *
+     * @return id.
+     */
+    public int getId()
+    {
+        return mId;
+    }
+
     @Override
     protected Object clone() throws CloneNotSupportedException
     {
@@ -162,12 +181,5 @@ public final class Entity
     void destroy()
     {
         mAlive = false;
-    }
-
-    private static void checkNotNull(Object object)
-    {
-        if (object == null) {
-            throw new NullPointerException();
-        }
     }
 }

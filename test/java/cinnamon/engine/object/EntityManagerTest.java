@@ -1,6 +1,6 @@
 package cinnamon.engine.object;
 
-import cinnamon.engine.object.ComponentManagerTest.DummyComponent;
+import cinnamon.engine.object.ComponentFactoryTest.DummyComponent;
 import cinnamon.engine.object.EntityManager.Tuner;
 import org.junit.*;
 
@@ -22,21 +22,19 @@ public class EntityManagerTest
 
     private Tuner mTuner;
 
-    private ComponentManager mComponentManager;
-
     @Before
     public void setUp()
     {
-        mComponentManager = createComponentManager();
-        mTuner = new EntityManager.Tuner(mComponentManager);
+        mTuner = new EntityManager.Tuner(0);
         mManager = mTuner.getManager();
+
+        createComponentPrototypes();
     }
 
     @After
     public void tearDown()
     {
         mManager = null;
-        mComponentManager = null;
     }
 
     @Test
@@ -245,18 +243,14 @@ public class EntityManagerTest
         return configs;
     }
 
-    private ComponentManager createComponentManager()
+    private void createComponentPrototypes()
     {
-        final Map<String, Component> prototypes = new HashMap<>();
+        final ComponentFactory factory = mManager.getComponentFactory();
 
         for (final String name : COMPONENT_PROTOTYPES) {
-            prototypes.put(name, new DummyComponent());
+            factory.setPrototype(name, new DummyComponent());
         }
 
-        final ComponentManager manager = new ComponentManager();
-        manager.setPrototypes(prototypes);
-        manager.setSource(DummyComponent.class, ComponentManagerTest.DummyComponent::new);
-
-        return manager;
+        factory.setSource(DummyComponent.class, ComponentFactoryTest.DummyComponent::new);
     }
 }

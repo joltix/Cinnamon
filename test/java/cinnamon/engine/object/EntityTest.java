@@ -1,6 +1,6 @@
 package cinnamon.engine.object;
 
-import cinnamon.engine.object.ComponentManagerTest.DummyComponent;
+import cinnamon.engine.object.ComponentFactoryTest.DummyComponent;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
