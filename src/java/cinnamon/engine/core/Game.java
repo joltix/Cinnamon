@@ -6,6 +6,11 @@ import cinnamon.engine.gfx.Canvas;
 import cinnamon.engine.gfx.Monitor;
 import cinnamon.engine.gfx.Window;
 import cinnamon.engine.core.Game.CoreSystem;
+import cinnamon.engine.object.ComponentFactory;
+import cinnamon.engine.object.EntityManager.Tuner;
+import cinnamon.engine.object.HealthComponent;
+import cinnamon.engine.object.Level;
+import cinnamon.engine.object.LevelManager;
 import cinnamon.engine.utils.Assets;
 import cinnamon.engine.utils.Properties;
 import cinnamon.engine.utils.PropertyMap;
@@ -16,6 +21,8 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Function;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Base class for a Cinnamon game. Games should extend this class to gain basic utilities and automate common game
@@ -38,9 +45,11 @@ import java.util.function.Function;
  * <p>Major game-specific systems are given the opportunity to execute once per tick. Implementations may insert
  * their own systems with {@link #addSystem(String, CoreSystem)}.</p>
  *
- * <p>If no monitors are detected or a resolution smaller than {@link Window#MINIMUM_WIDTH} x
- * {@link Window#MINIMUM_HEIGHT} is specified, the game will run as if {@link Preference#HIDDEN_WINDOW} was set to
- * {@code true}.</p>
+ * <p>If no monitors are detected, the game will run as if {@link Preference#HIDDEN_WINDOW} is {@code true}.</p>
+ *
+ * <p>If either of the given window dimensions is {@literal <} 0, the game will run as if
+ * {@link Preference#FULLSCREEN} is {@code true}. The window size will not be smaller than
+ * {@link Window#MINIMUM_WIDTH} x {@link Window#MINIMUM_HEIGHT}.</p>
  *
  * <h3>Configuration</h3>
  * <p>While some configuration steps are necessary, as shown below, {@link Preference}s can optionally be specified.
@@ -78,14 +87,15 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     /**
      * Configurable features to be set during a {@link Configuration}'s construction.
      *
-     * <p>The default values for each {@code Preference} is as follows (expected value types are noted in each
-     * {@code Preference}'s documentation).</p>
+     * <p>The default values for each {@code Preference} is as follows (expected value types are noted in
+     * the respective documentation).</p>
+     *
      * <ul>
      *     <li>{@link #MONITOR}: primary monitor</li>
-     *     <li>{@link #VSYNC}: true</li>
-     *     <li>{@link #FULLSCREEN}: true</li>
-     *     <li>{@link #BORDERLESS}: false</li>
-     *     <li>{@link #HIDDEN_WINDOW}: false</li>
+     *     <li>{@link #VSYNC}: enabled</li>
+     *     <li>{@link #FULLSCREEN}: enabled</li>
+     *     <li>{@link #BORDERLESS}: disabled</li>
+     *     <li>{@link #HIDDEN_WINDOW}: disabled</li>
      *     <li>{@link #RESOLUTION_X}: primary monitor's width</li>
      *     <li>{@link #RESOLUTION_Y}: primary monitor's height</li>
      *     <li>{@link #ICON}: none</li>
@@ -181,7 +191,7 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
          * returned.
          *
          * @param value value.
-         * @return value if valid, otherwise default value.
+         * @return {@code value} if valid, otherwise default value.
          */
         private Object autoCorrect(Object value)
         {
@@ -238,7 +248,13 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
      */
     public static final String CONTROLS_SYSTEM = "controls";
 
+    public static final String LEVEL_SYSTEM = "levels";
+
+    public static final String ENTITY_SYSTEM = "entities";
+
     private static final long NANOSECONDS_PER_SECOND = 1_000_000_000L;
+
+    private Tuner mECSTuner;
 
     private final PropertyMap mProperties;
 
@@ -258,11 +274,11 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
      * <p>If the configuration requests an unusable preference value, the request is ignored.</p>
      *
      * @param configuration configuration.
-     * @throws NullPointerException if configuration is null.
+     * @throws NullPointerException if {@code configuration} is {@code null}.
      */
     protected Game(Game.Configuration configuration)
     {
-        checkNotNull(configuration);
+        requireNonNull(configuration);
 
         mConfig = configuration;
 
@@ -284,6 +300,7 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
 
         configureWindow();
         installBasicSystems();
+        installBasicComponents();
 
         run();
     }
@@ -305,7 +322,7 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
      *
      * <p>This method may be called from any thread.</p>
      *
-     * @return true if the game continues.
+     * @return {@code true} if the game continues.
      */
     public final boolean isRunning()
     {
@@ -514,12 +531,15 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
 
         if (!mConfig.getBoolean(Preference.HIDDEN_WINDOW)) {
             mWindow.open();
+            mWindow.focus();
         }
 
         mSystems.startSystems();
         loop();
         mSystems.stopSystems();
 
+        unloadLevel();
+        cleanUpResources();
         onShutDown();
 
         Window.terminate();
@@ -527,16 +547,18 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     }
 
     /**
-     * Configures the {@code Window} based off {@code Preference}s. After this completes, the {@code Window} just
-     * needs to be opened.
+     * Configures the {@code Window} based off preferences. After this completes, the {@code Window} just needs to be
+     * opened.
      */
     private void configureWindow()
     {
         mWindow.setVsync(mConfig.getBoolean(Preference.VSYNC));
         mWindow.setDecorated(!mConfig.getBoolean(Preference.BORDERLESS));
+
         attemptToSetWindowIcon();
 
         final Monitor[] monitors = Monitor.getConnectedMonitors();
+
         if (monitors.length > 0) {
 
             // Select monitor to place on
@@ -559,10 +581,12 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
             } else {
                 mWindow.setPositionCenter(monitor);
             }
+
         } else {
             // Choose arbitrary size and position since window won't be shown
             mWindow.setSize(Window.MINIMUM_WIDTH, Window.MINIMUM_HEIGHT);
             mWindow.setPosition(0, 0);
+
             mConfig.mPrefs.put(Preference.HIDDEN_WINDOW.toString(), true);
         }
 
@@ -587,7 +611,7 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         try {
             final byte[] bytes = Assets.loadResource(iconPath, Assets.BYTE_ARRAY);
 
-            final ByteBuffer buffer = MemoryUtil.memAlloc(bytes.length);;
+            final ByteBuffer buffer = MemoryUtil.memAlloc(bytes.length);
             buffer.put(bytes);
             buffer.flip();
 
@@ -610,7 +634,18 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
     {
         final IntegratableInput input = mWindow.getInput();
 
+        mECSTuner = new Tuner(Integer.MAX_VALUE - 2);
+
+        addSystem(ENTITY_SYSTEM, mECSTuner.getManager());
+        addSystem(LEVEL_SYSTEM, new LevelManager(Integer.MAX_VALUE - 1, mECSTuner.getManager()));
         addSystem(CONTROLS_SYSTEM, new ControlsSystem(Integer.MAX_VALUE, input, input, input));
+    }
+
+    private void installBasicComponents()
+    {
+        final ComponentFactory factory = mECSTuner.getManager().getComponentFactory();
+
+        factory.setSource(HealthComponent.class, HealthComponent::new);
     }
 
     /**
@@ -656,6 +691,25 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         }
     }
 
+    private void unloadLevel()
+    {
+        final LevelManager manager = (LevelManager) getSystem(LEVEL_SYSTEM);
+        final Level current = manager.getCurrentLevel();
+
+        if (current != null) {
+            manager.unloadLevel(current.getName());
+
+            // Final tick notifies unload-related callbacks
+            ((CoreSystem) manager).onTick();
+        }
+    }
+
+    private void cleanUpResources()
+    {
+        // Allow Components to release any resources in use
+        mECSTuner.removeDestroyedEntities();
+    }
+
     private static void checkStringNotBlank(String name, String string)
     {
         if (string.trim().isEmpty()) {
@@ -664,18 +718,11 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         }
     }
 
-    private static void checkNotNull(Object object)
-    {
-        if (object == null) {
-            throw new NullPointerException();
-        }
-    }
-
     /**
      * Carries various initialization details for a {@code Game}'s startup such as the title, version, and
      * runtime tweaks.
      *
-     * <p>{@code Configuration}s are built step-by-step with a {@code Configuration.Builder}.</p>
+     * <p>{@code Configuration} objects are built step-by-step with a {@code Configuration.Builder}.</p>
      */
     public static final class Configuration
     {
@@ -720,13 +767,13 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
         }
 
         /**
-         * Progressively builds a {@link #Configuration}.
+         * Progressively builds a {@link Game.Configuration}.
          *
          * <p>The following is the minimum needed to produce a {@code Configuration}.</p>
          * <pre>
          *     <code>
          *
-         *         Configuration config = new Game.Configuration.Builder()
+         *         Game.Configuration config = new Game.Configuration.Builder()
          *             .withHeader("Title", "Developer")
          *             .withVersion("0.343a", 42)
          *             .withTickRate(30)
@@ -745,6 +792,7 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
              * <p>Repeated calls to this method will produce instances with the same information.</p>
              *
              * @throws IllegalStateException if header, version, tick rate, or a canvas was not specified.
+             * @return configuration.
              */
             public Configuration build()
             {
@@ -770,15 +818,18 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
              * @param title title.
              * @param developer developer.
              * @return builder.
-             * @throws NullPointerException if title or developer is null.
-             * @throws IllegalArgumentException if title or developer is empty or whitespace.
+             * @throws NullPointerException if {@code title} or {@code developer} is {@code null}.
+             * @throws IllegalArgumentException if {@code title} or {@code developer} is empty or consists of
+             * whitespace.
              */
             public Builder withHeader(String title, String developer)
             {
-                checkNotNull(title);
-                checkNotNull(developer);
+                requireNonNull(title);
+                requireNonNull(developer);
+
                 checkStringNotBlank("Game title", title);
                 checkStringNotBlank("Game developer", developer);
+
                 ensureConfigurationExists();
 
                 mConfig.mProps.put(Game.TITLE, title);
@@ -792,12 +843,13 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
              * @param version outward facing version.
              * @param build internal build number.
              * @return builder.
-             * @throws NullPointerException if version is null.
-             * @throws IllegalArgumentException if version is empty or whitespace or build is {@literal <} 0.
+             * @throws NullPointerException if {@code version} is {@code null}.
+             * @throws IllegalArgumentException if {@code version} is empty or consists of whitespace or {@code build}
+             * is {@literal <} 0.
              */
             public Builder withVersion(String version, int build)
             {
-                checkNotNull(version);
+                requireNonNull(version);
                 checkStringNotBlank("Game version", version);
 
                 if (build < 0) {
@@ -815,7 +867,7 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
              *
              * @param rate tick rate.
              * @return builder.
-             * @throws IllegalArgumentException if rate < 1.
+             * @throws IllegalArgumentException if {@code rate < 1}.
              */
             public Builder withTickRate(int rate)
             {
@@ -834,11 +886,11 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
              *
              * @param canvas renderer.
              * @return builder.
-             * @throws NullPointerException if canvas is null.
+             * @throws NullPointerException if {@code canvas} is {@code null}.
              */
             public Builder withCanvas(Canvas canvas)
             {
-                checkNotNull(canvas);
+                requireNonNull(canvas);
                 ensureConfigurationExists();
 
                 mConfig.mCanvas = canvas;
@@ -851,13 +903,13 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
              * @param key key.
              * @param value value.
              * @return builder.
-             * @throws NullPointerException if key or value is null.
-             * @throws IllegalArgumentException if the preference does not expect a {@code String} value.
+             * @throws NullPointerException if {@code key} or {@code value} is {@code null}.
+             * @throws IllegalArgumentException if {@code key} does not expect a {@code String} value.
              */
             public Builder withPreference(Preference key, String value)
             {
-                checkNotNull(key);
-                checkNotNull(value);
+                requireNonNull(key);
+                requireNonNull(value);
                 checkExpectedType(key, value);
                 ensureConfigurationExists();
 
@@ -871,12 +923,12 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
              * @param key key.
              * @param value value.
              * @return builder.
-             * @throws NullPointerException if key is null.
-             * @throws IllegalArgumentException if the preference does not expect an {@code int} value.
+             * @throws NullPointerException if {@code key} is {@code null}.
+             * @throws IllegalArgumentException if {@code key} does not expect an {@code int} value.
              */
             public Builder withPreference(Preference key, int value)
             {
-                checkNotNull(key);
+                requireNonNull(key);
                 checkExpectedType(key, value);
                 ensureConfigurationExists();
 
@@ -890,12 +942,12 @@ public abstract class Game implements Properties, WritableSystemDirectory<CoreSy
              * @param key key.
              * @param value value.
              * @return builder.
-             * @throws NullPointerException if key is null.
-             * @throws IllegalArgumentException if the preference does not expect a {@code boolean} value.
+             * @throws NullPointerException if {@code key} is {@code null}.
+             * @throws IllegalArgumentException if {@code key} does not expect a {@code boolean} value.
              */
             public Builder withPreference(Preference key, boolean value)
             {
-                checkNotNull(key);
+                requireNonNull(key);
                 checkExpectedType(key, value);
                 ensureConfigurationExists();
 
